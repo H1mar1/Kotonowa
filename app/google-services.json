@@ -12,7 +12,12 @@
           "package_name": "com.example.kotonowa"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "936774280451-lqha31bq58jrgfcrls4c1u3a6tmq8voq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCjSS3QH-qr3obnx1QLJt7floCYdvDWS7I"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "936774280451-lqha31bq58jrgfcrls4c1u3a6tmq8voq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
