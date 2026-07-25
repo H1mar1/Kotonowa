@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -37,6 +38,15 @@ class AuthRepositoryImpl @Inject constructor(
         Result.failure(e.toAuthException())
     }
 
+    override suspend fun signUp(email: String, password: String): Result<User> = try {
+        val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+        val firebaseUser = authResult.user
+            ?: throw AuthException("登録できましたが、ユーザー情報を取得できませんでした")
+        Result.success(firebaseUser.toUser())
+    } catch (e: Exception) {
+        Result.failure(e.toAuthException())
+    }
+
     override fun logout() {
         firebaseAuth.signOut()
     }
@@ -56,6 +66,9 @@ private fun Throwable.toAuthException(): AuthException = when (this) {
 
     is FirebaseAuthInvalidUserException ->
         AuthException("このメールアドレスのアカウントは見つかりませんでした", this)
+
+    is FirebaseAuthWeakPasswordException ->
+        AuthException("パスワードは6文字以上にしてください", this)
 
     is FirebaseAuthInvalidCredentialsException ->
         AuthException("メールアドレスまたはパスワードが正しくありません", this)

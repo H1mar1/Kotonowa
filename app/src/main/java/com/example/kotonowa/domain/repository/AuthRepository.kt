@@ -18,6 +18,9 @@ interface AuthRepository {
     /** メールアドレスとパスワードでログインする。 */
     suspend fun login(email: String, password: String): Result<User>
 
+    //サインアップ
+    suspend fun signUp(email: String, password: String): Result<User>
+
     /** ログアウトする。 */
     fun logout()
 }
