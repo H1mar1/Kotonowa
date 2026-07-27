@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "936774280451",
+    "project_id": "kotonowa-3b2fb",
+    "storage_bucket": "kotonowa-3b2fb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:936774280451:android:b0ca22b8b8a2ff3e833536",
+        "android_client_info": {
+          "package_name": "com.example.kotonowa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "936774280451-lqha31bq58jrgfcrls4c1u3a6tmq8voq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjSS3QH-qr3obnx1QLJt7floCYdvDWS7I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "936774280451-lqha31bq58jrgfcrls4c1u3a6tmq8voq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
