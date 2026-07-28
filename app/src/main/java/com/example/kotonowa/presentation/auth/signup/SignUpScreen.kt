@@ -194,7 +194,7 @@ private fun SignUpContent(
         }
 
         TextButton(
-            onClick = onNavigateToLogin,
+            onNavigateToLogin,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("ログイン画面に戻る")

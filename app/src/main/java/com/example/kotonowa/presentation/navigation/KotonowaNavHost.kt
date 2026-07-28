@@ -8,12 +8,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.home.HomeScreen
+import  com.example.kotonowa.presentation.auth.signup.SignUpScreen
 
 /** 画面を表す行き先の名前。文字列を直接書くとタイプミスに気づけないため定数にする。 */
 object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
-    // TODO(Step 9-11): SIGN_UP / PASSWORD_RESET / SPLASH を追加する
+
+    const val SIGN_UP="sign_up"
 }
 
 /**
@@ -51,6 +53,20 @@ fun KotonowaNavHost(
                         popUpTo(Routes.HOME) { inclusive = true }
                     }
                 },
+            )
+        }
+
+        composable(Routes.SIGN_UP){
+            SignUpScreen(
+                onSignUpSuccess = {
+                    navController.navigate(Routes.HOME){
+                        popUpTo(Routes.SIGN_UP){inclusive=true}
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                },
+
             )
         }
     }
