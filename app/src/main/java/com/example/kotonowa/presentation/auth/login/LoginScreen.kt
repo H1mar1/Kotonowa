@@ -40,6 +40,7 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onNavigateToSignUp: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
@@ -56,6 +57,7 @@ fun LoginScreen(
         onPasswordChange = viewModel::onPasswordChange,
         onTogglePasswordVisibility = viewModel::onTogglePasswordVisibility,
         onLoginClick = viewModel::login,
+        onNavigateToSignUp = onNavigateToSignUp,
         modifier = modifier,
     )
 }
@@ -66,6 +68,7 @@ private fun LoginContent(
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onTogglePasswordVisibility: () -> Unit,
+    onNavigateToSignUp: () -> Unit,
     onLoginClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -159,6 +162,19 @@ private fun LoginContent(
         }
 
         // TODO(Step 9-10): サインアップ画面・パスワードリセット画面への導線を追加する
+        TextButton(
+            onClick = onNavigateToSignUp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("サインアップ画面へ")
+        }
+
+//        TextButton(
+//            onPasswordChange,
+//            modifier = Modifier.fillMaxWidth(),
+//        ) {
+//            Text("パスワードリセット画面へ")
+//        }
     }
 }
 
@@ -172,6 +188,7 @@ private fun LoginContentPreview() {
             onPasswordChange = {},
             onTogglePasswordVisibility = {},
             onLoginClick = {},
+            onNavigateToSignUp = {},
         )
     }
 }
@@ -190,6 +207,7 @@ private fun LoginContentErrorPreview() {
             onPasswordChange = {},
             onTogglePasswordVisibility = {},
             onLoginClick = {},
+            onNavigateToSignUp = {},
         )
     }
 }
