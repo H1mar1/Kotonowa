@@ -26,10 +26,13 @@ class PasswordResetViewModel @Inject constructor(
     // TODO: 内部用の _uiState（MutableStateFlow）と、公開用の uiState（StateFlow）を用意する
     //  お手本は SignUpViewModel.kt:26-27
 
+    private val _uiState = MutableStateFlow(PasswordResetUiState())
+    val uiState: StateFlow<PasswordResetUiState> = _uiState.asStateFlow()
+
     fun onEmailChange(value: String) {
-        // TODO: uiState の email を新しい値に更新し、errorMessage は null に戻す
-        //  お手本は SignUpViewModel.kt:29-31
+        _uiState.update { it.copy(email = value, errorMessage = null) }
     }
+
 
     fun sendResetEmail() {
         // TODO: SignUpViewModel.kt:45-68（signUp）とほぼ同じ流れ
@@ -39,5 +42,26 @@ class PasswordResetViewModel @Inject constructor(
         //     メールアドレスは前後の空白を消すため .trim() を付ける
         //  4. .onSuccess { } → isLoading = false, isEmailSent = true
         //  5. .onFailure { error -> } → isLoading = false, errorMessage にエラー文を入れる
+        val current = _uiState.value
+        if (!current.canSubmit) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            authRepository.sendPasswordResetEmail(email = current.email.trim())
+                .onSuccess {
+                    _uiState.update { state ->
+                        state.copy(isLoading = false, isEmailSent = true)
+                    }
+                }
+                .onFailure { error ->
+                    (_uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            errorMessage = error.message ?: "パスワードリセット失敗しました",
+                        )
+                    })
+                }
+        }
     }
 }
