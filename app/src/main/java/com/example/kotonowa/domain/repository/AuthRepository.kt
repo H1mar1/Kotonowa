@@ -21,6 +21,11 @@ interface AuthRepository {
     //サインアップ
     suspend fun signUp(email: String, password: String): Result<User>
 
+    //パスワードリセット
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit>
+
     /** ログアウトする。 */
     fun logout()
+
+
 }

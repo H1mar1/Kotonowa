@@ -35,7 +35,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "ログインできました",
+            text = "ようこそ",
             style = MaterialTheme.typography.headlineSmall,
         )
         Spacer(Modifier.height(8.dp))

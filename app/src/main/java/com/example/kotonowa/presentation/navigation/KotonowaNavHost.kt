@@ -15,7 +15,7 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
 
-    const val SIGN_UP="sign_up"
+    const val SIGN_UP = "sign_up"
 }
 
 /**
@@ -43,6 +43,9 @@ fun KotonowaNavHost(
                         popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 },
+                onNavigateToSignUp = {
+                    navController.navigate(Routes.SIGN_UP)
+                },
             )
         }
 
@@ -56,17 +59,16 @@ fun KotonowaNavHost(
             )
         }
 
-        composable(Routes.SIGN_UP){
+        composable(Routes.SIGN_UP) {
             SignUpScreen(
                 onSignUpSuccess = {
-                    navController.navigate(Routes.HOME){
-                        popUpTo(Routes.SIGN_UP){inclusive=true}
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 },
                 onNavigateToLogin = {
                     navController.popBackStack()
                 },
-
             )
         }
     }
