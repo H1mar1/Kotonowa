@@ -36,11 +36,14 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
  *
  * ViewModel から状態を受け取り、ユーザーの操作を ViewModel に伝えるだけの役割。
  * 実際の見た目は [LoginContent] が描く（ViewModel を持たないので Preview で確認できる）。
+ *
+ * @param onNavigateToPasswordReset 「パスワードリセット画面へ」を押したときに呼ばれる呼び鈴。
  */
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToSignUp: () -> Unit,
+    onNavigateToPasswordReset: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
@@ -58,6 +61,7 @@ fun LoginScreen(
         onTogglePasswordVisibility = viewModel::onTogglePasswordVisibility,
         onLoginClick = viewModel::login,
         onNavigateToSignUp = onNavigateToSignUp,
+        onNavigateToPasswordReset = onNavigateToPasswordReset,
         modifier = modifier,
     )
 }
@@ -70,6 +74,7 @@ private fun LoginContent(
     onTogglePasswordVisibility: () -> Unit,
     onNavigateToSignUp: () -> Unit,
     onLoginClick: () -> Unit,
+    onNavigateToPasswordReset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -161,7 +166,6 @@ private fun LoginContent(
             }
         }
 
-        // TODO(Step 9-10): サインアップ画面・パスワードリセット画面への導線を追加する
         TextButton(
             onClick = onNavigateToSignUp,
             modifier = Modifier.fillMaxWidth(),
@@ -169,12 +173,12 @@ private fun LoginContent(
             Text("サインアップ画面へ")
         }
 
-//        TextButton(
-//            onPasswordChange,
-//            modifier = Modifier.fillMaxWidth(),
-//        ) {
-//            Text("パスワードリセット画面へ")
-//        }
+        TextButton(
+            onClick = onNavigateToPasswordReset,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("パスワードリセット画面へ")
+        }
     }
 }
 
@@ -189,6 +193,7 @@ private fun LoginContentPreview() {
             onTogglePasswordVisibility = {},
             onLoginClick = {},
             onNavigateToSignUp = {},
+            onNavigateToPasswordReset = {},
         )
     }
 }
@@ -208,6 +213,7 @@ private fun LoginContentErrorPreview() {
             onTogglePasswordVisibility = {},
             onLoginClick = {},
             onNavigateToSignUp = {},
+            onNavigateToPasswordReset = {},
         )
     }
 }

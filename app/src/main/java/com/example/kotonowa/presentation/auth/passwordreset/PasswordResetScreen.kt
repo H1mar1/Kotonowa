@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.ui.theme.KotonowaTheme
 
 /**
@@ -40,12 +42,16 @@ fun PasswordResetScreen(
     modifier: Modifier = Modifier,
     viewModel: PasswordResetViewModel = hiltViewModel(),
 ) {
-    // TODO: collectAsStateWithLifecycle() で viewModel.uiState を受け取る
-    //  お手本は SignUpScreen.kt:54
 
-    // TODO: PasswordResetContent(...) を呼び、下の引数をすべて渡す
-    //  ViewModel に頼む仕事は viewModel::関数名、
-    //  画面移動の呼び鈴（onNavigateBack）は素通しで渡す
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    PasswordResetContent(
+        uiState = uiState,
+        onEmailChange = viewModel::onEmailChange,
+        onSendClick = viewModel::sendResetEmail,
+        onNavigateBack = onNavigateBack,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -64,27 +70,83 @@ private fun PasswordResetContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // TODO: 見出しの Text（例：「パスワードの再設定」）
+        Text(
+            text = "パスワードの再設定",
+            style = MaterialTheme.typography.headlineLarge,
+        )
 
-        // TODO: 説明文の Text
-        //  例：「登録したメールアドレスに再設定用のリンクを送ります」
+        Spacer(Modifier.height(8.dp))
 
-        // TODO: メールアドレスの OutlinedTextField
-        //  お手本は SignUpScreen.kt:100-112
-        //  keyboardOptions の imeAction は、入力欄が1つだけなので Next ではなく Done
+        Text(
+            text = "登録したメールアドレスに再設定用のリンクを送ります",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-        // TODO: uiState.errorMessage が null でないときだけ、赤い文字でエラーを表示
-        //  お手本は SignUpScreen.kt:166-174
+        Spacer(Modifier.height(8.dp))
 
-        // TODO: uiState.isEmailSent が true のときだけ「メールを送信しました」を表示
-        //  errorMessage の表示と同じ形の if 文でよい
+        OutlinedTextField(
+            value = uiState.email,
+            onValueChange = onEmailChange,
+            label = { Text("メールアドレス") },
+            singleLine = true,
+            enabled = !uiState.isLoading,
+            isError = uiState.errorMessage != null,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Done,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-        // TODO: 送信ボタン（Button）
-        //  お手本は SignUpScreen.kt:178-194
-        //  enabled は uiState.canSubmit、通信中は CircularProgressIndicator を出す
+        if (uiState.errorMessage != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = uiState.errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth()
 
+            )
+        }
+
+        if (uiState.isEmailSent) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "メールを送信しました",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+                //modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+
+        Button(
+            onClick = onSendClick,
+            enabled = uiState.canSubmit,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (uiState.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.height(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                Text("送信")
+            }
+        }
         // TODO: 「ログイン画面に戻る」の TextButton
         //  onClick に onNavigateBack を渡す（カッコは付けない）
+
+        TextButton(
+            onClick = onNavigateBack,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("ログイン画面に戻る")
+        }
     }
 }
 
@@ -95,5 +157,14 @@ private fun PasswordResetContentPreview() {
         // TODO: PasswordResetContent(...) を呼ぶ
         //  uiState には PasswordResetUiState(email = "kotonowa@example.com") など、
         //  確認したい状態を直接書く。呼び鈴はすべて {} でよい
+
+        PasswordResetContent(
+            uiState = PasswordResetUiState(
+                email = "kotonowa@example.com",
+            ),
+            onEmailChange = {},
+            onSendClick = {},
+            onNavigateBack = {},
+        )
     }
 }
