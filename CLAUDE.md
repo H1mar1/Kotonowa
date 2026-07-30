@@ -53,20 +53,20 @@ Kotonowa（ことのわ）のリポジトリ。作業前にこのファイルと
 
 ## 現在の状態
 
-**Phase 1（認証）進行中。メール/パスワードでのログインまで実装済み。**
+**Phase 1（認証）進行中。メール/パスワードの認証画面（ログイン・サインアップ・パスワードリセット）は実装済み。**
 
 - ✅ Firebase 依存（BoM 34.16.0 / Auth・Firestore・Analytics）＋ `google-services.json`
 - ✅ Hilt 導入済み（`KotonowaApplication`, `di/FirebaseModule`, `di/RepositoryModule`）
 - ✅ Navigation Compose 導入済み（`presentation/navigation/KotonowaNavHost`）
 - ✅ Clean Architecture のパッケージ構成
-- ✅ ログイン機能一式
+- ✅ 認証まわり一式
   - `domain/model/User`, `domain/model/AuthException`
-  - `domain/repository/AuthRepository`（login / logout / currentUser）
+  - `domain/repository/AuthRepository`（login / signUp / sendPasswordResetEmail / logout / currentUser）
   - `data/repository/AuthRepositoryImpl`（Firebase Auth + 日本語エラー変換）
   - `presentation/auth/login/`（`LoginUiState`, `LoginViewModel`, `LoginScreen`）
+  - `presentation/auth/signup/`（Step 9）
+  - `presentation/auth/passwordreset/`（Step 10）
   - `presentation/home/`（ログイン確認用の仮ホーム。Phase2 でカレンダーに置き換える）
-- ❌ サインアップ画面（Step 9）
-- ❌ パスワードリセット画面（Step 10）
 - ❌ スプラッシュ／自動ログイン判定（Step 11）— 現状は起動時に必ずログイン画面から始まる
 - ❌ Google Sign-In（Step 12）
 
@@ -74,8 +74,6 @@ Kotonowa（ことのわ）のリポジトリ。作業前にこのファイルと
 
 | # | やること |
 |---|---|
-| 9 | サインアップ画面（`AuthRepository.signUp` を追加） |
-| 10 | パスワードリセット画面（`AuthRepository.sendPasswordResetEmail` を追加） |
 | 11 | スプラッシュ画面で `currentUser` を見て自動ログイン判定 |
 | 12 | Google Sign-In（`google-services.json` に OAuth クライアント設定済み） |
 
@@ -110,8 +108,8 @@ com.example.kotonowa/
 ## ロードマップ
 
 ```
-Phase0: セットアップ（Firebase疎通）      ← 今ここ
-Phase1: 認証（サインアップ/ログイン/ログアウト）
+Phase0: セットアップ（Firebase疎通）      ← 完了
+Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 今ここ（Step 11・12 が残り）
 Phase2: 個人のスケジュール/タスク管理 + ローカル通知
 Phase3: 共有カレンダー + ロールベース認可
 Phase4: プッシュ通知
