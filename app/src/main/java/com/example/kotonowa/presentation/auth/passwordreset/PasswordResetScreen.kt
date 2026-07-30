@@ -116,7 +116,7 @@ private fun PasswordResetContent(
                 text = "メールを送信しました",
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth()
+                //modifier = Modifier.fillMaxWidth()
             )
         }
 

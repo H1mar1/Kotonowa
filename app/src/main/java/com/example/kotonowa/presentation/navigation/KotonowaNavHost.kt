@@ -9,6 +9,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.home.HomeScreen
 import  com.example.kotonowa.presentation.auth.signup.SignUpScreen
+import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
+
 
 /** 画面を表す行き先の名前。文字列を直接書くとタイプミスに気づけないため定数にする。 */
 object Routes {
@@ -16,6 +18,8 @@ object Routes {
     const val HOME = "home"
 
     const val SIGN_UP = "sign_up"
+
+    const val PASSWORD_RESET = "password_reset"
 }
 
 /**
@@ -46,6 +50,10 @@ fun KotonowaNavHost(
                 onNavigateToSignUp = {
                     navController.navigate(Routes.SIGN_UP)
                 },
+
+                onNavigateToPasswordReset = {
+                    navController.navigate(Routes.PASSWORD_RESET)
+                },
             )
         }
 
@@ -55,6 +63,14 @@ fun KotonowaNavHost(
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.HOME) { inclusive = true }
                     }
+                },
+            )
+        }
+
+        composable(Routes.PASSWORD_RESET) {
+            PasswordResetScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 },
             )
         }
