@@ -53,7 +53,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前にこのファイルと
 
 ## 現在の状態
 
-**Phase 1（認証）進行中。メール/パスワードの認証画面（ログイン・サインアップ・パスワードリセット）は実装済み。**
+**Phase 1（認証）進行中。メール/パスワードの認証と自動ログイン判定まで実装済み。残りは Google Sign-In のみ。**
 
 - ✅ Firebase 依存（BoM 34.16.0 / Auth・Firestore・Analytics）＋ `google-services.json`
 - ✅ Hilt 導入済み（`KotonowaApplication`, `di/FirebaseModule`, `di/RepositoryModule`）
@@ -67,15 +67,19 @@ Kotonowa（ことのわ）のリポジトリ。作業前にこのファイルと
   - `presentation/auth/signup/`（Step 9）
   - `presentation/auth/passwordreset/`（Step 10）
   - `presentation/home/`（ログイン確認用の仮ホーム。Phase2 でカレンダーに置き換える）
-- ❌ スプラッシュ／自動ログイン判定（Step 11）— 現状は起動時に必ずログイン画面から始まる
+  - `presentation/splash/`（Step 11。`SplashUiState` は sealed interface）
+- ✅ 自動ログイン判定（Step 11）— 起動時に `currentUser` を見て HOME / LOGIN を出し分ける
 - ❌ Google Sign-In（Step 12）
 
 ### Phase1 の残ステップ
 
 | # | やること |
 |---|---|
-| 11 | スプラッシュ画面で `currentUser` を見て自動ログイン判定 |
 | 12 | Google Sign-In（`google-services.json` に OAuth クライアント設定済み） |
+
+Step 12 は Credential Manager（`androidx.credentials`）を使う。`GoogleSignInClient` は非推奨なので
+古い記事のやり方はそのままでは動かない。Google のダイアログ表示には `Activity` が必要なため、
+「画面が ID トークンを取得 → ViewModel/Repository に渡す」の役割分担にする。
 
 ## 技術スタック
 
@@ -109,7 +113,7 @@ com.example.kotonowa/
 
 ```
 Phase0: セットアップ（Firebase疎通）      ← 完了
-Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 今ここ（Step 11・12 が残り）
+Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 今ここ（残りは Step 12 のみ）
 Phase2: 個人のスケジュール/タスク管理 + ローカル通知
 Phase3: 共有カレンダー + ロールベース認可
 Phase4: プッシュ通知
