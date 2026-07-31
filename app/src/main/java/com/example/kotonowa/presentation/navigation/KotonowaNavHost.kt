@@ -10,6 +10,7 @@ import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.home.HomeScreen
 import  com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
+import com.example.kotonowa.presentation.splash.SplashScreen
 
 
 /** 画面を表す行き先の名前。文字列を直接書くとタイプミスに気づけないため定数にする。 */
@@ -20,6 +21,8 @@ object Routes {
     const val SIGN_UP = "sign_up"
 
     const val PASSWORD_RESET = "password_reset"
+
+    const val SPLASH = "splash"
 }
 
 /**
@@ -36,9 +39,25 @@ fun KotonowaNavHost(
     // TODO(Step 11): スプラッシュ画面を作り、すでにログイン済みなら HOME から始める
     NavHost(
         navController = navController,
-        startDestination = Routes.LOGIN,
+        startDestination = Routes.SPLASH,
         modifier = modifier,
     ) {
+        composable(Routes.SPLASH) {
+            SplashScreen(
+                onLoggedIn = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    }
+                },
+                onNotLoggedIn = {
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    }
+
+                }
+            )
+        }
+
         composable(Routes.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
