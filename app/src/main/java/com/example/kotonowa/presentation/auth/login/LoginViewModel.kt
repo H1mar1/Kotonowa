@@ -57,10 +57,41 @@ class LoginViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
+                            errorMessage = error.message ?: "Googleログインに失敗しました",
+                        )
+                    }
+                }
+
+        }
+    }
+
+
+    /** 画面が取得した Google の ID トークンでログインする。 */
+    fun loginWithGoogle(idToken: String) {
+        viewModelScope.launch {
+
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            authRepository.loginWithGoogle(idToken)
+                .onSuccess {
+                    _uiState.update { state ->
+                        state.copy(isLoading = false, isLoginSuccess = true)
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
                             errorMessage = error.message ?: "ログインに失敗しました",
                         )
                     }
                 }
         }
     }
+
+    /** Google のダイアログ側で起きたエラーを、画面に表示させる。 */
+    fun onGoogleSignInError(message: String) {
+        _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+    }
+
 }

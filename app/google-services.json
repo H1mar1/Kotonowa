@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "936774280451-ekpcds9b7gi0v1ngajpc6rnegfk2t8mr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kotonowa",
+            "certificate_hash": "ff80da0ddc747a4e40aed0ae5cdda6e0e0f0e381"
+          }
+        },
+        {
           "client_id": "936774280451-lqha31bq58jrgfcrls4c1u3a6tmq8voq.apps.googleusercontent.com",
           "client_type": 3
         }

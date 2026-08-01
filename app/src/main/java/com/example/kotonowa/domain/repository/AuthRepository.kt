@@ -24,6 +24,9 @@ interface AuthRepository {
     //パスワードリセット
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
 
+    /** Google から受け取った ID トークンでログインする。 */
+    suspend fun loginWithGoogle(idToken: String): Result<User>
+
     /** ログアウトする。 */
     fun logout()
 

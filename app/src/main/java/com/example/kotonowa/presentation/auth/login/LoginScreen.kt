@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,6 +63,7 @@ fun LoginScreen(
         onLoginClick = viewModel::login,
         onNavigateToSignUp = onNavigateToSignUp,
         onNavigateToPasswordReset = onNavigateToPasswordReset,
+        onGoogleLoginClick = {},
         modifier = modifier,
     )
 }
@@ -74,6 +76,7 @@ private fun LoginContent(
     onTogglePasswordVisibility: () -> Unit,
     onNavigateToSignUp: () -> Unit,
     onLoginClick: () -> Unit,
+    onGoogleLoginClick: () -> Unit,
     onNavigateToPasswordReset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -166,6 +169,18 @@ private fun LoginContent(
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = onGoogleLoginClick,
+            enabled = !uiState.isLoading,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Googleでログイン")
+        }
+
+
+
         TextButton(
             onClick = onNavigateToSignUp,
             modifier = Modifier.fillMaxWidth(),
@@ -194,6 +209,7 @@ private fun LoginContentPreview() {
             onLoginClick = {},
             onNavigateToSignUp = {},
             onNavigateToPasswordReset = {},
+            onGoogleLoginClick = {},
         )
     }
 }
@@ -214,6 +230,7 @@ private fun LoginContentErrorPreview() {
             onLoginClick = {},
             onNavigateToSignUp = {},
             onNavigateToPasswordReset = {},
+            onGoogleLoginClick = {},
         )
     }
 }
