@@ -11,6 +11,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,7 +49,7 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> = try {
-       firebaseAuth.sendPasswordResetEmail(email).await()
+        firebaseAuth.sendPasswordResetEmail(email).await()
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e.toAuthException())
@@ -56,6 +57,15 @@ class AuthRepositoryImpl @Inject constructor(
 
     override fun logout() {
         firebaseAuth.signOut()
+    }
+
+    override suspend fun loginWithGoogle(idToken: String): Result<User> = try {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        val authResult = firebaseAuth.signInWithCredential(credential).await()
+        val firebaseUser=authResult.user?:throw AuthException("Googleログインはできましたが、ユーザー情報を取得できませんでした")
+        Result.success(firebaseUser.toUser())
+    }catch (e: Exception){
+        Result.failure(e.toAuthException())
     }
 }
 
