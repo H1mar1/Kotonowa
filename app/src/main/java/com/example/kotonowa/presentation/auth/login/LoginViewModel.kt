@@ -57,7 +57,7 @@ class LoginViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: "Googleログインに失敗しました",
+                            errorMessage = error.message ?: "ログインに失敗しました",
                         )
                     }
                 }
@@ -82,7 +82,7 @@ class LoginViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: "ログインに失敗しました",
+                            errorMessage = error.message ?: "Googleログインに失敗しました",
                         )
                     }
                 }
