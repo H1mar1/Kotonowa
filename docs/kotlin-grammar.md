@@ -178,6 +178,36 @@ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 `@` で始まるものは**アノテーション**＝「この関数はこういう性質です」という付箋。
 `@Composable` は「これは画面を描く関数です」という印。
 
+### ㉜ `@Composable` 関数は `@Composable` の中でしか呼べない
+
+`suspend`（§2-⑨）とまったく同じ形のルールがもう1つある。
+
+| 種類 | 呼べる場所 |
+|---|---|
+| `suspend` 関数 | 待てる場所（`launch { }` の中、他の `suspend` 関数の中） |
+| `@Composable` 関数 | 画面を描いている場所（他の `@Composable` 関数の中） |
+
+`stringResource(R.string.xxx)`（文字列リソースを読む部品）は `@Composable` が付いている。
+だから**ボタンの `onClick` や `scope.launch { }` の中では呼べない**。あそこは画面を描く場所ではなく、
+「あとで実行される作業メモ」（§1-⑥ ラムダ）だから。
+
+対処は**外で受け取っておく**こと。
+
+```kotlin
+@Composable
+fun LoginScreen() {
+    val webClientId = stringResource(R.string.default_web_client_id)  // ここは描画中なのでOK
+
+    Button(onClick = {
+        scope.launch {
+            useIt(webClientId)   // 中では、外で取った値を使うだけ
+        }
+    })
+}
+```
+
+「値を先に取り出して、ラムダには結果だけ持ち込む」——`@Composable` でも `suspend` でも使える定石。
+
 ---
 
 ## §4 その他
@@ -308,6 +338,104 @@ try {
 
 `"..."` の中で `${ }` と書くと、その中身が計算されて文字列に埋め込まれる（文字列テンプレート）。
 `"..." + e.type + "..."` と繋ぐより読みやすい。
+
+---
+
+## §7 クラスの種類
+
+### ㉗ `data class` — データを入れる箱
+
+```kotlin
+data class User(val uid: String, val email: String?)
+```
+
+「値を持ち運ぶだけ」のクラス。`data` を付けると、Kotlin が以下を自動で用意してくれる。
+
+- `toString()` … 中身を読める文字列にする（ログに出すときに便利）
+- `equals()` … **中身が同じなら同じ**とみなす比較（付けないと「同じ箱かどうか」の比較になる）
+- `copy()` … 一部だけ変えた複製を作る（`it.copy(email = "...")` はこれ）
+
+`_uiState.update { it.copy(...) }` が書けるのは `UiState` が `data class` だから。
+
+### ㉘ `sealed class` — 仲間を数え上げられる型
+
+```kotlin
+sealed class ScheduleItem {
+    data class Event(...) : ScheduleItem()
+    data class Task(...) : ScheduleItem()
+}
+```
+
+`sealed`（シールド）＝「封をした」。**仲間はここに書いた分だけで、外から増やせない**と宣言する。
+
+嬉しいことが2つある。
+
+1. **`when` で分岐すると、その中では型が確定する。** `Event` の枝では `startAt` が必ず存在する（`?` が要らない）
+2. **分岐の書き忘れがコンパイルエラーになる。** 仲間の数が決まっているので Kotlin が数え上げられる
+
+`: ScheduleItem()` は「ScheduleItem の仲間です」という宣言（継承）。
+
+補足：`sealed interface` もある。中身（プロパティ）を持たせる必要がなく、
+複数の親を持たせたいときはこちら。`SplashUiState` がその例。
+
+### ㉚ `abstract val` — 「持っていることだけ決める」宣言
+
+```kotlin
+sealed class ScheduleItem {
+    abstract val id: String   // 中身は書かない
+}
+```
+
+`abstract`（アブストラクト＝抽象）は「**約束だけして、中身は子に書かせる**」という印。
+
+- `val id: String` だけなら「id という箱があり、中身はこれ」まで決めることになる
+- `abstract` を付けると「**id という箱を必ず持つこと**。何を入れるかは子が決める」になる
+
+親（`ScheduleItem`）は「予定もタスクも id を持つ」というルールだけ決めたい。
+実際の値は `Event` と `Task` がそれぞれ持つ。だから `abstract`。
+
+嬉しいのは、**親の型のまま共通部分を触れる**こと。
+
+```kotlin
+fun show(item: ScheduleItem) {
+    println(item.title)   // Event か Task か分からなくても title は必ずある
+}
+```
+
+`abstract` を付けた箱を子が用意し忘れると**コンパイルエラー**になる（書き忘れ防止）。
+
+### ㉛ `override` — 「親の約束に応える」印
+
+```kotlin
+data class Event(
+    override val id: String,
+    ...
+) : ScheduleItem()
+```
+
+`override`（オーバーライド＝上書き）は「これは**親が `abstract` で約束した箱**の中身です」という宣言。
+
+- Kotlin では**付け忘れるとコンパイルエラー**になる。「たまたま同じ名前の別の箱を作った」のか
+  「親の約束に応えている」のかを、書き手にはっきりさせるため
+- 逆に、親が約束していない名前に `override` を付けてもエラーになる
+
+⚠️ `override val id: String` の `val`（§1-①）は省略できない。
+省略すると「ただの引数」になり、箱として保持されなくなる。
+
+### ㉙ `when` — 場合分け
+
+```kotlin
+when (item) {
+    is Event -> ...
+    is Task  -> ...
+}
+```
+
+`if` を何個も並べる代わりの書き方。`is`（§4-⑱）と組み合わせると、
+枝の中で自動的にその型として扱える（スマートキャスト）。
+
+`sealed` な型に対して使うと**網羅チェック**が効く。値を返す `when` では、
+全部の枝を書かないとコンパイルが通らない。
 
 ---
 

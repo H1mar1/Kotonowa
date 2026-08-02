@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -66,6 +67,9 @@ fun LoginScreen(
     val activity = context as Activity
     val scope = rememberCoroutineScope()
 
+    // stringResource は @Composable なので、ラムダの中では呼べない。ここで先に取り出しておく
+    val webClientId = stringResource(R.string.default_web_client_id)
+
     // ログインが成功した瞬間に一度だけ画面遷移を呼ぶ
     LaunchedEffect(uiState.isLoginSuccess) {
         if (uiState.isLoginSuccess) onLoginSuccess()
@@ -85,7 +89,7 @@ fun LoginScreen(
                     //「Googleアカウントを1つ選ばせてください」という注文書
                     val googleOption = GetGoogleIdOption.Builder()
                         .setFilterByAuthorizedAccounts(false)
-                        .setServerClientId(context.getString(R.string.default_web_client_id))
+                        .setServerClientId(webClientId)
                         .build()
 
                     //注文書を封筒に入れる
@@ -99,6 +103,7 @@ fun LoginScreen(
                     //封筒を渡して、ユーザーが選ぶまで待つ
                     val result = credentialManager.getCredential(
                         context = activity,
+
                         request = request,
                     )
 
