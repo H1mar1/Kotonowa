@@ -33,12 +33,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.firebase.auth.oAuthCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
 /**
@@ -77,27 +81,47 @@ fun LoginScreen(
         onNavigateToPasswordReset = onNavigateToPasswordReset,
         onGoogleLoginClick = {
             scope.launch {
-//TODO
-                val googleOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-
+                try {
                     //「Googleアカウントを1つ選ばせてください」という注文書
-                    .setServerClientId(context.getString(R.string.default_web_client_id))
-                    .build()
+                    val googleOption = GetGoogleIdOption.Builder()
+                        .setFilterByAuthorizedAccounts(false)
+                        .setServerClientId(context.getString(R.string.default_web_client_id))
+                        .build()
 
-                //注文書を封筒に入れる
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleOption)
-                    .build()
+                    //注文書を封筒に入れる
+                    val request = GetCredentialRequest.Builder()
+                        .addCredentialOption(googleOption)
+                        .build()
 
-                //資格情報の担当者を呼び出す
-                val credentialManager = CredentialManager.create(context)
+                    //資格情報の担当者を呼び出す
+                    val credentialManager = CredentialManager.create(context)
 
-                //封筒を渡して、ユーザーが選ぶまで待つ
-                val result = credentialManager.getCredential(
-                    context = activity,
-                    request = request,
-                )
+                    //封筒を渡して、ユーザーが選ぶまで待つ
+                    val result = credentialManager.getCredential(
+                        context = activity,
+                        request = request,
+                    )
+
+                    //選ばれたアカウントの情報を取り出す
+                    val credential = result.credential
+
+                    //それが「GoogleのIDトークン」かどうか確かめる
+                    if (credential is CustomCredential &&
+                        credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                    ) {
+                        val googleIdTokenCredential =
+                            GoogleIdTokenCredential.createFrom(credential.data)
+                        viewModel.loginWithGoogle(googleIdTokenCredential.idToken)
+                    } else {
+                        viewModel.onGoogleSignInError("Googleのアカウント情報を取得できませんでした")
+                    }
+                } catch (e: GetCredentialCancellationException) {
+                    //ユーザーが自分で閉じただけなので、エラーは出さない
+                } catch (e: NoCredentialException) {
+                    viewModel.onGoogleSignInError("この端末にGoogleアカウントが登録されていません")
+                } catch (e: GetCredentialException) {
+                    viewModel.onGoogleSignInError("Googleログインに失敗しました（${e.type}）")
+                }
             }
         },
         modifier = modifier,
