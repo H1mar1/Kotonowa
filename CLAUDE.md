@@ -67,7 +67,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）進行中。メール/パスワードの認証と自動ログイン判定まで実装済み。残りは Google Sign-In のみ。**
+**Phase 1（認証）完了（2026-08-02）。次は Phase 2（個人のスケジュール/タスク管理 + ローカル通知）。**
 
 - ✅ Firebase 依存（BoM 34.16.0 / Auth・Firestore・Analytics）＋ `google-services.json`
 - ✅ Hilt 導入済み（`KotonowaApplication`, `di/FirebaseModule`, `di/RepositoryModule`）
@@ -75,7 +75,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 - ✅ Clean Architecture のパッケージ構成
 - ✅ 認証まわり一式
   - `domain/model/User`, `domain/model/AuthException`
-  - `domain/repository/AuthRepository`（login / signUp / sendPasswordResetEmail / logout / currentUser）
+  - `domain/repository/AuthRepository`（login / signUp / sendPasswordResetEmail / loginWithGoogle / logout / currentUser）
   - `data/repository/AuthRepositoryImpl`（Firebase Auth + 日本語エラー変換）
   - `presentation/auth/login/`（`LoginUiState`, `LoginViewModel`, `LoginScreen`）
   - `presentation/auth/signup/`（Step 9）
@@ -83,17 +83,36 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
   - `presentation/home/`（ログイン確認用の仮ホーム。Phase2 でカレンダーに置き換える）
   - `presentation/splash/`（Step 11。`SplashUiState` は sealed interface）
 - ✅ 自動ログイン判定（Step 11）— 起動時に `currentUser` を見て HOME / LOGIN を出し分ける
-- ❌ Google Sign-In（Step 12）
+- ✅ Google Sign-In（Step 12）— 実機相当のエミュレータで動作確認済み
 
-### Phase1 の残ステップ
+### Step 12（Google Sign-In）の実装メモ
 
-| # | やること |
+Credential Manager（`androidx.credentials`）を使っている。`GoogleSignInClient` は非推奨なので
+古い記事のやり方はそのままでは動かない。役割分担は以下の通り。
+
+| 層 | 担当 |
 |---|---|
-| 12 | Google Sign-In（`google-services.json` に OAuth クライアント設定済み） |
+| `LoginScreen` | Credential Manager を呼んでダイアログを出し、**ID トークンを取得**する。ダイアログには `Activity` が要るので画面の仕事 |
+| `LoginViewModel.loginWithGoogle(idToken)` | 受け取ったトークンを Repository に渡す |
+| `AuthRepositoryImpl.loginWithGoogle(idToken)` | `GoogleAuthProvider.getCredential` → `signInWithCredential` で Firebase にログイン |
 
-Step 12 は Credential Manager（`androidx.credentials`）を使う。`GoogleSignInClient` は非推奨なので
-古い記事のやり方はそのままでは動かない。Google のダイアログ表示には `Activity` が必要なため、
-「画面が ID トークンを取得 → ViewModel/Repository に渡す」の役割分担にする。
+- `setServerClientId` に渡すのは `R.string.default_web_client_id`（`google-services.json` の
+  `client_type: 3` から自動生成される**ウェブ用**クライアント ID）。Android 用（`client_type: 1`）ではない。
+- `setFilterByAuthorizedAccounts(false)` にしないと初回ログイン時に候補ゼロでダイアログが出ない。
+- キャンセル・アカウント0件は**例外**で飛んでくる。`try/catch` で受けないとアプリが落ちる。
+  `catch` は具体的な型（`GetCredentialCancellationException` → `NoCredentialException`）を先に、
+  おおまかな `GetCredentialException` を最後に置く。
+
+### 検証環境のハマりどころ（2026-08-02）
+
+- **Android 17 プレビュー版（`dev-keys`）のエミュレータでは Google アカウントを追加できない。**
+  ログイン処理が途中で異常終了する。正式リリース版（`release-keys`）のイメージを使うこと。
+  確認方法: `adb shell getprop ro.build.tags`
+- 動作確認は `Medium_Phone_API_36.1`（Android 16 / `google_apis_playstore`）で行った。
+- エミュレータの Gboard が日本語ローマ字入力だと、`adb shell input text` の英字が
+  ひらがなに変換される。`adb shell ime disable <IME>` で一時的に無効化すると直接入力できる（後で `ime enable` で戻す）。
+- 設定アプリが開けないときは `adb shell am start -a android.settings.ADD_ACCOUNT_SETTINGS` で
+  目的の画面だけ直接開ける。
 
 ## 技術スタック
 
@@ -127,8 +146,8 @@ com.example.kotonowa/
 
 ```
 Phase0: セットアップ（Firebase疎通）      ← 完了
-Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 今ここ（残りは Step 12 のみ）
-Phase2: 個人のスケジュール/タスク管理 + ローカル通知
+Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 完了
+Phase2: 個人のスケジュール/タスク管理 + ローカル通知  ← 今ここ
 Phase3: 共有カレンダー + ロールベース認可
 Phase4: プッシュ通知
 ```
