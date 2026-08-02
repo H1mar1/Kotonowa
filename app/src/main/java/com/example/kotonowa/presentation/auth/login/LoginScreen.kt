@@ -1,5 +1,7 @@
 package com.example.kotonowa.presentation.auth.login
 
+import android.app.Activity
+import com.example.kotonowa.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -20,17 +22,24 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.ui.theme.KotonowaTheme
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.firebase.auth.oAuthCredential
+import kotlinx.coroutines.launch
 
 /**
  * ログイン画面。
@@ -49,6 +58,9 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val activity = context as Activity
+    val scope = rememberCoroutineScope()
 
     // ログインが成功した瞬間に一度だけ画面遷移を呼ぶ
     LaunchedEffect(uiState.isLoginSuccess) {
@@ -63,7 +75,31 @@ fun LoginScreen(
         onLoginClick = viewModel::login,
         onNavigateToSignUp = onNavigateToSignUp,
         onNavigateToPasswordReset = onNavigateToPasswordReset,
-        onGoogleLoginClick = {},
+        onGoogleLoginClick = {
+            scope.launch {
+//TODO
+                val googleOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+
+                    //「Googleアカウントを1つ選ばせてください」という注文書
+                    .setServerClientId(context.getString(R.string.default_web_client_id))
+                    .build()
+
+                //注文書を封筒に入れる
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleOption)
+                    .build()
+
+                //資格情報の担当者を呼び出す
+                val credentialManager = CredentialManager.create(context)
+
+                //封筒を渡して、ユーザーが選ぶまで待つ
+                val result = credentialManager.getCredential(
+                    context = activity,
+                    request = request,
+                )
+            }
+        },
         modifier = modifier,
     )
 }
