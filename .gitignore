@@ -17,3 +17,6 @@ local.properties
 
 # Claude Code のローカル設定（端末ごとに異なるためコミットしない）
 .claude/settings.local.json
+
+# Kotlin ビルドの作業用フォルダ
+.kotlin/

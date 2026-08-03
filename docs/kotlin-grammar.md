@@ -148,6 +148,37 @@ val googleOption = GetGoogleIdOption.Builder()
 ViewModel の中で「待てる場所」を作る書き方。
 ViewModel が捨てられるとき、中で走っている処理も自動で打ち切られる。
 
+### ㉝ `Flow<T>` — 値が何度も流れてくる管
+
+```kotlin
+fun observeItems(calendarId: String): Flow<List<ScheduleItem>>
+```
+
+`suspend` との違いは「**返事の回数**」。
+
+| | 回数 | たとえ |
+|---|---|---|
+| `suspend fun ...: List<T>` | **1回だけ** | 手紙を出して、返事を1通受け取る |
+| `fun ...: Flow<List<T>>` | **何度でも** | 蛇口をひねる。以降、水が流れ続ける |
+
+`Flow`（フロー＝流れ）が返すのは**値そのものではなく「管の口」**。
+だから関数自体は一瞬で終わり、`suspend` は要らない。
+
+受け取る側は「流れてきたら何をするか」を登録する。
+
+```kotlin
+repository.observeItems(id).collect { list ->
+    // 新しい一覧が流れてくるたび、ここが実行される
+}
+```
+
+- `collect`（コレクト＝集める）＝「管に口をつけて、流れてくるものを受け取り続ける」
+- **`collect` は終わらない**（流れ続ける限り待ち続ける）ので `suspend` が付いている。
+  §2-⑨ の通り「待てる場所」＝ `viewModelScope.launch { }` の中で呼ぶ
+
+Firestore は「データが変わったら教える」機能を標準で持っているので、
+それを `Flow` に流し込むと**画面が勝手に最新になる**。
+
 ---
 
 ## §3 Compose 特有
