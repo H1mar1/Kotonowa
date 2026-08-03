@@ -15,28 +15,48 @@ import java.time.Instant
 sealed class ScheduleItem {
 
     abstract val id: String
-
-    // TODO: 残りの共通プロパティを abstract val で宣言する
-    //       calendarId / title / description / createdBy
-    //       reminderMinutesBefore / updatedAt
+    abstract val calendarId: String
+    abstract val title: String
+    abstract val description: String?
+    abstract val createdBy: String
+    abstract val reminderMinutesBefore: Int?
+    abstract val updatedAt: Instant
 
     /**
      * 予定。開始と終了の時刻を持つ。
      */
     data class Event(
         override val id: String,
-        // TODO: 共通プロパティを override val で並べる
-        // TODO: Event 専用のプロパティを足す
-        //       startAt(Instant) / endAt(Instant) / allDay(Boolean)
-    ) : ScheduleItem()
+
+        override val calendarId: String,
+        override val title: String,
+        override val description: String?,
+        override val createdBy: String,
+        override val reminderMinutesBefore: Int?,
+        override val updatedAt: Instant,
+
+        val startAt: Instant,
+        val endAt: Instant,
+        val allDay: Boolean,
+
+
+        ) : ScheduleItem()
 
     /**
      * タスク。期限（1 点）と完了状態を持つ。
      */
     data class Task(
         override val id: String,
-        // TODO: 共通プロパティを override val で並べる
-        // TODO: Task 専用のプロパティを足す
-        //       dueAt(Instant) / isCompleted(Boolean)
-    ) : ScheduleItem()
+
+        override val calendarId: String,
+        override val title: String,
+        override val description: String?,
+        override val createdBy: String,
+        override val reminderMinutesBefore: Int?,
+        override val updatedAt: Instant,
+
+        val dueAt: Instant,
+        val isCompleted: Boolean,
+
+        ) : ScheduleItem()
 }
