@@ -283,6 +283,43 @@ onEmailChange = viewModel::onEmailChange
 `viewModel.onEmailChange()` は「実行する」だが、`viewModel::onEmailChange` は「実行せずに関数を渡す」。
 `{ text -> viewModel.onEmailChange(text) }` の短縮形。
 
+### ㉞ `TODO()` — 「まだ書いていない」印
+
+```kotlin
+override suspend fun getItem(itemId: String): Result<ScheduleItem> = TODO("あとで実装")
+```
+
+Kotlin が標準で用意している関数で、**呼ばれたらその場でアプリを止める**。
+
+なぜ便利か：`interface` の約束を全部実装しないとコンパイルが通らないが、
+一度に全部書くのはつらい。`TODO()` を置いておけば**形だけ整って先に進める**。
+
+- コメントの `// TODO:` は**ただのメモ**（何も起きない）
+- `TODO()` は**実行されると止まる**（カッコがある＝命令、§1-③）
+
+書き忘れたまま動かすと `NotImplementedError`（未実装エラー）で落ちるので、
+「あとで書くつもりが忘れていた」を確実に気づける。
+
+### ㉟ `mapOf("キー" to 値)` — 名札付きの箱の集まり
+
+```kotlin
+val data = mapOf(
+    "title" to "会議",
+    "isCompleted" to false,
+)
+```
+
+`Map`（マップ）＝ **名札と中身の組を集めたもの**。辞書と同じで「`title` を引くと `会議` が出る」。
+
+- `to`（トゥー）は「**組にする**」という意味。`"title" to "会議"` で1組
+- `mapOf(...)` はその組をいくつも受け取って Map を作る
+
+Firestore は**この形でしかデータを受け取らない**。だから Kotlin の `ScheduleItem` を
+そのまま渡すことはできず、`Map` に詰め替えてから送る。
+
+`List`（リスト＝順番に並んだ列）との違いは、**取り出し方**。
+`List` は「3番目」と番号で取り、`Map` は「`title` の」と名札で取る。
+
 ### ⑳ `Result<T>` / `.onSuccess {} .onFailure {}`
 
 成功か失敗かを包んで返す入れ物。
