@@ -148,6 +148,48 @@ val googleOption = GetGoogleIdOption.Builder()
 ViewModel の中で「待てる場所」を作る書き方。
 ViewModel が捨てられるとき、中で走っている処理も自動で打ち切られる。
 
+### ㊸ `.await()` — 「作業の引換券」が完了するまで待つ
+
+Firebase の書き込み・読み込みを呼ぶと、**その場では通信していない**。
+「受け付けました」と即座に返ってきて、実際の通信は裏で走る。
+返ってくるのは結果ではなく **`Task`（作業の引換券）**。
+
+`.await()`（アウェイト＝待つ）は「その引換券が『完了』になるまでここで待つ」という命令。
+待つ処理なので `suspend`（⑨）が付いており、呼ぶ側の関数にも `suspend` が要る。
+
+**書き忘れるとどうなるか。**
+
+```kotlin
+firestore.collection(...).document(...).set(...)   // await 無し
+Result.success(Unit)     // ← まだ保存できていないのに「成功」を返してしまう
+```
+
+さらに、**通信が失敗しても `catch` に飛んでこない**（失敗したときにはもう `try` を抜けている）。
+「成功したはずなのにデータが無い」という追いにくい不具合になる。
+`.await()` があって初めて `try` / `catch`（§6-㉔）が機能する。
+
+💡 これを使うために `kotlinx-coroutines-play-services` を入れてある。
+import は `kotlinx.coroutines.tasks.await`。
+
+### ㊹ メソッドチェーンは「手に持っているもの」が変わっていく
+
+⑦ のチェーンは、`.` を 1 つ進むごとに手にしているものが変わる。ここを意識すると読める。
+
+```kotlin
+firestore.collection("events").document(id).set(map).await()
+```
+
+| 書いたところまで | 手に持っているもの | たとえ |
+|---|---|---|
+| `firestore` | Firestore 全体 | **図書館そのもの** |
+| `.collection("events")` | events コレクション | 図書館の中の **1 つの棚** |
+| `.document(id)` | 1 件のドキュメント | 棚に並んだ **1 冊の本** |
+| `.set(map)` | 作業の引換券（`Task`） | 「書き換えといて」と頼んだ**受付票** |
+| `.await()` | 作業完了 | 受付票を持って**終わるまで待つ**（㊸） |
+
+`.collection()` と `.document()` は「**指すだけ**」で通信しない。住所を絞り込んでいるだけ（②）。
+実際に通信するのは `.set()` から。
+
 ### ㉝ `Flow<T>` — 値が何度も流れてくる管
 
 ```kotlin
@@ -283,10 +325,148 @@ onEmailChange = viewModel::onEmailChange
 `viewModel.onEmailChange()` は「実行する」だが、`viewModel::onEmailChange` は「実行せずに関数を渡す」。
 `{ text -> viewModel.onEmailChange(text) }` の短縮形。
 
+### ㉞ `TODO()` — 「まだ書いていない」印
+
+```kotlin
+override suspend fun getItem(itemId: String): Result<ScheduleItem> = TODO("あとで実装")
+```
+
+Kotlin が標準で用意している関数で、**呼ばれたらその場でアプリを止める**。
+
+なぜ便利か：`interface` の約束を全部実装しないとコンパイルが通らないが、
+一度に全部書くのはつらい。`TODO()` を置いておけば**形だけ整って先に進める**。
+
+- コメントの `// TODO:` は**ただのメモ**（何も起きない）
+- `TODO()` は**実行されると止まる**（カッコがある＝命令、§1-③）
+
+書き忘れたまま動かすと `NotImplementedError`（未実装エラー）で落ちるので、
+「あとで書くつもりが忘れていた」を確実に気づける。
+
+### ㉟ `mapOf("キー" to 値)` — 名札付きの箱の集まり
+
+```kotlin
+val data = mapOf(
+    "title" to "会議",
+    "isCompleted" to false,
+)
+```
+
+`Map`（マップ）＝ **名札と中身の組を集めたもの**。辞書と同じで「`title` を引くと `会議` が出る」。
+
+- `to`（トゥー）は「**組にする**」という意味。`"title" to "会議"` で1組
+- `mapOf(...)` はその組をいくつも受け取って Map を作る
+
+Firestore は**この形でしかデータを受け取らない**。だから Kotlin の `ScheduleItem` を
+そのまま渡すことはできず、`Map` に詰め替えてから送る。
+
+`List`（リスト＝順番に並んだ列）との違いは、**取り出し方**。
+`List` は「3番目」と番号で取り、`Map` は「`title` の」と名札で取る。
+
+### ㊵ `return` — 「この関数の答えはこれ」
+
+関数の書き方には 2 通りあり、`return`（リターン＝返す）が要るかどうかが違う。
+
+| 関数の形 | `return` |
+|---|---|
+| `fun f(): T { ... }` … `{ }` で書く | **要る**。最後に置いただけでは返らない |
+| `fun f(): T = ...` … `=` で書く（§6-㉔-補） | **要らない**。`=` の右がそのまま答え |
+
+```kotlin
+private fun ScheduleItem.toMap(): Map<String, Any?> {
+    val base = mapOf(...)
+    val extra = when (this) { ... }
+    return base + extra          // ← これが答え
+}
+```
+
+⚠️ **`{ }` の関数で `return` を書き忘れても、コンパイルエラーになるとは限らない。**
+式を書きっぱなしにすると「作って捨てる」だけの行になり、警告どまりのことがある。
+
+```kotlin
+mapOf("id" to id)          // ❌ 作っただけ。誰も受け取らないので消える
+val base = mapOf("id" to id)   // ✅ 箱に入れた（§1-①）
+return mapOf("id" to id)       // ✅ 答えとして返した
+```
+
+作った結果は必ず「**`val` で受ける**」か「**`return` で返す**」かのどちらかにする。
+
+### ㊱ 拡張関数 — 既存の型に、後から命令を生やす
+
+```kotlin
+private fun ScheduleItem.toMap(): Map<String, Any?> { ... }
+```
+
+`fun` と関数名の間に **`型名.`** が挟まっているのが目印。
+
+| 書き方 | 呼び方 |
+|---|---|
+| `fun toMap(item: ScheduleItem)` … 普通の関数 | `toMap(item)` |
+| `fun ScheduleItem.toMap()` … 拡張関数 | `item.toMap()`（§1-② の「〜の」で読める） |
+
+**なぜわざわざこう書くのか。** `ScheduleItem` は domain 層のもので、Firestore の存在を
+知ってはいけない（依存の向きが `domain ← data`）。だから `toMap()` を `ScheduleItem.kt` 本体には
+書けない。でも data 層のファイルに拡張関数として書けば、**domain を汚さずに** `item.toMap()` と書ける。
+
+`private` は「このファイルの中だけで使える」という印。
+
+### ㊲ `this` — 拡張関数の中の「本人」
+
+拡張関数の中で `this`（ジス）と書くと、**`.` の左に書かれたもの本人**を指す。
+`item.toMap()` と呼べば `this` は `item`。
+
+しかも **`this.` は省略できる**。
+
+```kotlin
+"title" to title      // this.title と同じ。item の title が入る
+```
+
+### ㊴ `+` で Map どうしを合体できる
+
+```kotlin
+mapOf("a" to 1) + mapOf("b" to 2)   // → {"a"=1, "b"=2} という新しい Map
+```
+
+数字の足し算と同じ記号だが、Map（§4-㉟）では「**2 つを合わせた新しい Map を作る**」という意味。
+元の 2 つは変わらない。同じ名札が両方にあれば**右側が勝つ**。
+
+「共通フィールドの Map」＋「種類ごとの Map」を 1 つにまとめるのに使う。
+
 ### ⑳ `Result<T>` / `.onSuccess {} .onFailure {}`
 
 成功か失敗かを包んで返す入れ物。
 `.onSuccess { }` は成功したときだけ、`.onFailure { }` は失敗したときだけ `{ }` の中が動く。
+
+### ㊶ `Unit` — 「返すものが無い」を表す型
+
+Kotlin では「**何も返さない**」ということ自体を 1 つの型として扱う。それが `Unit`（ユニット）。
+
+`Result<○○>` は「成功したら ○○ が入っている封筒」（⑳）。`○○` はその関数の性格で決まる。
+
+| 関数 | 型 | 成功したとき封筒に入っているもの |
+|---|---|---|
+| `getItem` | `Result<ScheduleItem>` | 取ってきた予定 1 件 |
+| `addItem` | `Result<Unit>` | **何も無い** |
+
+`addItem` は「保存する」だけの命令。呼び出し側が知りたいのは成功/失敗だけで、
+受け取りたいデータは無い。だから `Unit`。「中身は空だが、封筒自体は必要」。
+
+💡 `Unit` は大文字始まり（§1-⑧）なので設計図の名前だが、**中身が世の中に 1 個しかない**
+特殊な型で、`Unit` と書くとその 1 個そのものを指す。だから値としてそのまま渡せる。
+
+### ㊷ `Result.success()` / `Result.failure()` — 封筒を**作る**側
+
+⑳ は「受け取った `Result` をどう**使う**か」だった。Repository は「**作って渡す**」側になる。
+
+```kotlin
+Result.success(Unit)   // 「うまくいった」封筒。中身は無い（㊶）
+Result.failure(e)      // 「失敗した」封筒。中にエラー e を入れる
+```
+
+- `Result` が大文字始まり（§1-⑧）＝設計図。そこにぶら下がった `success` / `failure` が封筒を作る命令
+- `success(...)` の中身が**成功時に渡したいもの**
+- `failure(...)` の中身が**起きたエラー**。`catch (e: Exception)`（§6-㉔）で受けた `e` をそのまま渡す
+
+ここで作った封筒が、そのまま ViewModel の `.onSuccess { }` / `.onFailure { }` に届く。
 
 ---
 
@@ -311,6 +491,22 @@ if (uiState.isLoginSuccess) onLoginSuccess()
 | `\|\|` | 「または」 | どちらか一方でも成り立つか |
 
 ⚠️ `=`（1個）は「箱に入れる」（§1-①）、`==`（2個）は「同じか確かめる」。**まったく別物。**
+
+### ㊳ `when` は「値を返す式」としても使える
+
+㉙ では「分岐＝やることを選ぶ」として出てきたが、`when` は**答えを返す**使い方もできる。
+
+```kotlin
+val extra = when (this) {
+    is ScheduleItem.Event -> mapOf("type" to "event", ...)   // Event ならこれが答え
+    is ScheduleItem.Task  -> mapOf("type" to "task",  ...)   // Task ならこれが答え
+}
+```
+
+`->` の**右側が、その場合の答え**。左の `val extra`（§1-①）にその答えが入る。
+
+`sealed`（§7-㉘）な型に対しては全部の枝を書けば `else` は要らない。
+逆に書き漏らすとコンパイルエラーになる（値を返す `when` は「答えが決まらない場合」を許さないため）。
 
 ### ㉓ 全部大文字の名前 — 定数
 
@@ -342,6 +538,24 @@ try {
 
 `try` の中で中断が起きると、**そこから下の行は実行されない**。だから
 「失敗するかもしれない処理」と「成功した後にやること」は、まとめて `try` の中に入れる。
+
+### ㉔-補 `= try { } catch { }` — `try` も値を返す
+
+㊳ の `when` と同じで、`try` も**答えを返す式**として使える。
+
+```kotlin
+override suspend fun sendPasswordResetEmail(email: String): Result<Unit> = try {
+    firebaseAuth.sendPasswordResetEmail(email).await()
+    Result.success(Unit)                   // ← 無事に終わったときの答え（try の最後の行）
+} catch (e: Exception) {
+    Result.failure(e.toAuthException())    // ← コケたときの答え（catch の最後の行）
+}
+```
+
+関数名のうしろの `=`（§1-①）が「この関数の答えは右側」という意味。
+**try が最後まで行けば try の最後の値、途中でコケたら catch の最後の値**が関数の答えになる。
+
+`return` を書かずに済むので、Repository の「やってみて、成功か失敗を `Result` で返す」形と相性がいい。
 
 ### ㉕ `catch` は複数並べられる — 上から順に照合される
 
