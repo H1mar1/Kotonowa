@@ -28,13 +28,14 @@ class ScheduleRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
 ) : ScheduleRepository {
 
-    override suspend fun addItem(item: ScheduleItem): Result<Unit> {
-        // TODO: ① firestore.collection(COLLECTION_EVENTS) で events コレクションを指す
-        // TODO: ② .document(item.id) で「この id のドキュメント」を指す
-        // TODO: ③ .set(item.toMap()) で中身を書き込み、.await() で終わるまで待つ
-        // TODO: ④ 全体を try / catch で囲み、Result.success(Unit) か Result.failure(e) を返す
-        //         書き方は AuthRepositoryImpl の sendPasswordResetEmail が見本
-        TODO("Step 15-C で実装する")
+    override suspend fun addItem(item: ScheduleItem): Result<Unit> = try {
+        firestore.collection(COLLECTION_EVENTS)
+            .document(item.id)
+            .set(item.toMap())
+            .await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     override suspend fun updateItem(item: ScheduleItem): Result<Unit> =
@@ -60,15 +61,33 @@ class ScheduleRepositoryImpl @Inject constructor(
  * 日時は Instant のままでは保存できないので Date に変換する（Firestore が Timestamp にしてくれる）。
  */
 private fun ScheduleItem.toMap(): Map<String, Any?> {
-    // TODO: ① 共通のフィールドを mapOf(...) で並べる
-    //         id / calendarId / title / description / createdBy
-    //         reminderMinutesBefore / updatedAt
-    //         updatedAt は Date.from(updatedAt) と書いて Date に変換する
 
-    // TODO: ② when (this) で Event と Task に分岐し、それぞれ専用のフィールドを足す（§7-㉙）
-    //         Event → "type" to "event", startAt, endAt, allDay
-    //         Task  → "type" to "task",  dueAt,   isCompleted
-    //         type は domain のモデルが持たないので、ここで付ける
+    val base = mapOf(
+        "id" to id,
+        "calendarId" to calendarId,
+        "title" to title,
+        "description" to description,
+        "createdBy" to createdBy,
+        "reminderMinutesBefore" to reminderMinutesBefore,
+        "updatedAt" to Date.from(updatedAt)
+    )
 
-    TODO("Step 15-C で実装する")
+
+    val extra = when (this) {
+        is ScheduleItem.Event -> mapOf(
+            "type" to "event",
+            "startAt" to Date.from(startAt),
+            "endAt" to Date.from(endAt),
+            "allDay" to allDay
+        )
+
+        is ScheduleItem.Task -> mapOf(
+            "type" to "task",
+            "dueAt" to Date.from(dueAt),
+            "isCompleted" to isCompleted
+        )
+
+    }
+
+    return base + extra
 }
