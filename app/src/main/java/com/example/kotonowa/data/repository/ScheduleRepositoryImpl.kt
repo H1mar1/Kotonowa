@@ -2,6 +2,7 @@ package com.example.kotonowa.data.repository
 
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.ScheduleRepository
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
@@ -59,8 +60,19 @@ class ScheduleRepositoryImpl @Inject constructor(
     }
 
 
-    override suspend fun getItem(itemId: String): Result<ScheduleItem> =
-        TODO("Step 15-E で実装する")
+    override suspend fun getItem(itemId: String): Result<ScheduleItem> = try {
+        val snapshot = firestore.collection(COLLECTION_EVENTS)
+            .document(itemId)
+            .get()
+            .await()
+
+        if (!snapshot.exists()) {
+            throw IllegalStateException("予定が見つかりません(id=$itemId)")
+        }
+        Result.success(snapshot.toScheduleItem())
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     override fun observeItems(
         calendarId: String,
@@ -105,4 +117,31 @@ private fun ScheduleItem.toMap(): Map<String, Any?> {
     }
 
     return base + extra
+}
+
+/**
+ * Firestore から取ってきた 1 件分のコピー（[DocumentSnapshot]）を [ScheduleItem] に組み立て直す。
+ *
+ * [toMap] の裏返し。ただし Firestore から来る値は「何が入っているか分からない」状態なので、
+ * 1 つずつ「文字列として取る」「日時として取る」と指定して取り出す。
+ * 指定と違えば null が返るため、必須のものが欠けていたら例外を投げて壊れたデータを通さない。
+ */
+private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
+    // TODO: ① 共通フィールドを取り出す（7 個）
+    //         getString("id") / getString("calendarId") / getString("title") /
+    //         getString("description") / getString("createdBy") /
+    //         getLong("reminderMinutesBefore") / getDate("updatedAt")
+    //         null が返りうるので、必須のものは ?: で受けて throw する（§4-⑮）
+    //         description と reminderMinutesBefore は元々 null 可なのでそのままでよい
+
+    // TODO: ② getString("type") を when で分岐する（§7-㉙）
+    //         "event" -> ScheduleItem.Event(...) を組み立てて返す
+    //         "task"  -> ScheduleItem.Task(...) を組み立てて返す
+    //         else    -> 想定外の値なので throw
+
+    // TODO: ③ 型を戻すのを忘れない（toMap の逆）
+    //         Date -> .toInstant() で Instant に戻す
+    //         Long -> .toInt() で Int に戻す（Firestore は整数を必ず Long で返すため）
+
+    TODO("Step 15-E で実装する")
 }
