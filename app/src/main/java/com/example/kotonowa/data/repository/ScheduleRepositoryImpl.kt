@@ -38,20 +38,35 @@ class ScheduleRepositoryImpl @Inject constructor(
         Result.failure(e)
     }
 
-    override suspend fun updateItem(item: ScheduleItem): Result<Unit> =
-        TODO("Step 15-A で実装する")
+    override suspend fun updateItem(item: ScheduleItem): Result<Unit> = try {
+        firestore.collection(COLLECTION_EVENTS)
+            .document(item.id)
+            .update(item.toMap())//そのドキュメントが存在している時だけ書き換える
+            .await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
-    override suspend fun deleteItem(itemId: String): Result<Unit> =
-        TODO("Step 15-A で実装する")
+    override suspend fun deleteItem(itemId: String): Result<Unit> = try {
+        firestore.collection(COLLECTION_EVENTS)
+            .document(itemId)
+            .delete()
+            .await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
 
     override suspend fun getItem(itemId: String): Result<ScheduleItem> =
-        TODO("Step 15-A で実装する")
+        TODO("Step 15-E で実装する")
 
     override fun observeItems(
         calendarId: String,
         from: Instant,
         to: Instant,
-    ): Flow<List<ScheduleItem>> = TODO("Step 15-A で実装する")
+    ): Flow<List<ScheduleItem>> = TODO("Step 15-F で実装する")
 }
 
 /**
