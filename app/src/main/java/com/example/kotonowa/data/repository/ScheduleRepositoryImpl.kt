@@ -138,11 +138,6 @@ private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
     val updatedAt = getDate("updatedAt")?.toInstant()
         ?: throw IllegalStateException("updatedAtが入っていません")
 
-    // TODO: ② getString("type") を when で分岐する（§7-㉙）
-    //         "event" -> ScheduleItem.Event(...) を組み立てて返す
-    //         "task"  -> ScheduleItem.Task(...) を組み立てて返す
-    //         else    -> 想定外の値なので throw
-
     return when (getString("type")) {
         "event" -> ScheduleItem.Event(
             id = id,
@@ -152,20 +147,28 @@ private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
             createdBy = createdBy,
             reminderMinutesBefore = reminderMinutesBefore,
             updatedAt = updatedAt,
-            startAt = getData("startAt")?.toInstant()
+            startAt = getDate("startAt")?.toInstant()
                 ?: throw IllegalStateException("startAtが入っていません"),
-            endAt
+            endAt = getDate("endAt")?.toInstant()
+                ?: throw IllegalStateException("endAtが入っていません"),
+            allDay = getBoolean("allDay") ?: throw IllegalStateException("allDayが入っていません"),
 
+            )
+
+        "task" -> ScheduleItem.Task(
+            id = id,
+            calendarId = calendarId,
+            title = title,
+            description = description,
+            createdBy = createdBy,
+            reminderMinutesBefore = reminderMinutesBefore,
+            updatedAt = updatedAt,
+            dueAt = getDate("dueAt")?.toInstant()
+                ?: throw IllegalStateException("dueAtが入っていません"),
+            isCompleted = getBoolean("isCompleted")
+                ?: throw IllegalStateException("isCompletedが入っていません"),
         )
 
-        "task" -> ScheduleItem.Task()
         else -> throw IllegalStateException("typeが不正です")
     }
-
-
-    // TODO: ③ 型を戻すのを忘れない（toMap の逆）
-    //         Date -> .toInstant() で Instant に戻す
-    //         Long -> .toInt() で Int に戻す（Firestore は整数を必ず Long で返すため）
-
-    TODO("Step 15-E で実装する")
 }
