@@ -127,17 +127,41 @@ private fun ScheduleItem.toMap(): Map<String, Any?> {
  * 指定と違えば null が返るため、必須のものが欠けていたら例外を投げて壊れたデータを通さない。
  */
 private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
-    // TODO: ① 共通フィールドを取り出す（7 個）
-    //         getString("id") / getString("calendarId") / getString("title") /
-    //         getString("description") / getString("createdBy") /
-    //         getLong("reminderMinutesBefore") / getDate("updatedAt")
-    //         null が返りうるので、必須のものは ?: で受けて throw する（§4-⑮）
-    //         description と reminderMinutesBefore は元々 null 可なのでそのままでよい
+    val id = getString("id") ?: throw IllegalStateException("idが入っていません")
+    val calendarId =
+        getString("calendarId") ?: throw IllegalStateException("calendarIdが入っていません")
+    val title = getString("title") ?: throw IllegalStateException("titleが入っていません")
+    val description = getString("description")
+    val createdBy =
+        getString("createdBy") ?: throw IllegalStateException("createdByが入っていません")
+    val reminderMinutesBefore = getLong("reminderMinutesBefore")?.toInt()
+    val updatedAt = getDate("updatedAt")?.toInstant()
+        ?: throw IllegalStateException("updatedAtが入っていません")
 
     // TODO: ② getString("type") を when で分岐する（§7-㉙）
     //         "event" -> ScheduleItem.Event(...) を組み立てて返す
     //         "task"  -> ScheduleItem.Task(...) を組み立てて返す
     //         else    -> 想定外の値なので throw
+
+    return when (getString("type")) {
+        "event" -> ScheduleItem.Event(
+            id = id,
+            calendarId = calendarId,
+            title = title,
+            description = description,
+            createdBy = createdBy,
+            reminderMinutesBefore = reminderMinutesBefore,
+            updatedAt = updatedAt,
+            startAt = getData("startAt")?.toInstant()
+                ?: throw IllegalStateException("startAtが入っていません"),
+            endAt
+
+        )
+
+        "task" -> ScheduleItem.Task()
+        else -> throw IllegalStateException("typeが不正です")
+    }
+
 
     // TODO: ③ 型を戻すのを忘れない（toMap の逆）
     //         Date -> .toInstant() で Instant に戻す
