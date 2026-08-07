@@ -1,10 +1,13 @@
 package com.example.kotonowa.data.repository
 
+import androidx.compose.animation.core.snap
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import java.util.Date
@@ -74,11 +77,32 @@ class ScheduleRepositoryImpl @Inject constructor(
         Result.failure(e)
     }
 
+    /**
+     * 指定した期間の予定/タスクを監視する。
+     *
+     * Firestore の「変わったら教える」機能はコールバック（呼び返し）方式なので、
+     * [callbackFlow] で Flow の管に変換して流す（§2-㊾）。
+     */
     override fun observeItems(
         calendarId: String,
         from: Instant,
         to: Instant,
-    ): Flow<List<ScheduleItem>> = TODO("Step 15-F で実装する")
+    ): Flow<List<ScheduleItem>> = callbackFlow {
+        
+        val registration = firestore.collection(COLLECTION_EVENTS)
+            .whereEqualTo("calendarId", calendarId)
+            .whereGreaterThanOrEqualTo("sortAt", Date.from(from))
+            .whereLessThan("sortAt",Date.from(to))
+            .orderBy("sortAt")
+            .addSnapshotListener { napshots, error -> }
+
+        //
+        //   ヒント: where に渡す日時は Date.from(...) にする。
+        //          保存したのが Date なので、探す条件も同じ形に揃える（15-F-1 と同じ話）
+
+        // TODO 2: awaitClose { } の中で、TODO 1 の解除券を使って見張りを外す（外す命令は remove()）
+        //   これを書かないと実行時にエラーになる。画面が消えても通信し続けるのを防ぐ後片付け
+    }
 }
 
 /**
@@ -105,13 +129,15 @@ private fun ScheduleItem.toMap(): Map<String, Any?> {
             "type" to "event",
             "startAt" to Date.from(startAt),
             "endAt" to Date.from(endAt),
-            "allDay" to allDay
+            "allDay" to allDay,
+            "sortAt" to Date.from(startAt)
         )
 
         is ScheduleItem.Task -> mapOf(
             "type" to "task",
             "dueAt" to Date.from(dueAt),
-            "isCompleted" to isCompleted
+            "isCompleted" to isCompleted,
+            "sortAt" to Date.from(dueAt)
         )
 
     }
@@ -138,11 +164,6 @@ private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
     val updatedAt = getDate("updatedAt")?.toInstant()
         ?: throw IllegalStateException("updatedAtが入っていません")
 
-    // TODO: ② getString("type") を when で分岐する（§7-㉙）
-    //         "event" -> ScheduleItem.Event(...) を組み立てて返す
-    //         "task"  -> ScheduleItem.Task(...) を組み立てて返す
-    //         else    -> 想定外の値なので throw
-
     return when (getString("type")) {
         "event" -> ScheduleItem.Event(
             id = id,
@@ -152,20 +173,28 @@ private fun DocumentSnapshot.toScheduleItem(): ScheduleItem {
             createdBy = createdBy,
             reminderMinutesBefore = reminderMinutesBefore,
             updatedAt = updatedAt,
-            startAt = getData("startAt")?.toInstant()
+            startAt = getDate("startAt")?.toInstant()
                 ?: throw IllegalStateException("startAtが入っていません"),
-            endAt
+            endAt = getDate("endAt")?.toInstant()
+                ?: throw IllegalStateException("endAtが入っていません"),
+            allDay = getBoolean("allDay") ?: throw IllegalStateException("allDayが入っていません"),
 
+            )
+
+        "task" -> ScheduleItem.Task(
+            id = id,
+            calendarId = calendarId,
+            title = title,
+            description = description,
+            createdBy = createdBy,
+            reminderMinutesBefore = reminderMinutesBefore,
+            updatedAt = updatedAt,
+            dueAt = getDate("dueAt")?.toInstant()
+                ?: throw IllegalStateException("dueAtが入っていません"),
+            isCompleted = getBoolean("isCompleted")
+                ?: throw IllegalStateException("isCompletedが入っていません"),
         )
 
-        "task" -> ScheduleItem.Task()
         else -> throw IllegalStateException("typeが不正です")
     }
-
-
-    // TODO: ③ 型を戻すのを忘れない（toMap の逆）
-    //         Date -> .toInstant() で Instant に戻す
-    //         Long -> .toInt() で Int に戻す（Firestore は整数を必ず Long で返すため）
-
-    TODO("Step 15-E で実装する")
 }

@@ -135,7 +135,7 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | `users` | トップレベル | uid, displayName, email, photoUrl, fcmTokens[], createdAt |
 | `calendars` | トップレベル | calendarId, name, ownerUid, type, color, createdAt |
 | `calendars/{calendarId}/members` | サブコレクション | uid, role(owner/editor/viewer), joinedAt, invitedBy |
-| `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, createdBy, reminderMinutesBefore, updatedAt |
+| `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, sortAt, createdBy, reminderMinutesBefore, updatedAt |
 | `invites` | トップレベル | inviteId, calendarId, invitedEmail, role, status, invitedBy, createdAt |
 
 **設計メモ**
@@ -143,6 +143,11 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 - `members`はサブコレクションにすることで、Firestoreセキュリティルールから「このカレンダーの`members/{自分のuid}`を参照してロールを確認する」という認可判定を自然に書ける
 - FCMトークンはユーザードキュメントの配列フィールドで管理（複数端末対応、シンプルさ優先）
 - リマインダー時間はイベント単位の共通設定（メンバーごとの個別設定は将来拡張）
+- **`sortAt` は期間クエリ・並べ替え専用の共通フィールド**（2026-08-07 決定）。予定は `startAt`、タスクは `dueAt` と同じ値を入れる。
+  Firestore の範囲絞り込みは単一フィールドにしか掛けられないため、`type` によって見る場所が変わるのを避ける狙い。
+  - Kotlin 側の `ScheduleItem` には持たせない。`startAt` / `dueAt` から導出できる重複情報なので、data 層の `toMap()` で保存直前に付与する（`type` と同じ扱い）
+  - ⚠️ 既知の割り切り：表示期間をまたぐ長い予定（例：7/28〜8/5 の旅行を8月のカレンダーで見る）は `sortAt` が範囲外になり取得できない。
+    Phase2 では許容し、必要になった時点で `endAt` を併用する条件に拡張する
 
 ---
 
