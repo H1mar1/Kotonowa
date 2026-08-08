@@ -67,7 +67,23 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。次は Phase 2（個人のスケジュール/タスク管理 + ローカル通知）。**
+**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — データ層まで完成（2026-08-08）。**
+
+### Phase 2 の進捗
+
+| Step | 内容 | 状態 |
+|---|---|---|
+| 13 | `domain/model/ScheduleItem`（sealed class。Event / Task） | ✅ |
+| 14 | `domain/repository/ScheduleRepository`（interface） | ✅ |
+| 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
+| 16 | カレンダー画面の ViewModel（`observeItems` を collect） | ⬅️ 次 |
+
+Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
+E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
+
+**Step 16 で最初にやること**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の
+範囲条件を組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラー
+メッセージ内の URL を開けば作成できる。
 
 - ✅ Firebase 依存（BoM 34.16.0 / Auth・Firestore・Analytics）＋ `google-services.json`
 - ✅ Hilt 導入済み（`KotonowaApplication`, `di/FirebaseModule`, `di/RepositoryModule`）
