@@ -268,6 +268,41 @@ repository.observeItems(id).collect { list ->
 Firestore は「データが変わったら教える」機能を標準で持っているので、
 それを `Flow` に流し込むと**画面が勝手に最新になる**。
 
+### (58) `StateFlow` — 「今の値」を必ず持っている管
+
+㉝ の `Flow` は**流れてくるだけ**で、「今いくつ？」と聞いても答えられない（蛇口は水を出すが、
+出した水を覚えてはいない）。画面は「今の状態」をいつでも知る必要があるので、それでは困る。
+
+`StateFlow`（ステートフロー＝状態の管）は「**最新の1つを常に手元に持っている管**」。
+
+| | 今の値を聞けるか | たとえ |
+|---|---|---|
+| `Flow` | ✕ | 蛇口 |
+| `StateFlow` | ○（`.value`） | **中身が見えるタンク付きの蛇口** |
+
+画面が回転して作り直されても、`StateFlow` に聞けば最新の状態がすぐ手に入る。
+
+**3点セットで使う。**
+
+```kotlin
+private val _uiState = MutableStateFlow(LoginUiState())        // ①内部用
+val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()  // ②公開用
+
+_uiState.update { it.copy(isLoading = true) }                  // ③書き換え
+```
+
+| | 役割 |
+|---|---|
+| `MutableStateFlow(初期値)` | **書き換えられる**版。`Mutable`（ミュータブル＝変えられる） |
+| `.asStateFlow()` | 書き換え機能を隠して「**読むだけ**」の姿にする |
+| `.update { }` | 今の値を `it` で受け取り、`copy()`（㉗）で一部だけ変えて入れ直す |
+
+**なぜ2つに分けるのか。** 画面から勝手に状態を書き換えられると、どこで値が変わったのか
+追えなくなる。「**書き換えていいのは ViewModel だけ**」という約束を型で強制している。
+`_` 始まりの名前は「内部用」を示す慣習。
+
+💡 画面側で受け取るときは `by ... collectAsStateWithLifecycle()`（§3-⑫）を使う。
+
 ### ㊾ `callbackFlow { }` — 「呼び返し」を `Flow` の管に変える変換器
 
 ㉝ で「Firestore の変更通知を `Flow` に流し込む」と書いたが、**そのままでは繋がらない**。
@@ -449,6 +484,29 @@ error.message ?: "ログインに失敗しました"
 `if` の入れ子が深くならず読みやすい。
 
 ⚠️ 打ち切る処理（`close` など）を書いても、`return@` を忘れると**下の行も実行される**。セットで書く。
+
+### (59) `>` の直後の `=` — スペースが意味を変える唯一の場面
+
+Kotlin は普通、スペースの有無で意味が変わらない。`a=b` も `a = b` も同じ。
+**例外は「記号どうしが隣り合うとき」**で、2文字が合体して別の記号になる。
+
+```kotlin
+val uiState: StateFlow<CalendarUiState>=_uiState.asStateFlow()   // ❌
+val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow() // ✅
+```
+
+❌ の方は `>` と `=` が **`>=`（以上、§5-(53)）** として読まれ、こうなる。
+
+```
+Syntax error: Expecting a '>'.        → '>' が必要です（< > が閉じていない）
+Property must be initialized...       → 中身が決まらないので連鎖して出る
+```
+
+⚠️ **エラーが3つ出ても原因は1箇所**ということがよくある。上から順に、
+**最初のエラーだけ**を見て直すのが早い。
+
+💡 `< >`（§4-㊼）付きの型を書いた直後に `=` を置くときは必ずスペースを空ける。
+**Ctrl + Alt + L**（Reformat Code）で自動的に正しくなる。
 
 ### ⑯ `?` — null（ヌル）かもしれない印
 
@@ -938,6 +996,39 @@ data class User(val uid: String, val email: String?)
 - `copy()` … 一部だけ変えた複製を作る（`it.copy(email = "...")` はこれ）
 
 `_uiState.update { it.copy(...) }` が書けるのは `UiState` が `data class` だから。
+
+⚠️ **プロパティ（引数）が最低1つ必要。** カッコの中が空だと
+`Data class must have at least one primary constructor parameter`
+（data class には少なくとも1つのコンストラクタ引数が必要です）というエラーになる。
+
+中身が1つも無ければ、比較すべきものも複製すべきものも無く、`data` を付ける意味が消えるため。
+
+### (57) `val x: T = 既定値` — 省略できる引数（デフォルト値）
+
+```kotlin
+data class CalendarUiState(
+    val items: List<ScheduleItem> = emptyList(),
+    val isLoading: Boolean = true,
+)
+```
+
+`=` の右は「**書かなかったときに使われる値**」。渡さずに済ませられる。
+
+| 呼び方 | 結果 |
+|---|---|
+| `CalendarUiState()` | 全部デフォルト値 |
+| `CalendarUiState(isLoading = false)` | 指定したものだけ差し替え（§1-⑤ の名前付き引数と併用） |
+
+⚠️ **これで `=` は3種類目。** 見分けは「どこに書いてあるか」。
+
+| 場所 | 意味 | 参照 |
+|---|---|---|
+| 文の途中 `val a = b` | 箱に入れる | §1-① |
+| `()` の中・**呼ぶ側** | 荷札（名前付き引数） | §1-⑤ |
+| `()` の中・**宣言側** | **既定値** | (57) |
+
+💡 これがあるので `MutableStateFlow(LoginUiState())` のように**空のカッコ**で初期状態を作れる。
+`data class` の `copy()`（㉗）が「一部だけ変えた複製」を作れるのも、この仕組みのおかげ。
 
 ### ㉘ `sealed class` — 仲間を数え上げられる型
 

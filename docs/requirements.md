@@ -143,6 +143,10 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 - `members`はサブコレクションにすることで、Firestoreセキュリティルールから「このカレンダーの`members/{自分のuid}`を参照してロールを確認する」という認可判定を自然に書ける
 - FCMトークンはユーザードキュメントの配列フィールドで管理（複数端末対応、シンプルさ優先）
 - リマインダー時間はイベント単位の共通設定（メンバーごとの個別設定は将来拡張）
+- **個人カレンダーの `calendarId` は、そのユーザーの `uid` をそのまま使う**（2026-08-08 決定）。
+  Phase2 は個人利用のみなので `calendars` ドキュメントは作らない。ViewModel は `AuthRepository.currentUser?.uid`
+  を `calendarId` として `ScheduleRepository` に渡す。
+  Phase3 で共有カレンダーを導入する際に `calendars/{uid}`（type=personal）を後から作れば、既存データと矛盾しない
 - **`sortAt` は期間クエリ・並べ替え専用の共通フィールド**（2026-08-07 決定）。予定は `startAt`、タスクは `dueAt` と同じ値を入れる。
   Firestore の範囲絞り込みは単一フィールドにしか掛けられないため、`type` によって見る場所が変わるのを避ける狙い。
   - Kotlin 側の `ScheduleItem` には持たせない。`startAt` / `dueAt` から導出できる重複情報なので、data 層の `toMap()` で保存直前に付与する（`type` と同じ扱い）
