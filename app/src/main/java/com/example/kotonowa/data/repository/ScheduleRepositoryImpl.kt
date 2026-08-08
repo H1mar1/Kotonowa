@@ -88,20 +88,29 @@ class ScheduleRepositoryImpl @Inject constructor(
         from: Instant,
         to: Instant,
     ): Flow<List<ScheduleItem>> = callbackFlow {
-        
+
         val registration = firestore.collection(COLLECTION_EVENTS)
             .whereEqualTo("calendarId", calendarId)
             .whereGreaterThanOrEqualTo("sortAt", Date.from(from))
-            .whereLessThan("sortAt",Date.from(to))
+            .whereLessThan("sortAt", Date.from(to))
             .orderBy("sortAt")
-            .addSnapshotListener { napshots, error -> }
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
 
-        //
-        //   ヒント: where に渡す日時は Date.from(...) にする。
-        //          保存したのが Date なので、探す条件も同じ形に揃える（15-F-1 と同じ話）
+                val items = snapshot?.documents
+                    ?.mapNotNull { doc -> runCatching { doc.toScheduleItem() }.getOrNull() }
+                    ?: emptyList()
 
-        // TODO 2: awaitClose { } の中で、TODO 1 の解除券を使って見張りを外す（外す命令は remove()）
-        //   これを書かないと実行時にエラーになる。画面が消えても通信し続けるのを防ぐ後片付け
+                trySend(items)
+            }
+
+
+        awaitClose {
+            registration.remove()
+        }
     }
 }
 
