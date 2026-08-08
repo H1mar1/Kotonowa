@@ -86,15 +86,15 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 | | 内容 | 状態 |
 |---|---|---|
 | 16-A | `CalendarUiState`（items / isLoading / errorMessage） | ✅ |
-| 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ⚠️ あと1つ |
-| 16-C | `init` で `observeItems` を collect して UiState に反映 | — |
+| 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ✅ |
+| 16-C | `init` で `observeItems` を collect して UiState に反映 | ⬅️ 次 |
 | 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | — |
 | 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | — |
 | 16-F | 実機で確認＋Firestore の複合インデックス作成 | — |
 
-**⚠️ 次にやること（ビルドが通らない状態）**：`di/RepositoryModule.kt` の TODO。
-`ScheduleRepository` の `@Binds` が無く `[Dagger/MissingBinding]` でビルド失敗する。
-`bindAuthRepository` と同じ形で1つ足せば解消する。
+**16-C でやること**：`init { }` の中で `observeItems(calendarId, from, to)` を `collect` し、
+流れてきた一覧を `_uiState.update { }` で反映する。今月の範囲（`from`〜`to`）は
+`java.time` の `YearMonth` / `ZoneId` で作る（`Instant` と端末タイムゾーンの変換が初めて必要になる）。
 
 **16-F の注意**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の範囲条件を
 組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラーメッセージ内の
