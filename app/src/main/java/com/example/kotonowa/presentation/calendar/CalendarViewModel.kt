@@ -2,6 +2,7 @@ package com.example.kotonowa.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,8 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -77,6 +81,41 @@ class CalendarViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * 動作確認用に、ダミーの予定を 1 件追加する。
+     *
+     * Step 17 で作成画面を作ったら削除する仮実装。
+     */
+    fun addDummyItem() {
+
+        val id = calendarId ?: return
+
+        viewModelScope.launch {
+
+            val now = Instant.now()
+
+
+            val item = ScheduleItem.Event(
+                id = UUID.randomUUID().toString(),
+                calendarId = id,
+                title = "テスト予定",
+                description = null,
+                createdBy = id,
+                reminderMinutesBefore = null,
+                startAt = now,
+                updatedAt = now,
+                endAt = now.plus(1, ChronoUnit.HOURS),
+                allDay = false,
+            )
+            scheduleRepository.addItem(item)
+                .onFailure { error ->
+                    _uiState.update { state ->
+                        state.copy(errorMessage = error.message ?: "予定の追加に失敗しました")
+                    }
+                }
         }
     }
 }
