@@ -79,4 +79,33 @@ class CalendarViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * 動作確認用に、ダミーの予定を 1 件追加する。
+     *
+     * Step 17 で作成画面を作ったら削除する仮実装。
+     */
+    fun addDummyItem() {
+        // TODO 8: calendarId が null なら何もせず終わる
+        //   ?: return と書ける（§4-⑮ の「〜が無ければ」＋ return）。解説を参照
+
+        // TODO 9: viewModelScope.launch { } の中で addItem を呼ぶ（§2-⑩）
+        //   addItem は suspend なので「待てる場所」が要る（§2-⑨）
+        //
+        //   渡すのは ScheduleItem.Event（§7-㉘）。名前付き引数（§1-⑤）で全項目を埋める。
+        //   ScheduleItem.kt:28-43 を見ながら、必要な項目を確認すること
+        //
+        //   値の決め方:
+        //     id                    … UUID.randomUUID().toString()（重複しない文字列を作る）
+        //     calendarId            … 上で取り出したもの
+        //     title                 … "テスト予定" など好きな文言
+        //     description           … null
+        //     createdBy             … calendarId と同じ（＝自分の uid）
+        //     reminderMinutesBefore … null
+        //     updatedAt / startAt   … Instant.now()（今この瞬間）
+        //     endAt                 … 1 時間後。now.plus(1, ChronoUnit.HOURS)
+        //     allDay                … false
+        //
+        //   失敗したときは .onFailure { } で errorMessage を入れる（§4-⑳）
+    }
 }
