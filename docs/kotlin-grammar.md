@@ -154,6 +154,21 @@ list.map { item -> item.title }  // 同じ意味
 ⚠️ §1-⑤ の `名前 = 値`（名前付き引数）と混同しないこと。あちらは「**渡す**ときの荷札」、
 こちらは「**受け取った**ものに付ける名前」で、向きが逆。
 
+**その名前が通じるのは `{ }` の中だけ**（スコープ＝有効範囲）。
+
+```kotlin
+.collect { list ->
+    // ← ここでは list が使える
+}
+// ← ここでは list はもう存在しない（Unresolved reference: list）
+```
+
+`list` は「**流れてきたとき、その1回ぶんを呼ぶための呼び名**」でしかない。
+`{ }` を抜けた場所には「流れてきたもの」自体が無いので、名前も消える。
+
+💡 だから「流れてきたら○○する」という処理は、**必ず `{ }` の中に書く**。
+外に出したくなったら、それは設計を間違えている合図。
+
 ### (52) `"名前"` と `名前` — クオートの有無で世界が変わる
 
 同じ綴りでも、`"..."` で囲むかどうかで**別世界のもの**を指す。Firestore を触るコードで頻出。
@@ -267,6 +282,61 @@ repository.observeItems(id).collect { list ->
 
 Firestore は「データが変わったら教える」機能を標準で持っているので、
 それを `Flow` に流し込むと**画面が勝手に最新になる**。
+
+### (62) `Flow` は `collect` するまで何もしない（コールド）
+
+```kotlin
+scheduleRepository.observeItems(calendarId, from, to)   // ① まだ何も起きていない
+    .collect { list -> ... }                            // ② ここで初めて動き出す
+```
+
+- **①の時点では Firestore と一切通信していない。** 返ってくるのは「まだ水の流れていない蛇口」
+- **②の `.collect` を付けた瞬間に、`callbackFlow { }`（㊾）の中身が実行される。**
+  `addSnapshotListener` で見張りが付くのはこの瞬間
+
+この性質を**コールド**（冷たい）という。「**誰かが受け取ろうとするまで何もしない**」ので、
+誰も見ていない画面のために通信し続けることがない。
+
+⚠️ 逆に言うと、**`collect` を書き忘れると永久に何も起きない**。エラーも出ないので気づきにくい。
+「Repository は正しいのにデータが来ない」ときは、まずここを疑う。
+
+💡 `StateFlow`（(58)）は逆で**ホット**。`collect` していなくても最新の値を持ち続けている。
+画面が回転して作り直されても、すぐ今の状態を渡せるのはそのため。
+
+### (58) `StateFlow` — 「今の値」を必ず持っている管
+
+㉝ の `Flow` は**流れてくるだけ**で、「今いくつ？」と聞いても答えられない（蛇口は水を出すが、
+出した水を覚えてはいない）。画面は「今の状態」をいつでも知る必要があるので、それでは困る。
+
+`StateFlow`（ステートフロー＝状態の管）は「**最新の1つを常に手元に持っている管**」。
+
+| | 今の値を聞けるか | たとえ |
+|---|---|---|
+| `Flow` | ✕ | 蛇口 |
+| `StateFlow` | ○（`.value`） | **中身が見えるタンク付きの蛇口** |
+
+画面が回転して作り直されても、`StateFlow` に聞けば最新の状態がすぐ手に入る。
+
+**3点セットで使う。**
+
+```kotlin
+private val _uiState = MutableStateFlow(LoginUiState())        // ①内部用
+val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()  // ②公開用
+
+_uiState.update { it.copy(isLoading = true) }                  // ③書き換え
+```
+
+| | 役割 |
+|---|---|
+| `MutableStateFlow(初期値)` | **書き換えられる**版。`Mutable`（ミュータブル＝変えられる） |
+| `.asStateFlow()` | 書き換え機能を隠して「**読むだけ**」の姿にする |
+| `.update { }` | 今の値を `it` で受け取り、`copy()`（㉗）で一部だけ変えて入れ直す |
+
+**なぜ2つに分けるのか。** 画面から勝手に状態を書き換えられると、どこで値が変わったのか
+追えなくなる。「**書き換えていいのは ViewModel だけ**」という約束を型で強制している。
+`_` 始まりの名前は「内部用」を示す慣習。
+
+💡 画面側で受け取るときは `by ... collectAsStateWithLifecycle()`（§3-⑫）を使う。
 
 ### ㊾ `callbackFlow { }` — 「呼び返し」を `Flow` の管に変える変換器
 
@@ -450,6 +520,29 @@ error.message ?: "ログインに失敗しました"
 
 ⚠️ 打ち切る処理（`close` など）を書いても、`return@` を忘れると**下の行も実行される**。セットで書く。
 
+### (59) `>` の直後の `=` — スペースが意味を変える唯一の場面
+
+Kotlin は普通、スペースの有無で意味が変わらない。`a=b` も `a = b` も同じ。
+**例外は「記号どうしが隣り合うとき」**で、2文字が合体して別の記号になる。
+
+```kotlin
+val uiState: StateFlow<CalendarUiState>=_uiState.asStateFlow()   // ❌
+val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow() // ✅
+```
+
+❌ の方は `>` と `=` が **`>=`（以上、§5-(53)）** として読まれ、こうなる。
+
+```
+Syntax error: Expecting a '>'.        → '>' が必要です（< > が閉じていない）
+Property must be initialized...       → 中身が決まらないので連鎖して出る
+```
+
+⚠️ **エラーが3つ出ても原因は1箇所**ということがよくある。上から順に、
+**最初のエラーだけ**を見て直すのが早い。
+
+💡 `< >`（§4-㊼）付きの型を書いた直後に `=` を置くときは必ずスペースを空ける。
+**Ctrl + Alt + L**（Reformat Code）で自動的に正しくなる。
+
 ### ⑯ `?` — null（ヌル）かもしれない印
 
 `String?` は「文字列、または中身なし」。`String` は「必ず文字列が入っている」。
@@ -482,6 +575,44 @@ val updatedAt = getDate("updatedAt")?.toInstant()
 |---|---|---|
 | `?.` | 「あれば、その〜」 | null なら先へ進まず null を返す |
 | `?:` | 「〜が無ければ」 | null だったときの代わりを出す |
+
+### (61) `java.time` — 日時の型の使い分け
+
+日時には**種類がいくつもある**。「情報をどこまで持っているか」が違う。
+
+| 型 | 持っている情報 | 例 | たとえ |
+|---|---|---|---|
+| `Instant` | **世界共通の時刻の一点** | 2026-08-01T15:00:00Z | 「地球上のこの瞬間」 |
+| `LocalDate` | 日付だけ | 2026-08-01 | **カレンダーの升目**。何時かは言っていない |
+| `LocalDateTime` | 日付＋時刻 | 2026-08-01 00:00 | 壁掛け時計。**どこの国かは言っていない** |
+| `ZonedDateTime` | 日付＋時刻＋**場所** | 2026-08-01 00:00 +09:00 | 「日本時間の8月1日0時」 |
+| `ZoneId` | タイムゾーンそのもの | Asia/Tokyo | 「どこの国の時計か」 |
+| `YearMonth` | 年と月だけ | 2026-08 | 「今月」 |
+
+**なぜ分かれているのか。** 「8月1日 0:00」は**世界共通の瞬間ではない**。
+日本の 0:00 とロンドンの 0:00 は 9 時間ずれた別の瞬間。
+だから `LocalDateTime` のままでは「いつ」が決まらず、`Instant` に変換できない。
+**タイムゾーンを当てて初めて一点に定まる。**
+
+```kotlin
+val zone = ZoneId.systemDefault()                    // 端末のタイムゾーン
+val month = YearMonth.now(zone)                      // 2026-08
+val from = month.atDay(1).atStartOfDay(zone).toInstant()
+```
+
+| 書いたところまで | 手に持っているもの |
+|---|---|
+| `YearMonth.now(zone)` | 2026-08（年と月） |
+| `.atDay(1)` | 2026-08-01（`LocalDate`。at day＝その日の） |
+| `.atStartOfDay(zone)` | 2026-08-01 00:00 +09:00（`ZonedDateTime`。start of day＝その日の始まり） |
+| `.toInstant()` | 世界共通の時刻（`Instant`） |
+
+`.plusMonths(1)` は「1か月足す」＝翌月にずらす（`plus`＝足す）。
+
+💡 **アプリの中では常に `Instant` で持ち、表示するときだけタイムゾーンを当てる**のが定石
+（`ScheduleItem.kt:12` のコメントがこれ）。国をまたいでも予定の時刻がずれない。
+
+💡 minSdk 26 なのでそのまま使える（古い Android 向けの desugaring 設定は不要）。
 
 ### ⑰ `as` — 型を言い換える
 
@@ -939,6 +1070,39 @@ data class User(val uid: String, val email: String?)
 
 `_uiState.update { it.copy(...) }` が書けるのは `UiState` が `data class` だから。
 
+⚠️ **プロパティ（引数）が最低1つ必要。** カッコの中が空だと
+`Data class must have at least one primary constructor parameter`
+（data class には少なくとも1つのコンストラクタ引数が必要です）というエラーになる。
+
+中身が1つも無ければ、比較すべきものも複製すべきものも無く、`data` を付ける意味が消えるため。
+
+### (57) `val x: T = 既定値` — 省略できる引数（デフォルト値）
+
+```kotlin
+data class CalendarUiState(
+    val items: List<ScheduleItem> = emptyList(),
+    val isLoading: Boolean = true,
+)
+```
+
+`=` の右は「**書かなかったときに使われる値**」。渡さずに済ませられる。
+
+| 呼び方 | 結果 |
+|---|---|
+| `CalendarUiState()` | 全部デフォルト値 |
+| `CalendarUiState(isLoading = false)` | 指定したものだけ差し替え（§1-⑤ の名前付き引数と併用） |
+
+⚠️ **これで `=` は3種類目。** 見分けは「どこに書いてあるか」。
+
+| 場所 | 意味 | 参照 |
+|---|---|---|
+| 文の途中 `val a = b` | 箱に入れる | §1-① |
+| `()` の中・**呼ぶ側** | 荷札（名前付き引数） | §1-⑤ |
+| `()` の中・**宣言側** | **既定値** | (57) |
+
+💡 これがあるので `MutableStateFlow(LoginUiState())` のように**空のカッコ**で初期状態を作れる。
+`data class` の `copy()`（㉗）が「一部だけ変えた複製」を作れるのも、この仕組みのおかげ。
+
 ### ㉘ `sealed class` — 仲間を数え上げられる型
 
 ```kotlin
@@ -959,6 +1123,30 @@ sealed class ScheduleItem {
 
 補足：`sealed interface` もある。中身（プロパティ）を持たせる必要がなく、
 複数の親を持たせたいときはこちら。`SplashUiState` がその例。
+
+### (60) `init { }` — 作られた瞬間に 1 回だけ走る場所
+
+```kotlin
+class CalendarViewModel(...) : ViewModel() {
+    private val _uiState = MutableStateFlow(CalendarUiState())
+
+    init {
+        observeThisMonth()   // ← この ViewModel が作られた瞬間に実行される
+    }
+}
+```
+
+`init`（イニット＝ initialize＝初期化）は**クラスが作られるときに走る `{ }`**。
+「箱を用意するだけでは足りず、**最初に一度やっておきたいこと**がある」ときに使う。
+
+- 上から順に、`val` の初期化と混ざって**書いた順に**実行される
+- だから `init { }` は、そこで使う `val` より**下**に書く（上に書くとまだ空）
+
+**なぜカレンダー画面で必要か。** ログイン画面は「ユーザーがボタンを押すまで何もしない」ので
+`init` が要らなかった。カレンダーは**開いた瞬間に読み込みを始めたい**ので、
+誰かがボタンを押すのを待たず、`init` で自分から動き出す。
+
+💡 `CalendarUiState.isLoading` の既定値を `true` にしたのはこのため（§7-(57)）。
 
 ### ㉚ `abstract val` — 「持っていることだけ決める」宣言
 

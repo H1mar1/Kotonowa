@@ -76,14 +76,35 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 13 | `domain/model/ScheduleItem`（sealed class。Event / Task） | ✅ |
 | 14 | `domain/repository/ScheduleRepository`（interface） | ✅ |
 | 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
-| 16 | カレンダー画面の ViewModel（`observeItems` を collect） | ⬅️ 次 |
+| 16 | カレンダー画面（`presentation/calendar/`） | ⬅️ 進行中 |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
 
-**Step 16 で最初にやること**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の
-範囲条件を組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラー
-メッセージ内の URL を開けば作成できる。
+#### Step 16 の内訳
+
+| | 内容 | 状態 |
+|---|---|---|
+| 16-A | `CalendarUiState`（items / isLoading / errorMessage） | ✅ |
+| 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ✅ |
+| 16-C | `init` で `observeItems` を collect して UiState に反映 | ✅ |
+| 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ⬅️ 次 |
+| 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | — |
+| 16-F | 実機で確認＋Firestore の複合インデックス作成 | — |
+
+**16-D でやること**：`CalendarScreen` を作り、`uiState` を `collectAsStateWithLifecycle` で受けて
+一覧を表示する。動作確認用に、押すとダミー予定を `addItem` する仮「＋」ボタンも置く
+（Step 17 の作成画面ができたら外す）。
+
+**16-F の注意**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の範囲条件を
+組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラーメッセージ内の
+URL を開けば作成できる。
+
+#### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
+
+- 個人カレンダーの `calendarId` は**そのユーザーの `uid`**。`calendars` コレクションは作らない
+- `sortAt`（Event は `startAt`、Task は `dueAt` と同値）で期間クエリと並べ替えを行う
+- 画面はまず**一覧だけ**作る。月の升目は後回し
 
 - ✅ Firebase 依存（BoM 34.16.0 / Auth・Firestore・Analytics）＋ `google-services.json`
 - ✅ Hilt 導入済み（`KotonowaApplication`, `di/FirebaseModule`, `di/RepositoryModule`）
