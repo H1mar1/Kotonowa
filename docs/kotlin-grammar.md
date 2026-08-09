@@ -614,6 +614,35 @@ val from = month.atDay(1).atStartOfDay(zone).toInstant()
 
 💡 minSdk 26 なのでそのまま使える（古い Android 向けの desugaring 設定は不要）。
 
+**時間を足す・引く。**
+
+```kotlin
+Instant.now().plus(1, ChronoUnit.HOURS)   // 1 時間後
+```
+
+`plus(数, 単位)` の形で、単位は `ChronoUnit`（クロノユニット＝時間の単位）から選ぶ
+（`MINUTES` / `HOURS` / `DAYS` など）。
+
+⚠️ **`Instant` には月・年の単位が使えない。** 月は 28〜31 日と長さがバラバラで、
+「世界共通の時刻の一点」だけでは何日足せばよいか決まらないため。
+月単位でずらしたいときは `YearMonth` や `LocalDate` の `.plusMonths(1)` を使う。
+
+### (63) `UUID.randomUUID().toString()` — 重複しない ID を作る
+
+```kotlin
+val id = UUID.randomUUID().toString()   // 例: "3f2b1c8e-...-9a7d"
+```
+
+`UUID`（ユーユーアイディー）は「世界中で重複しない」ように作られた識別子。
+`randomUUID()` でランダムに1つ作り、`.toString()` で文字列にする。
+
+**なぜアプリ側で作るのか。** `addItem` は `.document(item.id).set(...)` と書いており、
+**保存先の場所を `item.id` で決めている**（`ScheduleRepositoryImpl.kt`）。
+渡す前に id が決まっていなければならない。
+
+Firestore に自動採番させる方法（`.add()`）もあるが、それだと「保存するまで id が分からない」
+ことになり、`ScheduleItem` が `id` を必ず持つ設計（`abstract val id`、§7-㉚）と噛み合わない。
+
 ### ⑰ `as` — 型を言い換える
 
 ```kotlin
@@ -940,6 +969,31 @@ Firestore の絞り込みでは、`==` や `>=` といった**記号を書かな
 ⚠️ カッコの中に記号を書くと壊れる。`whereEqualTo("calendarId" == calendarId)` は
 「判定の答え（`false`）を材料1つだけ渡した」ことになり、`No value passed for parameter 'value'`
 （パラメータ `value` に値が渡されていません）というエラーになる。
+
+### (64) 主語なしの `when { }` — 条件を上から順に試す
+
+㉙ の `when (item) { ... }` は「**この値**が何か」で分岐する形だった。
+`( )` を書かずに `when { }` とすると、**条件を上から順に試す**形になる。
+
+```kotlin
+when {
+    uiState.isLoading -> ぐるぐるを出す
+    uiState.errorMessage != null -> エラー文言を出す
+    uiState.items.isEmpty() -> 「予定はありません」を出す
+    else -> 一覧を出す
+}
+```
+
+- `->` の**左が条件**（はい/いいえで答えられる問い。§5-㉑）
+- **上から順に試し、最初に当てはまった 1 つだけ**が実行される（§6-㉕ の `catch` と同じ）
+- `if / else if / else` を何個も並べるのと同じ意味だが、**縦に揃って読みやすい**
+
+⚠️ **順番が意味を持つ。** 上の例で `items.isEmpty()` を先頭に置くと、
+読み込み中（まだ 0 件）のときに「予定はありません」と出てしまう。
+**「まだ分からない」→「異常」→「空」→「正常」**の順に並べるのが定石。
+
+⚠️ 値を返す `when`（㊳）として使うときは `else` が必須。条件の羅列では
+「全部の場合を書いた」と Kotlin が保証できないため。
 
 ### ㉓ 全部大文字の名前 — 定数
 

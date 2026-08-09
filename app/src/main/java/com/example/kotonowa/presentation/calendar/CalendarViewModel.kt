@@ -2,6 +2,7 @@ package com.example.kotonowa.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,8 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -86,26 +90,32 @@ class CalendarViewModel @Inject constructor(
      * Step 17 で作成画面を作ったら削除する仮実装。
      */
     fun addDummyItem() {
-        // TODO 8: calendarId が null なら何もせず終わる
-        //   ?: return と書ける（§4-⑮ の「〜が無ければ」＋ return）。解説を参照
 
-        // TODO 9: viewModelScope.launch { } の中で addItem を呼ぶ（§2-⑩）
-        //   addItem は suspend なので「待てる場所」が要る（§2-⑨）
-        //
-        //   渡すのは ScheduleItem.Event（§7-㉘）。名前付き引数（§1-⑤）で全項目を埋める。
-        //   ScheduleItem.kt:28-43 を見ながら、必要な項目を確認すること
-        //
-        //   値の決め方:
-        //     id                    … UUID.randomUUID().toString()（重複しない文字列を作る）
-        //     calendarId            … 上で取り出したもの
-        //     title                 … "テスト予定" など好きな文言
-        //     description           … null
-        //     createdBy             … calendarId と同じ（＝自分の uid）
-        //     reminderMinutesBefore … null
-        //     updatedAt / startAt   … Instant.now()（今この瞬間）
-        //     endAt                 … 1 時間後。now.plus(1, ChronoUnit.HOURS)
-        //     allDay                … false
-        //
-        //   失敗したときは .onFailure { } で errorMessage を入れる（§4-⑳）
+        val id = calendarId ?: return
+
+        viewModelScope.launch {
+
+            val now = Instant.now()
+
+
+            val item = ScheduleItem.Event(
+                id = UUID.randomUUID().toString(),
+                calendarId = id,
+                title = "テスト予定",
+                description = null,
+                createdBy = id,
+                reminderMinutesBefore = null,
+                startAt = now,
+                updatedAt = now,
+                endAt = now.plus(1, ChronoUnit.HOURS),
+                allDay = false,
+            )
+            scheduleRepository.addItem(item)
+                .onFailure { error ->
+                    _uiState.update { state ->
+                        state.copy(errorMessage = error.message ?: "予定の追加に失敗しました")
+                    }
+                }
+        }
     }
 }
