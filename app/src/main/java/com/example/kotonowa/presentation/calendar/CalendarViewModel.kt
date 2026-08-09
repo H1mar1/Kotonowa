@@ -1,12 +1,17 @@
 package com.example.kotonowa.presentation.calendar
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 
 /**
@@ -30,4 +35,48 @@ class CalendarViewModel @Inject constructor(
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
 
     val calendarId = authRepository.currentUser?.uid
+
+    init {
+        observeThisMonth()
+    }
+
+    /**
+     * 今月の予定/タスクを監視し始める。
+     */
+    private fun observeThisMonth() {
+        // ログインしていなければ calendarId が無く、読み込みようがない
+        if (calendarId == null) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = "ログイン情報が取得できませんでした"
+                )
+            }
+            return
+        }
+
+        val zone = ZoneId.systemDefault()
+        val month = YearMonth.now(zone)
+        val from = month.atDay(1).atStartOfDay(zone).toInstant()
+        val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()
+
+
+        viewModelScope.launch {
+            try {
+                scheduleRepository.observeItems(calendarId, from, to)
+                    .collect { list ->
+                        _uiState.update { state ->
+                            state.copy(items = list, isLoading = false)
+                        }
+                    }
+            } catch (e: Exception) {
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "予定の読み込みに失敗しました"
+                    )
+                }
+            }
+        }
+    }
 }

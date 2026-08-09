@@ -87,14 +87,14 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 |---|---|---|
 | 16-A | `CalendarUiState`（items / isLoading / errorMessage） | ✅ |
 | 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ✅ |
-| 16-C | `init` で `observeItems` を collect して UiState に反映 | ⬅️ 次 |
-| 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | — |
+| 16-C | `init` で `observeItems` を collect して UiState に反映 | ✅ |
+| 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ⬅️ 次 |
 | 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | — |
 | 16-F | 実機で確認＋Firestore の複合インデックス作成 | — |
 
-**16-C でやること**：`init { }` の中で `observeItems(calendarId, from, to)` を `collect` し、
-流れてきた一覧を `_uiState.update { }` で反映する。今月の範囲（`from`〜`to`）は
-`java.time` の `YearMonth` / `ZoneId` で作る（`Instant` と端末タイムゾーンの変換が初めて必要になる）。
+**16-D でやること**：`CalendarScreen` を作り、`uiState` を `collectAsStateWithLifecycle` で受けて
+一覧を表示する。動作確認用に、押すとダミー予定を `addItem` する仮「＋」ボタンも置く
+（Step 17 の作成画面ができたら外す）。
 
 **16-F の注意**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の範囲条件を
 組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラーメッセージ内の
