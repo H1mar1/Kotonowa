@@ -643,6 +643,41 @@ val id = UUID.randomUUID().toString()   // 例: "3f2b1c8e-...-9a7d"
 Firestore に自動採番させる方法（`.add()`）もあるが、それだと「保存するまで id が分からない」
 ことになり、`ScheduleItem` が `id` を必ず持つ設計（`abstract val id`、§7-㉚）と噛み合わない。
 
+### (65) スマートキャストが効かないとき — ローカルの `val` に受け直す
+
+⑱ の通り、`if (x != null)` で確かめた後は Kotlin が `x` を「中身あり」として扱ってくれる
+（スマートキャスト）。**ただし、それが効くのは「途中で変わらないと保証できるもの」だけ。**
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+when {
+    uiState.errorMessage != null -> Text(uiState.errorMessage)   // ❌ 効かない
+}
+```
+
+> `Smart cast to 'String' is impossible, because 'uiState.errorMessage' is a property
+> that has open or custom getter`
+> （`uiState.errorMessage` は独自の取り出し方を持つプロパティなので、スマートキャストできません）
+
+`uiState` は `by`（§3-⑫）で委譲された箱で、**触るたびに中身を取り直している**。
+Kotlin から見ると「確かめた直後に別の値へ変わっているかもしれない」ので、保証できない。
+
+**対処は、いったんローカルの `val` に受けること。**
+
+```kotlin
+val message = uiState.errorMessage      // ここで 1 回だけ取り出す
+
+when {
+    message != null -> Text(message)    // ✅ message は変わらないので効く
+}
+```
+
+`val`（§1-①）は一度入れたら変わらない箱なので、Kotlin が安心して確定できる。
+
+💡 同じ対処は `@Composable` の中で何度も同じ値を読むときにも有効
+（毎回取り直す無駄が減る）。§3-㉜ の「値を先に取り出しておく」と同じ発想。
+
 ### ⑰ `as` — 型を言い換える
 
 ```kotlin

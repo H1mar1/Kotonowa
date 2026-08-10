@@ -1,9 +1,18 @@
 package com.example.kotonowa.presentation.calendar
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * カレンダー画面。
@@ -19,24 +28,34 @@ fun CalendarScreen(
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
-    // TODO 10: ViewModel の状態を受け取る（手本: LoginScreen.kt:65）
-    //   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    //   by は §3-⑫。import が 2 つ要る（getValue と collectAsStateWithLifecycle）
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
-            // TODO 11: FloatingActionButton を置く
-            //   onClick で viewModel.addDummyItem() を呼ぶ
-            //   中身は Icon(Icons.Default.Add, contentDescription = "予定を追加")
+            FloatingActionButton(onClick = { viewModel.addDummyItem() }) {
+                Text("＋")
+            }
         },
     ) { innerPadding ->
-        // TODO 12: uiState の中身によって表示を出し分ける（§5-(64) の「主語なし when」）
-        //   isLoading が true      → CircularProgressIndicator（ぐるぐる）
-        //   errorMessage が null 以外 → Text でエラー文言
-        //   items が空             → Text("今月の予定はありません")
-        //   それ以外               → 16-D-3 で一覧（LazyColumn）を書く
-        //
-        //   どの枝でも Modifier に .padding(innerPadding) を付けること（理由は解説）
+        val message = uiState.errorMessage
+
+
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            // 上から順に試し、最初に当てはまった 1 つだけが描かれる（§5-(64)）
+            // 「まだ分からない」→「異常」→「空」→「正常」の順
+            when {
+                uiState.isLoading -> CircularProgressIndicator()
+                message != null -> Text(message)
+                uiState.items.isEmpty() -> Text("今月の予定はありません")
+                else -> Text("一覧はここに出る")   // 16-D-3 で LazyColumn に置き換える
+            }
+        }
     }
 }
