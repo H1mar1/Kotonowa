@@ -430,6 +430,49 @@ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 `@` で始まるものは**アノテーション**＝「この関数はこういう性質です」という付箋。
 `@Composable` は「これは画面を描く関数です」という印。
 
+### (66) `LazyColumn` — 見えている分だけ描く縦のリスト
+
+`Column`（縦に並べる）との違いは「**いつ描くか**」。
+
+| | 描くもの | 向いている場面 |
+|---|---|---|
+| `Column` | **中身を全部**。最初に全部作る | 数個の部品を縦に並べる |
+| `LazyColumn` | **画面に見えている分だけ**。スクロールに応じて作る | 件数が分からない一覧 |
+
+`Lazy`（レイジー＝怠け者）＝「必要になるまで作らない」。予定が 1000 件あっても、
+画面に映る 10 件ぶんしか作らないので固まらない。
+
+```kotlin
+LazyColumn(
+    contentPadding = PaddingValues(16.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+) {
+    items(
+        items = uiState.items,
+        key = { item -> item.id },
+    ) { item ->
+        Text(item.title)
+    }
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `items(items = リスト) { 要素 -> }` | リストの 1 件ごとに `{ }` を呼んで行を作る（§1-㊿） |
+| `key = { it.id }` | **各行を見分ける目印**。下の⚠️を参照 |
+| `contentPadding` | **リストの内側**の余白。スクロールすると余白も一緒に動く |
+| `verticalArrangement = Arrangement.spacedBy(8.dp)` | 行と行のすき間 |
+
+⚠️ **`key` は付けること。** 無いと Compose は「上から何番目か」でしか行を見分けられない。
+先頭に 1 件挿入すると全部が 1 つずつずれ、**全行を作り直す**ことになる。
+`key` に `id` を渡しておけば「この行はさっきと同じもの」と分かり、
+**動いた行だけ**を描き直せる（速いうえに、入力中の状態も保たれる）。
+
+⚠️ `contentPadding` と `Modifier.padding` は別物。`Modifier.padding` はリスト**の外側**を縮めるので、
+スクロールしたとき端で内容が切れて見える。一覧の余白は `contentPadding` を使う。
+
+💡 `dp`（ディーピー）は画面の密度に依らない長さの単位。`16.dp` は「どの端末でも同じくらいの見た目の 16」。
+
 ### ㉜ `@Composable` 関数は `@Composable` の中でしか呼べない
 
 `suspend`（§2-⑨）とまったく同じ形のルールがもう1つある。
