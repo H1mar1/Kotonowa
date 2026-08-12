@@ -670,6 +670,44 @@ Instant.now().plus(1, ChronoUnit.HOURS)   // 1 時間後
 「世界共通の時刻の一点」だけでは何日足せばよいか決まらないため。
 月単位でずらしたいときは `YearMonth` や `LocalDate` の `.plusMonths(1)` を使う。
 
+### (67) `DateTimeFormatter` — 日時を「読める文字」にする型紙
+
+`Instant`（(61)）はコンピュータ用の時刻で、そのまま出すと
+`2026-08-13T05:00:00Z` のような人に優しくない文字になる。表示用に整えるのが `DateTimeFormatter`。
+
+```kotlin
+private val DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("M/d(E) HH:mm")
+
+private fun Instant.toDisplayText(): String =
+    atZone(ZoneId.systemDefault()).format(DISPLAY_FORMATTER)
+```
+
+**型紙の記号**（`ofPattern` に渡す文字列）
+
+| 記号 | 意味 | 例 |
+|---|---|---|
+| `M` / `MM` | 月 | `8` / `08` |
+| `d` / `dd` | 日 | `3` / `03` |
+| `E` | 曜日 | `木` |
+| `HH` | 時（24時間） | `14` |
+| `mm` | 分 | `05` |
+
+**同じ文字を重ねると桁が揃う。** `M` は `8`、`MM` は `08`。
+
+⚠️ **記号でない文字を混ぜたいときは `'` で囲む。** `"M月d日"` の「月」「日」は
+たまたま記号と衝突しないが、`"HH時"` の `時` は安全でも `"HH'時'"` と書くのが確実。
+
+**2つの手順に分かれている。**
+
+1. `atZone(zone)` … 世界共通の時刻に「**どこの時計で見るか**」を当てて `ZonedDateTime` にする
+2. `.format(型紙)` … 型紙どおりの文字列にする
+
+タイムゾーンを当てないと「何日の何時」が決まらない（(61) の通り）。
+
+💡 **型紙は関数の外（ファイル直下）に `private val` で置く。** 作るのに手間がかかるうえ、
+中身が変わらないため。関数の中に書くと、一覧の行を描くたびに毎回作り直すことになる。
+`DateTimeFormatter` は中身を書き換えないので使い回して安全（§5-㉓ の定数に近い扱い）。
+
 ### (63) `UUID.randomUUID().toString()` — 重複しない ID を作る
 
 ```kotlin

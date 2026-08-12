@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.Instant
 
 /**
  * カレンダー画面。
@@ -68,7 +71,7 @@ fun CalendarScreen(
                         items = uiState.items,
                         key = { item -> item.id },
                     ) { item ->
-                        // TODO 15: 16-D-3-b で行の見た目に差し替える
+                        // TODO 17: 16-D-3-b-2 で ScheduleItemRow(item) に差し替える
                         Text(item.title)
                     }
                 }
@@ -76,3 +79,9 @@ fun CalendarScreen(
         }
     }
 }
+
+
+private val DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("M/d(E) HH:mm")
+
+private fun Instant.toDisplayText(): String =
+    atZone(ZoneId.systemDefault()).format(DISPLAY_FORMATTER)
