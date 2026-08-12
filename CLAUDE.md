@@ -88,17 +88,25 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 | 16-A | `CalendarUiState`（items / isLoading / errorMessage） | ✅ |
 | 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ✅ |
 | 16-C | `init` で `observeItems` を collect して UiState に反映 | ✅ |
-| 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ⬅️ 次 |
-| 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | — |
-| 16-F | 実機で確認＋Firestore の複合インデックス作成 | — |
+| 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ✅ |
+| 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | ✅ |
+| 16-F | 実機で確認＋Firestore の複合インデックス作成 | ✅ |
 
-**16-D でやること**：`CalendarScreen` を作り、`uiState` を `collectAsStateWithLifecycle` で受けて
-一覧を表示する。動作確認用に、押すとダミー予定を `addItem` する仮「＋」ボタンも置く
-（Step 17 の作成画面ができたら外す）。
+**Step 16 は 2026-08-12 に動作確認まで完了。** 「＋」を押すと Firestore に保存され、
+`observeItems` の Flow 経由で一覧が自動更新されることを実機相当のエミュレータで確認した。
 
-**16-F の注意**：`observeItems` のクエリは `calendarId` の等価条件と `sortAt` の範囲条件を
-組み合わせるため、**Firestore の複合インデックスが必要**。初回実行時に出るエラーメッセージ内の
-URL を開けば作成できる。
+残作業：16-D-3-b（行の見た目 — 予定/タスクの出し分け、日時の整形）。
+ログアウトボタンは `HomeScreen` の削除に伴い一時的に消えている。設定画面か `TopAppBar` に置き直す。
+
+**Firestore 側でやったこと（2026-08-12）**
+
+- セキュリティルールを `allow read, write: if request.auth != null;` に変更
+  （本番モードの初期値 `if false` のままだと `PERMISSION_DENIED`）
+- 複合インデックス（`events`: `calendarId` 昇順 ＋ `sortAt` 昇順）を作成
+  `observeItems` は等価条件と範囲条件を組み合わせるため必須。
+  エラーメッセージ内の URL を開けば設定入力済みの画面が出る
+
+**仮「＋」ボタン**は Step 17 の作成画面ができたら外す。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
@@ -139,6 +147,38 @@ Credential Manager（`androidx.credentials`）を使っている。`GoogleSignIn
 - キャンセル・アカウント0件は**例外**で飛んでくる。`try/catch` で受けないとアプリが落ちる。
   `catch` は具体的な型（`GetCredentialCancellationException` → `NoCredentialException`）を先に、
   おおまかな `GetCredentialException` を最後に置く。
+
+### 検証環境のハマりどころ（2026-08-12 追記）
+
+**「... is already running as process NNNN」でビルド/実行できない。**
+エミュレータのウィンドウを閉じても qemu プロセスだけ残ることがある（スリープ復帰後、
+Android Studio の強制終了後に起きやすい）。2026-08-10 と 08-12 に発生。
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb devices                       # offline と出ていればこの症状
+Stop-Process -Id <PID> -Force        # メッセージに出ている PID
+& $adb kill-server; & $adb start-server
+```
+
+そのあと Device Manager から起動し直す。`.lock` ファイルが残っていれば
+`~\.android\avd\<AVD名>.avd\` 配下から削除する。
+
+**ビルドキャッシュの破損。** 症状によって対処を変える（軽い方から試す）。
+
+| 症状 | 対処 |
+|---|---|
+| `NoSuchFileException`（Hilt/KSP の生成ファイルが無い） | `.\gradlew.bat :app:clean` |
+| `Incremental compilation failed` / `EOFException` | `.\gradlew.bat --stop` → `app\build`, `build`, `.kotlin` を削除 → 再ビルド |
+| Android Studio の表示だけおかしい | File → Invalidate Caches |
+
+⚠️ `clean` の実行中に Android Studio でビルドやエディタ操作をしない。
+同じフォルダを 2 プロセスが同時に触ると破損する（実際に発生した）。
+
+**Firestore が繋がっていなくてもエラーにならない。**
+Firestore SDK はオフライン時、端末内のキャッシュを返して裏で再接続を試み続ける。
+そのため画面上は「0 件」に見え、`close(error)` も呼ばれない。
+**「エラーが出ない＝繋がっている」ではない。** 疑わしいときは Logcat を `Firestore` で絞る。
 
 ### 検証環境のハマりどころ（2026-08-02）
 
@@ -217,7 +257,12 @@ Firestore のコレクション構造は `docs/requirements.md` §4 が正。要
 - **Hilt は 2.60.1 以上が必須。** 2.57.2 以下は AGP 9 で削除された `BaseExtension` API を使うため「Android BaseExtension not found」で失敗する。
 - **`gradle.properties` の `android.disallowKotlinSourceSets=false` は KSP の回避策。** Kotlin 2.2.10 に対応する KSP は 2.0.2 が最新で、これは AGP 9 の built-in Kotlin に未対応（生成コードの登録に旧 `kotlin.sourceSets` DSL を使う）。KSP が AGP 9 に対応したらフラグを削除する。
 - `hiltViewModel()` は `androidx.hilt.lifecycle.viewmodel.compose` から import する。`androidx.hilt.navigation.compose` の方は非推奨。
-- Firestore のセキュリティルールは未設計（テストモードのまま）。テストモードは作成から30日で失効するので Phase3 までに本設計する。
+- **Firestore データベースは 2026-08-12 に作成**（ロケーション `asia-northeast1` / テストモード）。
+  Phase1 では Auth しか使っておらず、データベース自体が存在しなかった。
+  作成には **Blaze プラン（従量課金）が必須**だったため 2026-08-12 にアップグレード済み。
+  無料枠内なら実費はほぼ 0 円だが、GCP の予算設定は**アラートのみで自動停止はしない**。
+- Firestore のセキュリティルールは未設計（テストモードのまま）。
+  **テストモードは作成から30日（＝2026-09-11 まで）で書き込みが拒否される**ので、Phase3 までに本設計する。
 
 ## ドキュメント
 

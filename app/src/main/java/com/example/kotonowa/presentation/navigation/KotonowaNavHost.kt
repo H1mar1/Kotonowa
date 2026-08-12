@@ -10,7 +10,6 @@ import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
 import com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.calendar.CalendarScreen
-//import com.example.kotonowa.presentation.home.HomeScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
 
@@ -76,16 +75,7 @@ fun KotonowaNavHost(
         }
 
         composable(Routes.HOME) {
-
             CalendarScreen()
-
-//            HomeScreen(
-//                onLogout = {
-//                    navController.navigate(Routes.LOGIN) {
-//                        popUpTo(Routes.HOME) { inclusive = true }
-//                    }
-//                },
-//            )
         }
 
         composable(Routes.PASSWORD_RESET) {
