@@ -2,13 +2,21 @@ package com.example.kotonowa.presentation.calendar
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,9 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.kotonowa.domain.model.ScheduleItem
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.Instant
 
 /**
  * カレンダー画面。
@@ -71,11 +80,50 @@ fun CalendarScreen(
                         items = uiState.items,
                         key = { item -> item.id },
                     ) { item ->
-                        // TODO 17: 16-D-3-b-2 で ScheduleItemRow(item) に差し替える
-                        Text(item.title)
+                        ScheduleItemRow(item = item)
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 一覧の 1 行。予定（Event）とタスク（Task）で表示を変える。
+ *
+ * 見た目だけを担当し、データの取得や判断は [CalendarViewModel] が済ませている。
+ */
+@Composable
+private fun ScheduleItemRow(
+    item: ScheduleItem,
+    modifier: Modifier = Modifier,
+) {
+    val label = when (item) {
+        is ScheduleItem.Event -> "予定"
+        is ScheduleItem.Task ->
+            if (item.isCompleted) "タスク完了"
+            else "タスク未完了"
+    }
+
+    val subText = when (item) {
+        is ScheduleItem.Event ->
+            if (item.allDay) "${item.startAt.toDateText()} 終日"
+            else "${item.startAt.toDisplayText()}～${item.endAt.toTimeText()}"
+
+        is ScheduleItem.Task -> "期限 ${item.dueAt.toDisplayText()}"
+
+    }
+
+
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(8.dp))
+                Text(item.title, style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(subText, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -85,3 +133,14 @@ private val DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("M/d(E) HH:mm")
 
 private fun Instant.toDisplayText(): String =
     atZone(ZoneId.systemDefault()).format(DISPLAY_FORMATTER)
+
+private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+
+private fun Instant.toTimeText(): String =
+    atZone(ZoneId.systemDefault()).format(TIME_FORMATTER)
+
+private val DATE_FORMATTER = DateTimeFormatter.ofPattern("M/d(E)")
+
+private fun Instant.toDateText(): String =
+    atZone(ZoneId.systemDefault()).format(DATE_FORMATTER)
+
