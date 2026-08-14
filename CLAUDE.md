@@ -91,7 +91,7 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 | 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ✅ |
 | 16-D-3-b | 行の見た目（`ScheduleItemRow`。予定/タスクの出し分け、日時の整形） | ✅ 08-14 |
 | 16-D-3-c | `@Preview` で 4 パターンを一度に確認できるようにする | ✅ 08-14 |
-| 16-D-3-d | 状態ごとの色分け（ラベルをバッジ化） | ⬅️ d-1 のみ完了 |
+| 16-D-3-d | 状態ごとの色分け（ラベルをバッジ化＋完了タスクの打ち消し線） | ✅ 08-15 |
 | 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | ✅ |
 | 16-F | 実機で確認＋Firestore の複合インデックス作成 | ✅ |
 
@@ -116,16 +116,23 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 `PREVIEW_ITEMS` に 4 件を固定値（`Instant.parse`）で持たせ、Preview パネルで一度に見比べる。
 Step 17 以降も画面を作るたびに使う。
 
-**16-D-3-d の残作業（再開地点）。** `CalendarScreen.kt` の `// TODO d-2:` を参照。
+**16-D-3-d（色分け）は 2026-08-15 に完了。** 状態ごとの見た目は以下の通り。
 
-- d-1 ✅ ラベルを `Surface` で囲みバッジ化。色は `MaterialTheme.colorScheme` から借りる
-- d-2 ⬜ `label` の `when` を `RowStyle` を返す `when` に作り替え、`Surface` / `Text` を繋ぎ替える
-  （Event → `primaryContainer` / Task 未完了 → `tertiaryContainer` / Task 完了 → `surfaceVariant`）
-- d-3 ⬜ 完了タスクのタイトルに打ち消し線＋文字を薄く
+| 状態 | バッジの色 | タイトル |
+|---|---|---|
+| 予定（Event） | `primaryContainer` | `onSurface` |
+| タスク未完了 | `tertiaryContainer` | `onSurface` |
+| タスク完了 | `surfaceVariant` | `onSurfaceVariant` ＋打ち消し線 |
 
-`RowStyle`（`data class`）は「同じ判定を label 用・色用と複数の `when` に分けると、
-状態が増えたとき片方だけ直し忘れる」ため、判定を 1 回にまとめる入れ物として用意した。
-d-2 が終わるまで未使用の警告が出る。
+色は `Color` の直書きではなく **`MaterialTheme.colorScheme` から借りる**。
+ダークテーマで破綻せず、`ui/theme/` の 1 か所で調整できるため。
+背景色と文字色は必ずペア（`〇〇` と `on〇〇`）で使う。
+
+**`RowStyle`（`data class`）に状態ごとの見た目をまとめている。**
+ラベル用・バッジ色用・タイトル装飾用と `when` を分けて書くと、状態が増えたとき
+一部だけ直し忘れる。判定を 1 回にして結果を詰める形にすると、
+`RowStyle` に項目を足した時点で**全分岐がコンパイルエラーになる**ので直し忘れが起きない。
+`Surface` / `Text` 側には条件分岐を持たせず、`rowStyle.〜` を読むだけにしてある。
 
 ログアウトボタンは `HomeScreen` の削除に伴い一時的に消えている。設定画面か `TopAppBar` に置き直す。
 
