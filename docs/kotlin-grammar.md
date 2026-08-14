@@ -1392,6 +1392,39 @@ data class CalendarUiState(
 💡 これがあるので `MutableStateFlow(LoginUiState())` のように**空のカッコ**で初期状態を作れる。
 `data class` の `copy()`（㉗）が「一部だけ変えた複製」を作れるのも、この仕組みのおかげ。
 
+### (72) `enum class` — 選択肢を数え上げる型
+
+「取りうる値がこれだけ」と決まっているものを表す型。
+
+```kotlin
+enum class ScheduleItemType {
+    EVENT,
+    TASK,
+}
+```
+
+使うときは `ScheduleItemType.EVENT` のように**型の名前を頭に付ける**。
+
+**なぜ `Boolean` や `String` で済ませないのか。**
+
+| 書き方 | 困ること |
+|---|---|
+| `val isTask: Boolean` | 3 種類目（例：メモ）が増えたとき破綻する。`false` が何を指すか名前から分からない |
+| `val type: String` | `"event"` を `"Event"` と書き間違えてもコンパイルが通る（§4-(52) と同じ罠） |
+| `val type: ScheduleItemType` | **打ち間違いはコンパイルエラー。**候補も補完で出る |
+
+⚠️ **`sealed class`（㉘）との違い。**
+
+| | 使い分け |
+|---|---|
+| `enum class` | 選択肢それぞれが**追加のデータを持たない**。ただの名札 |
+| `sealed class` | 選択肢ごとに**持つデータが違う**（`Event` は開始/終了、`Task` は期限） |
+
+`ScheduleItem` が `sealed class` なのは中身が違うから。
+`ScheduleItemType` が `enum class` なのは「どっちを選んだか」だけを表すから。
+
+💡 `when` で分岐すると `sealed class` と同じく**全部の枝を書けば `else` が要らない**（§5-㊳）。
+
 ### ㉘ `sealed class` — 仲間を数え上げられる型
 
 ```kotlin
