@@ -503,6 +503,101 @@ fun LoginScreen() {
 
 「値を先に取り出して、ラムダには結果だけ持ち込む」——`@Composable` でも `suspend` でも使える定石。
 
+### (69) `@Preview` — アプリを起動せずに見た目だけ確かめる
+
+`@Composable`（⑭）と同じアノテーション（＝名前に付ける札）の一種。
+これを付けた関数は **Android Studio の右側のパネルに絵として表示される**。
+エミュレータの起動もログインも Firestore への接続も要らない。
+
+```kotlin
+@Preview(showBackground = true)
+@Composable
+private fun ScheduleItemRowPreview() {
+    KotonowaTheme {
+        ScheduleItemRow(item = サンプルデータ)
+    }
+}
+```
+
+| 部品 | なぜ必要か |
+|---|---|
+| `@Preview` | 「これを絵にして見せて」という札。**ビルドされたアプリには含まれない** |
+| `showBackground = true` | 背景を白く塗る（§1-⑤ 名前付き引数）。付けないと背景が透明で文字が見にくい |
+| `@Composable` | 中で `ScheduleItemRow` を呼ぶため。§3-㉜ のルールどおり |
+| `private` | この画面の中だけで使う確認用。外から呼ばれる必要がない |
+| `KotonowaTheme { }` | **色や文字サイズを本番と同じにする**包み。忘れると `MaterialTheme.typography.…` が既定値になり、実機と違う見た目になる |
+
+**⚠️ `@Preview` を付けた関数は引数を取れない。** 誰も値を渡してくれないため。
+だから確認したいデータは、**関数の中に手で書く**か、ファイル内のサンプル定数から渡す。
+
+**ViewModel を受け取る関数は Preview できない。** `hiltViewModel()` は実際のアプリの
+仕組みが動いていないと作れないため。だから「画面全体」ではなく、
+`ScheduleItemRow` のような**データを引数でもらうだけの部品**に付けるのが基本。
+Phase1 の `LoginScreen.kt` で `LoginScreen` ではなく `LoginContent` に付けているのはこの理由。
+
+💡 **1つの関数に `@Preview` を何個も重ねられる。** `name = "完了"` のように名前を付けて
+状態ごとに並べると、正常・エラー・空といったパターンを一覧で見比べられる。
+
+### (70) `MaterialTheme.colorScheme` — 色は「テーマから借りる」
+
+`Color.Blue` のように**色を直接書かない**。`MaterialTheme.colorScheme.〇〇` で借りる。
+
+```kotlin
+MaterialTheme.colorScheme.primaryContainer
+```
+
+**なぜ直接書かないのか。**
+
+| 直接書くと | テーマから借りると |
+|---|---|
+| ダークモードで背景が黒になっても青のまま → 読めない | 暗い画面用の色に**自動で切り替わる** |
+| アプリの色を変えたいとき全ファイルを直す | `ui/theme/Theme.kt` の1か所だけ直せば済む |
+
+切り替えているのは `KotonowaTheme`（`ui/theme/Theme.kt`）。だから Preview でも
+`KotonowaTheme { }` で包む必要がある（(69) 参照）。
+
+**色は必ず2つで1組。** 「背景の色」と「その上に載せる文字の色」がペアで用意されている。
+
+| 背景に使う色 | その上の文字に使う色 | 見え方 |
+|---|---|---|
+| `primary` | `onPrimary` | 濃い。ボタンなど目立たせたいもの |
+| `primaryContainer` | `onPrimaryContainer` | **淡い**。バッジなど小さい面に向く |
+| `tertiaryContainer` | `onTertiaryContainer` | 淡い（別系統の色） |
+| `surfaceVariant` | `onSurfaceVariant` | 灰色。控えめにしたいもの |
+
+**`on` は「〜の上に載せる」という意味。** `onPrimary` は「`primary` の上に置く文字の色」。
+このペアを守る限り、明るい画面でも暗い画面でも**文字が読めなくなることはない**（そう設計されている）。
+
+⚠️ `primary` と `onSurface` のように**組を崩して混ぜると読めなくなる**ことがある。
+
+### (71) `Surface` — 色と形を持つ「板」
+
+中に置いたものの背後を塗り、形（角丸など）を与える入れ物。
+
+```kotlin
+Surface(
+    color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    shape = MaterialTheme.shapes.small,
+) {
+    Text("予定", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+}
+```
+
+| 受け口 | 意味 |
+|---|---|
+| `color` | 板そのものの色 |
+| `contentColor` | **中に置いた文字の色**。`Text` に `color =` を書かなくても伝わる |
+| `shape` | 形。`MaterialTheme.shapes.small` で角丸になる |
+
+💡 **`contentColor` は中の部品に自動で伝わる。** `Text` は「自分の色が指定されていなければ、
+包んでいる `Surface` の `contentColor` を使う」という約束で動いている。
+だから板の色と文字の色を**同じ場所で1組にして書ける**（(70) のペアがそのまま置ける）。
+
+⚠️ **内側の余白は `Surface` ではなく中の `Text` に付ける。** `Surface` に `padding` を付けると
+「板の外側の余白」になり、板が小さいまま文字だけはみ出す。
+`Modifier.padding(horizontal = …, vertical = …)` は「左右」「上下」を別々に指定する書き方。
+
 ---
 
 ## §4 その他
@@ -1057,6 +1152,30 @@ val extra = when (this) {
 
 `sealed`（§7-㉘）な型に対しては全部の枝を書けば `else` は要らない。
 逆に書き漏らすとコンパイルエラーになる（値を返す `when` は「答えが決まらない場合」を許さないため）。
+
+### (68) `if` も値を返す式 — ただし `else` が必須になる
+
+㊳ の `when` と同じことが `if`（㉑）でもできる。**2択のときは `if` の方が短い。**
+
+```kotlin
+val subText = if (item.allDay) "終日" else "時間あり"
+```
+
+`if` の後ろが「はい」のときの答え、`else` の後ろが「いいえ」のときの答え。
+それが左の `val subText`（§1-①）に入る。
+
+⚠️ **値として使うときは `else` を省略できない。**
+
+```kotlin
+val x = if (a) "はい"              // ❌ a が false のとき箱に何を入れるか決まらない
+if (a) doSomething()               // ✅ こちらは「やるだけ」なので else は要らない
+```
+
+㉑ の「条件が成り立つときだけ実行する」使い方と、この「答えを選ぶ」使い方の違いは
+**左辺に `val 名前 =` があるかどうか**で見分けられる。理由は㊳の `when` とまったく同じで、
+**箱には必ず何かが入らないといけない**から。
+
+💡 3択以上になったら `if` / `else if` を並べるより、主語なしの `when { }`（(64)）の方が読みやすい。
 
 ### (53) `where〇〇("A", B)` の読み方 — 名前が述語になっている
 
