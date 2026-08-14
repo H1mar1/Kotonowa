@@ -1,0 +1,37 @@
+package com.example.kotonowa.presentation.calendar.edit
+
+/**
+ * 作成画面で「予定」と「タスク」のどちらを作ろうとしているか。
+ *
+ * 画面上部の切り替えボタンで選ぶ。保存するときに
+ * `ScheduleItem.Event` と `ScheduleItem.Task` のどちらを組み立てるかがこれで決まる。
+ */
+enum class ScheduleItemType {
+    EVENT,
+    TASK,
+}
+
+/**
+ * 予定/タスクの作成画面の「今の状態」をまとめて表したもの。
+ *
+ * 画面（Composable）はこの箱だけを見て描き、
+ * 中身を書き換えるのは ScheduleEditViewModel の仕事。
+ * 入力中の値もここに持つので、画面が作り直されても入力が消えない。
+ */
+data class ScheduleEditUiState(
+
+    /** 予定とタスクのどちらを作ろうとしているか。画面上部の切り替えで変わる。 */
+    val itemType: ScheduleItemType = ScheduleItemType.EVENT,
+
+    val title: String = "",
+    val description: String = "",
+    val allDay: Boolean = false,
+
+    val isSaving: Boolean = false,
+    val isSaved: Boolean = false,
+    val errorMessage: String? = null,
+
+    // TODO 17 後半: 日時（startAt / endAt / dueAt）はここに足す。
+    //   前半は ViewModel 側で「今から1時間」の固定値にして経路を通す。
+
+)
