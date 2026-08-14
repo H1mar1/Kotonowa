@@ -18,11 +18,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -32,8 +34,6 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.util.UUID
 
 /**
  * カレンダー画面。
@@ -93,6 +93,18 @@ fun CalendarScreen(
 }
 
 /**
+ * 1 行の見た目のうち、状態（予定 / タスク未完了 / タスク完了）で変わるものをまとめた入れ物。
+ *
+ * ラベルと色を別々の `when` で選ぶと同じ判定を何度も書くことになり、
+ * 状態が増えたときに片方だけ直し忘れる。判定は 1 回にして、結果をここに詰める。
+ */
+private data class RowStyle(
+    val label: String,
+    val badgeColor: Color,
+    val badgeContentColor: Color,
+)
+
+/**
  * 一覧の 1 行。予定（Event）とタスク（Task）で表示を変える。
  *
  * 見た目だけを担当し、データの取得や判断は [CalendarViewModel] が済ませている。
@@ -102,6 +114,11 @@ private fun ScheduleItemRow(
     item: ScheduleItem,
     modifier: Modifier = Modifier,
 ) {
+    // TODO d-2: この when を「RowStyle を返す when」に作り替える。
+    //   Event            → label "予定"      / primaryContainer   / onPrimaryContainer
+    //   Task 未完了      → label "タスク未完了" / tertiaryContainer  / onTertiaryContainer
+    //   Task 完了        → label "タスク完了"   / surfaceVariant     / onSurfaceVariant
+    // 作り替えたら、下の Surface と Text も rowStyle.〜 を見るように直す。
     val label = when (item) {
         is ScheduleItem.Event -> "予定"
         is ScheduleItem.Task ->
@@ -122,7 +139,19 @@ private fun ScheduleItemRow(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = MaterialTheme.typography.labelMedium)
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = MaterialTheme.shapes.small,
+
+                    ) {
+
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(item.title, style = MaterialTheme.typography.titleMedium)
             }
@@ -212,8 +241,8 @@ private val PREVIEW_ITEMS: List<ScheduleItem> = listOf(
 private fun ScheduleItemRowPreview() {
     KotonowaTheme {
         Column(
-            Modifier.padding(16.dp),
-            Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PREVIEW_ITEMS.forEach { item ->
                 ScheduleItemRow(item = item)
