@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar
 
+import android.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,16 +115,25 @@ private fun ScheduleItemRow(
     item: ScheduleItem,
     modifier: Modifier = Modifier,
 ) {
-    // TODO d-2: この when を「RowStyle を返す when」に作り替える。
-    //   Event            → label "予定"      / primaryContainer   / onPrimaryContainer
-    //   Task 未完了      → label "タスク未完了" / tertiaryContainer  / onTertiaryContainer
-    //   Task 完了        → label "タスク完了"   / surfaceVariant     / onSurfaceVariant
-    // 作り替えたら、下の Surface と Text も rowStyle.〜 を見るように直す。
-    val label = when (item) {
-        is ScheduleItem.Event -> "予定"
+    val rowStyle = when (item) {
+        is ScheduleItem.Event ->
+            RowStyle(
+                label = "予定",
+                badgeColor = MaterialTheme.colorScheme.primaryContainer,
+                badgeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+
         is ScheduleItem.Task ->
-            if (item.isCompleted) "タスク完了"
-            else "タスク未完了"
+            if (item.isCompleted) RowStyle(
+                label = "タスク完了",
+                badgeColor = MaterialTheme.colorScheme.surfaceVariant,
+                badgeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else RowStyle(
+                label = "タスク未完了",
+                badgeColor = MaterialTheme.colorScheme.tertiaryContainer,
+                badgeContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
     }
 
     val subText = when (item) {
@@ -140,14 +150,12 @@ private fun ScheduleItemRow(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = rowStyle.badgeColor,
+                    contentColor = rowStyle.badgeContentColor,
                     shape = MaterialTheme.shapes.small,
-
-                    ) {
-
+                ) {
                     Text(
-                        label,
+                        rowStyle.label,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
