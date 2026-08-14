@@ -503,6 +503,41 @@ fun LoginScreen() {
 
 「値を先に取り出して、ラムダには結果だけ持ち込む」——`@Composable` でも `suspend` でも使える定石。
 
+### (69) `@Preview` — アプリを起動せずに見た目だけ確かめる
+
+`@Composable`（⑭）と同じアノテーション（＝名前に付ける札）の一種。
+これを付けた関数は **Android Studio の右側のパネルに絵として表示される**。
+エミュレータの起動もログインも Firestore への接続も要らない。
+
+```kotlin
+@Preview(showBackground = true)
+@Composable
+private fun ScheduleItemRowPreview() {
+    KotonowaTheme {
+        ScheduleItemRow(item = サンプルデータ)
+    }
+}
+```
+
+| 部品 | なぜ必要か |
+|---|---|
+| `@Preview` | 「これを絵にして見せて」という札。**ビルドされたアプリには含まれない** |
+| `showBackground = true` | 背景を白く塗る（§1-⑤ 名前付き引数）。付けないと背景が透明で文字が見にくい |
+| `@Composable` | 中で `ScheduleItemRow` を呼ぶため。§3-㉜ のルールどおり |
+| `private` | この画面の中だけで使う確認用。外から呼ばれる必要がない |
+| `KotonowaTheme { }` | **色や文字サイズを本番と同じにする**包み。忘れると `MaterialTheme.typography.…` が既定値になり、実機と違う見た目になる |
+
+**⚠️ `@Preview` を付けた関数は引数を取れない。** 誰も値を渡してくれないため。
+だから確認したいデータは、**関数の中に手で書く**か、ファイル内のサンプル定数から渡す。
+
+**ViewModel を受け取る関数は Preview できない。** `hiltViewModel()` は実際のアプリの
+仕組みが動いていないと作れないため。だから「画面全体」ではなく、
+`ScheduleItemRow` のような**データを引数でもらうだけの部品**に付けるのが基本。
+Phase1 の `LoginScreen.kt` で `LoginScreen` ではなく `LoginContent` に付けているのはこの理由。
+
+💡 **1つの関数に `@Preview` を何個も重ねられる。** `name = "完了"` のように名前を付けて
+状態ごとに並べると、正常・エラー・空といったパターンを一覧で見比べられる。
+
 ---
 
 ## §4 その他

@@ -23,13 +23,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.domain.model.ScheduleItem
+import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 /**
  * カレンダー画面。
@@ -143,4 +147,78 @@ private val DATE_FORMATTER = DateTimeFormatter.ofPattern("M/d(E)")
 
 private fun Instant.toDateText(): String =
     atZone(ZoneId.systemDefault()).format(DATE_FORMATTER)
+
+/**
+ * Preview 専用のサンプルデータ。
+ *
+ * エミュレータも Firestore も使わずに [ScheduleItemRow] の 4 パターンを確かめるために置く。
+ * 時刻は `Instant.now()` ではなく固定値にする（実行するたびに表示が変わると比べられないため）。
+ */
+private val PREVIEW_ITEMS: List<ScheduleItem> = listOf(
+
+    ScheduleItem.Event(
+        id = "1",
+        calendarId = "1",
+        title = "テスト予定",
+        description = null,
+        createdBy = "1",
+        reminderMinutesBefore = null,
+        startAt = Instant.parse("2026-08-14T05:00:00Z"),
+        updatedAt = Instant.parse("2026-08-14T05:00:00Z"),
+        endAt = Instant.parse("2026-08-14T06:00:00Z"),
+        allDay = false,
+    ),
+
+    ScheduleItem.Event(
+        id = "2",
+        calendarId = "2",
+        title = "お休み",
+        description = null,
+        createdBy = "1",
+        reminderMinutesBefore = null,
+        startAt = Instant.parse("2026-08-14T05:00:00Z"),
+        updatedAt = Instant.parse("2026-08-14T05:00:00Z"),
+        endAt = Instant.parse("2026-08-14T06:00:00Z"),
+        allDay = true,
+    ),
+
+    ScheduleItem.Task(
+        id = "3",
+        calendarId = "3",
+        title = "レポート提出",
+        description = null,
+        createdBy = "3",
+        reminderMinutesBefore = null,
+        dueAt = Instant.parse("2026-08-14T05:00:00Z"),
+        updatedAt = Instant.parse("2026-08-14T05:00:00Z"),
+        isCompleted = false,
+    ),
+
+    ScheduleItem.Task(
+        id = "4",
+        calendarId = "4",
+        title = "ゴミ出し",
+        description = null,
+        createdBy = "4",
+        reminderMinutesBefore = null,
+        dueAt = Instant.parse("2026-08-14T05:00:00Z"),
+        updatedAt = Instant.parse("2026-08-14T05:00:00Z"),
+        isCompleted = true,
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ScheduleItemRowPreview() {
+    KotonowaTheme {
+        Column(
+            Modifier.padding(16.dp),
+            Arrangement.spacedBy(8.dp),
+        ) {
+            PREVIEW_ITEMS.forEach { item ->
+                ScheduleItemRow(item = item)
+            }
+        }
+    }
+}
 
