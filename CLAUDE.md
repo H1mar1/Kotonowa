@@ -67,7 +67,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — データ層まで完成（2026-08-08）。**
+**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 一覧画面の表示まで完成（2026-08-14）。**
 
 ### Phase 2 の進捗
 
@@ -89,13 +89,51 @@ E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapsho
 | 16-B | `CalendarViewModel` の骨組み（Repository 2つ・StateFlow・calendarId） | ✅ |
 | 16-C | `init` で `observeItems` を collect して UiState に反映 | ✅ |
 | 16-D | `CalendarScreen`（一覧＋動作確認用の仮「＋」ボタン） | ✅ |
+| 16-D-3-b | 行の見た目（`ScheduleItemRow`。予定/タスクの出し分け、日時の整形） | ✅ 08-14 |
+| 16-D-3-c | `@Preview` で 4 パターンを一度に確認できるようにする | ✅ 08-14 |
+| 16-D-3-d | 状態ごとの色分け（ラベルをバッジ化＋完了タスクの打ち消し線） | ✅ 08-15 |
 | 16-E | `KotonowaNavHost` の HOME を差し替え、`presentation/home/` を削除 | ✅ |
 | 16-F | 実機で確認＋Firestore の複合インデックス作成 | ✅ |
 
-**Step 16 は 2026-08-12 に動作確認まで完了。** 「＋」を押すと Firestore に保存され、
+**Step 16 の本体は 2026-08-12 に動作確認まで完了。** 「＋」を押すと Firestore に保存され、
 `observeItems` の Flow 経由で一覧が自動更新されることを実機相当のエミュレータで確認した。
 
-残作業：16-D-3-b（行の見た目 — 予定/タスクの出し分け、日時の整形）。
+**行の見た目（16-D-3-b/c/d）は 2026-08-14 に着手。** 表示ルールは以下の通り（日時は書式の例）。
+
+| 状態 | ラベル | 日時 |
+|---|---|---|
+| Event / 時間あり | 予定 | `8/14(金) 14:00～15:00` |
+| Event / 終日 | 予定 | `8/14(金) 終日` |
+| Task / 未完了 | タスク未完了 | `期限 8/16(日) 23:59` |
+| Task / 完了 | タスク完了 | `期限 8/14(金) 8:00` |
+
+日時の型紙は `DateTimeFormatter` を 3 枚（日付＋時刻 / 日付のみ / 時刻のみ）用意し、
+`Instant` の拡張関数から使っている。完了状態は**ラベル側**に出す
+（完了しても期限は変わらないので、日時側で分岐しない）。
+
+**`@Preview` を入れた理由。** `addDummyItem` は `Event` / `allDay = false` しか作れず、
+エミュレータでは 4 パターンのうち 1 つしか確認できなかった。
+`PREVIEW_ITEMS` に 4 件を固定値（`Instant.parse`）で持たせ、Preview パネルで一度に見比べる。
+Step 17 以降も画面を作るたびに使う。
+
+**16-D-3-d（色分け）は 2026-08-15 に完了。** 状態ごとの見た目は以下の通り。
+
+| 状態 | バッジの色 | タイトル |
+|---|---|---|
+| 予定（Event） | `primaryContainer` | `onSurface` |
+| タスク未完了 | `tertiaryContainer` | `onSurface` |
+| タスク完了 | `surfaceVariant` | `onSurfaceVariant` ＋打ち消し線 |
+
+色は `Color` の直書きではなく **`MaterialTheme.colorScheme` から借りる**。
+ダークテーマで破綻せず、`ui/theme/` の 1 か所で調整できるため。
+背景色と文字色は必ずペア（`〇〇` と `on〇〇`）で使う。
+
+**`RowStyle`（`data class`）に状態ごとの見た目をまとめている。**
+ラベル用・バッジ色用・タイトル装飾用と `when` を分けて書くと、状態が増えたとき
+一部だけ直し忘れる。判定を 1 回にして結果を詰める形にすると、
+`RowStyle` に項目を足した時点で**全分岐がコンパイルエラーになる**ので直し忘れが起きない。
+`Surface` / `Text` 側には条件分岐を持たせず、`rowStyle.〜` を読むだけにしてある。
+
 ログアウトボタンは `HomeScreen` の削除に伴い一時的に消えている。設定画面か `TopAppBar` に置き直す。
 
 **Firestore 側でやったこと（2026-08-12）**

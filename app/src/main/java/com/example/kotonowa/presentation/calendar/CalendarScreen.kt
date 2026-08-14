@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -102,6 +103,10 @@ private data class RowStyle(
     val label: String,
     val badgeColor: Color,
     val badgeContentColor: Color,
+    /** タイトルの文字色。完了したタスクだけ控えめにする。 */
+    val titleColor: Color,
+    /** タイトルの装飾。打ち消し線を引かないときは null。 */
+    val titleDecoration: TextDecoration?,
 )
 
 /**
@@ -114,16 +119,31 @@ private fun ScheduleItemRow(
     item: ScheduleItem,
     modifier: Modifier = Modifier,
 ) {
-    // TODO d-2: この when を「RowStyle を返す when」に作り替える。
-    //   Event            → label "予定"      / primaryContainer   / onPrimaryContainer
-    //   Task 未完了      → label "タスク未完了" / tertiaryContainer  / onTertiaryContainer
-    //   Task 完了        → label "タスク完了"   / surfaceVariant     / onSurfaceVariant
-    // 作り替えたら、下の Surface と Text も rowStyle.〜 を見るように直す。
-    val label = when (item) {
-        is ScheduleItem.Event -> "予定"
+    val rowStyle = when (item) {
+        is ScheduleItem.Event ->
+            RowStyle(
+                label = "予定",
+                badgeColor = MaterialTheme.colorScheme.primaryContainer,
+                badgeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                titleColor = MaterialTheme.colorScheme.onSurface,
+                titleDecoration = null,
+            )
+
         is ScheduleItem.Task ->
-            if (item.isCompleted) "タスク完了"
-            else "タスク未完了"
+            if (item.isCompleted) RowStyle(
+                label = "タスク完了",
+                badgeColor = MaterialTheme.colorScheme.surfaceVariant,
+                badgeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                titleColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                titleDecoration = TextDecoration.LineThrough,
+            )
+            else RowStyle(
+                label = "タスク未完了",
+                badgeColor = MaterialTheme.colorScheme.tertiaryContainer,
+                badgeContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                titleColor = MaterialTheme.colorScheme.onSurface,
+                titleDecoration = null,
+            )
     }
 
     val subText = when (item) {
@@ -140,20 +160,23 @@ private fun ScheduleItemRow(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = rowStyle.badgeColor,
+                    contentColor = rowStyle.badgeContentColor,
                     shape = MaterialTheme.shapes.small,
-
-                    ) {
-
+                ) {
                     Text(
-                        label,
+                        rowStyle.label,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(item.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = rowStyle.titleColor,
+                    textDecoration = rowStyle.titleDecoration,
+                )
             }
             Spacer(Modifier.height(4.dp))
             Text(subText, style = MaterialTheme.typography.bodySmall)
