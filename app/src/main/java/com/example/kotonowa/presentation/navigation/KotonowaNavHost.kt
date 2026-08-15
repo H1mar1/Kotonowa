@@ -10,12 +10,14 @@ import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
 import com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.calendar.CalendarScreen
+import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
 
 object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
+    const val SCHEDULE_EDIT = "schedule_edit"
 
     const val SIGN_UP = "sign_up"
 
@@ -75,7 +77,9 @@ fun KotonowaNavHost(
         }
 
         composable(Routes.HOME) {
-            CalendarScreen()
+            CalendarScreen(
+                onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) }
+            )
         }
 
         composable(Routes.PASSWORD_RESET) {
@@ -96,6 +100,18 @@ fun KotonowaNavHost(
                 onNavigateToLogin = {
                     navController.popBackStack()
                 },
+            )
+        }
+
+        composable(Routes.SCHEDULE_EDIT) {
+            ScheduleEditScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onSaved = {
+                    navController.popBackStack()
+                }
+
             )
         }
     }

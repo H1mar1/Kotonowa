@@ -47,6 +47,7 @@ import java.time.format.DateTimeFormatter
  */
 @Composable
 fun CalendarScreen(
+    onAddClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -55,7 +56,7 @@ fun CalendarScreen(
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.addDummyItem() }) {
+            FloatingActionButton(onClick = onAddClick) {
                 Text("＋")
             }
         },
