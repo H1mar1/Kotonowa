@@ -83,39 +83,4 @@ class CalendarViewModel @Inject constructor(
             }
         }
     }
-
-    /**
-     * 動作確認用に、ダミーの予定を 1 件追加する。
-     *
-     * Step 17 で作成画面を作ったら削除する仮実装。
-     */
-    fun addDummyItem() {
-
-        val id = calendarId ?: return
-
-        viewModelScope.launch {
-
-            val now = Instant.now()
-
-
-            val item = ScheduleItem.Event(
-                id = UUID.randomUUID().toString(),
-                calendarId = id,
-                title = "テスト予定",
-                description = null,
-                createdBy = id,
-                reminderMinutesBefore = null,
-                startAt = now,
-                updatedAt = now,
-                endAt = now.plus(1, ChronoUnit.HOURS),
-                allDay = false,
-            )
-            scheduleRepository.addItem(item)
-                .onFailure { error ->
-                    _uiState.update { state ->
-                        state.copy(errorMessage = error.message ?: "予定の追加に失敗しました")
-                    }
-                }
-        }
-    }
 }
