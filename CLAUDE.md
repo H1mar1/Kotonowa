@@ -67,7 +67,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 一覧画面の表示まで完成（2026-08-14）。**
+**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映まで動作（2026-08-16）。**
 
 ### Phase 2 の進捗
 
@@ -76,7 +76,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 13 | `domain/model/ScheduleItem`（sealed class。Event / Task） | ✅ |
 | 14 | `domain/repository/ScheduleRepository`（interface） | ✅ |
 | 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
-| 16 | カレンダー画面（`presentation/calendar/`） | ⬅️ 進行中 |
+| 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
+| 17 | 作成画面（`presentation/calendar/edit/`） | ⬅️ 進行中 |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -144,7 +145,49 @@ Step 17 以降も画面を作るたびに使う。
   `observeItems` は等価条件と範囲条件を組み合わせるため必須。
   エラーメッセージ内の URL を開けば設定入力済みの画面が出る
 
-**仮「＋」ボタン**は Step 17 の作成画面ができたら外す。
+2026-08-16 に `events` コレクションのダミー（`addDummyItem` 由来の「テスト予定」）を
+コンソールから全削除した。アプリ側に削除機能ができるまでは、**溜まったテストデータは
+Firestore コンソールから消す**（コレクションを消してもインデックスは残るので作り直し不要）。
+
+**仮「＋」ボタン**（`CalendarViewModel.addDummyItem`）は **2026-08-16 に廃止**。
+「＋」は作成画面を開くだけになった（Step 17-F）。
+
+#### Step 17 の内訳
+
+| | 内容 | 状態 |
+|---|---|---|
+| 17-A〜C | `ScheduleEditUiState` ＋ `ScheduleItemType`（enum） | ✅ 08-15 |
+| 17-D-1/2 | `ScheduleEditViewModel`（入力の保持・`save()` の組み立て） | ✅ 08-15 |
+| 17-D-3 | `addItem` を呼び、結果を UiState に反映 | ✅ 08-16 |
+| 17-E-1 | `ScheduleEditScreen`（入力欄・保存/戻る・`@Preview`） | ✅ 08-16 |
+| 17-E-2 | 予定 / タスクの切り替えボタン | ⬜ |
+| 17-E-3 | 終日スイッチ（予定のときだけ出す） | ⬜ |
+| 17-E-4 | `isSaved` を見て `onSaved()` を呼ぶ（`LaunchedEffect`） | ✅ 08-16 |
+| 17-F | `NavHost` に登録し、一覧の「＋」から開けるようにする | ✅ 08-16 |
+| 17 後半 | 日時（`startAt` / `endAt` / `dueAt`）の入力 | ⬜ |
+
+**17-F まで完了した時点で経路が 1 本通った（2026-08-16 に動作確認）。**
+＋ → 入力 → 保存 → 一覧に反映、までをエミュレータで確認済み。
+保存後に一覧を読み直す処理は**書いていない**。`observeItems` の Flow（Step 15-F）が
+Firestore の変更を拾って勝手に流してくれるため。
+
+**現状の制限（17 後半で解消する）**
+
+- 日時は `ScheduleEditViewModel` で「今から 1 時間」に固定。UiState にはまだ持っていない
+- そのため一覧は `sortAt` 昇順で**新しく作ったものほど下**に来る
+- `ScheduleItemType` は UiState にあるが画面から変えられないので、**タスクは作れない**（17-E-2 待ち）
+
+**画面遷移の分担。** 画面には `navController` を渡さず、**`() -> Unit` の呼び鈴だけ**を持たせる。
+
+| 層 | 知っていること |
+|---|---|
+| `ScheduleEditViewModel` | `isSaved` の旗を立てるだけ。画面遷移を知らない |
+| `ScheduleEditScreen` | 旗が立ったら `onSaved()` を鳴らすだけ。行き先を知らない |
+| `KotonowaNavHost` | 鳴ったら `popBackStack()`。**行き先を決めるのはここだけ** |
+
+`CalendarScreen` も同じで、「＋」が押されたら `onAddClick()` を鳴らすだけ。
+こうしておくと画面が単体で `@Preview` でき、遷移先を変えても画面側を触らずに済む。
+Step 18 以降の画面も同じ形で足すこと。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
