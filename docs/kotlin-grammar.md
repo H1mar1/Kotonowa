@@ -169,6 +169,35 @@ list.map { item -> item.title }  // 同じ意味
 💡 だから「流れてきたら○○する」という処理は、**必ず `{ }` の中に書く**。
 外に出したくなったら、それは設計を間違えている合図。
 
+### (73) `it` の入れ子 — 外側の `it` は内側に隠される
+
+㊿ の通り `it` は「材料が 1 個のときの省略名」。**ラムダの中にラムダを書くと `it` が 2 回出てくる**ことがある。
+
+```kotlin
+scheduleRepository.addItem(item)
+    .onFailure {                                       // ← この it は Throwable（起きたエラー）
+        _uiState.update { it.copy(isSaving = false) }  // ← この it は UiState
+    }
+```
+
+このとき、**内側の `{ }` の中では内側の `it` が勝つ**。外側の `it` は名前で呼べなくなる。
+これを**シャドーイング**（shadow＝影。影に隠れる）という。
+
+> `Implicit parameter 'it' of enclosing lambda is shadowed`
+> （外側のラムダの暗黙の引数 `it` が、隠されています）
+
+コンパイルは通る（動作は意図どおり）が、読む人が「どっちの `it` か」を数えないと分からない。
+**外側に名前を付けて解決する。**
+
+```kotlin
+.onFailure { error ->                                  // ← 名前を付けた（㊿）
+    _uiState.update { it.copy(errorMessage = "…") }    // ← it は UiState だけを指す
+}
+```
+
+💡 名前を付けると、**外側の材料を内側でも使える**ようになる（`error.message` など）。
+隠れたままでは使えないので、これは書き味の問題ではなく機能の差でもある。
+
 ### (52) `"名前"` と `名前` — クオートの有無で世界が変わる
 
 同じ綴りでも、`"..."` で囲むかどうかで**別世界のもの**を指す。Firestore を触るコードで頻出。

@@ -100,10 +100,18 @@ class ScheduleEditViewModel @Inject constructor(
                     isCompleted = false,
                 )
             }
-        }
 
-        // TODO 17-D-3: scheduleRepository.addItem(item) を呼び、結果を UiState に反映
-        //   成功 → isSaving = false / isSaved = true
-        //   失敗 → isSaving = false / errorMessage にメッセージ
+            scheduleRepository.addItem(item)
+                .onSuccess { _uiState.update { it.copy(isSaving = false, isSaved = true) } }
+                .onFailure {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            isSaved = false,
+                            errorMessage = "保存できていません"
+                        )
+                    }
+                }
+        }
     }
 }
