@@ -2,17 +2,20 @@ package com.example.kotonowa.presentation.calendar.edit
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -96,7 +99,20 @@ private fun ScheduleEditContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // TODO 17-E-3: 終日スイッチ（予定のときだけ出す）
+        // 終日は「予定」だけの考え方。タスクの期限は一点の時刻なので出さない
+        if (uiState.itemType == ScheduleItemType.EVENT) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("終日")
+                Switch(
+                    checked = uiState.allDay,
+                    onCheckedChange = onAllDayChange,
+                )
+            }
+        }
 
         val message = uiState.errorMessage
         if (message != null) {

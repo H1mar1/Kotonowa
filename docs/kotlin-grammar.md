@@ -677,6 +677,128 @@ Surface(
 「板の外側の余白」になり、板が小さいまま文字だけはみ出す。
 `Modifier.padding(horizontal = …, vertical = …)` は「左右」「上下」を別々に指定する書き方。
 
+### (77) `Column { }` の中の `if` — そのまま「出す / 出さない」になる
+
+`Column` や `Row`（(75)）の `{ }` の中は「**部品を順に並べる場所**」。
+ここに `if`（§5-㉑）を書くと、そのまま「**条件が成り立つときだけ並べる**」という意味になる。
+
+```kotlin
+Column {
+    Text("タイトル")                       // いつも並ぶ
+
+    if (uiState.itemType == ScheduleItemType.EVENT) {
+        Text("終日")                       // 予定のときだけ並ぶ
+    }
+
+    Text("保存")                           // いつも並ぶ
+}
+```
+
+条件が `false` のとき、その部品は**隠れているのではなく、そもそも作られない**。
+だから場所も取らず、下の部品がそのぶん上へ詰まる。
+
+⚠️ **`if` を書く場所は、他の部品と同じ高さ。** 部品の `( )` の中ではない。
+
+```kotlin
+Button(
+    if (条件) { }        // ❌ Button の引数に if は置けない
+) { }
+```
+
+`( )` の中に入るのは `onClick = …` のような**荷札付きの材料**（§1-⑤）だけ。
+「出すかどうか」は部品の外側で決める。
+
+💡 `else` は要らない（§5-(68) の「やるだけの if」）。
+「予定のときはスイッチ、タスクのときは別の部品」と**出し分けたい**ときだけ `else` を足す。
+
+### (75) `Row` / `Column` — 並べる向きと、余った場所の配り方
+
+| 部品 | 並べる向き |
+|---|---|
+| `Column`（コラム＝縦の列） | **縦**に積む |
+| `Row`（ロウ＝横の行） | **横**に並べる |
+
+どちらも入れ物で、`{ }` の中に置いたものが順に並ぶ。**向きが違うだけで使い方は同じ。**
+
+⚠️ **向きによって受け口の名前が入れ替わる。** ここが混乱しやすい。
+
+| | 並ぶ方向（主役の向き） | それと直角の方向 |
+|---|---|---|
+| `Column` | `verticalArrangement` | `horizontalAlignment` |
+| `Row` | `horizontalArrangement` | `verticalAlignment` |
+
+- **`Arrangement`**（アレンジメント＝配置）… **並ぶ方向**に、部品どうしをどう配るか
+- **`Alignment`**（アラインメント＝そろえ）… **直角の方向**に、どこへ寄せるか
+
+```kotlin
+Row(verticalAlignment = Alignment.CenterVertically) { ... }
+```
+
+横並びなので、直角＝上下方向のそろえ方が `verticalAlignment`。
+`CenterVertically`（上下の中央）にすると、背の高い部品と低い部品の**中心線がそろう**。
+指定しないと上端でそろい、文字だけ浮いて見える。
+
+**`Arrangement` の主な選択肢**
+
+| 書き方 | 意味 |
+|---|---|
+| `Arrangement.spacedBy(8.dp)` | 部品どうしのすき間を空ける（§3-(66)） |
+| `Arrangement.SpaceBetween` | **両端に寄せ、余りを間に配る**。「左に文字・右にスイッチ」がこれ |
+| `Arrangement.Center` | まとめて中央に寄せる |
+
+⚠️ **`SpaceBetween` は `Modifier.fillMaxWidth()` とセット。** 入れ物が中身のぶんしか
+広がっていなければ「余った場所」が存在せず、見た目が変わらない。
+
+**`Modifier.weight(1f)` — 余った場所を吸い取る**
+
+```kotlin
+Row {
+    Text("終日", modifier = Modifier.weight(1f))   // 余りを全部もらう
+    Switch(...)                                    // 必要なぶんだけ
+}
+```
+
+`weight`（ウェイト＝重み）を付けた部品が、**残りの幅を分け合って広がる**。
+1 つだけに付ければその部品が余りを全部もらうので、隣は端へ押しやられる。
+
+💡 `SpaceBetween` と `weight(1f)` は見た目がほぼ同じになる。違いは「**誰が広がるか**」。
+`SpaceBetween` は部品の大きさを変えず**すき間**を広げ、`weight` は**部品自体**を広げる。
+文字が長くて折り返してほしいときは `weight`、そうでなければどちらでもよい。
+
+### (76) `checked` / `onCheckedChange` — 部品は状態を持たない（状態ホイスティング）
+
+Compose の入力部品は、**すべて同じ 2 点セット**でできている。
+
+| 部品 | 今の値 | 変わったときの知らせ |
+|---|---|---|
+| `OutlinedTextField` | `value` | `onValueChange` |
+| `Switch` | `checked` | `onCheckedChange` |
+| `Checkbox` | `checked` | `onCheckedChange` |
+
+```kotlin
+Switch(
+    checked = uiState.allDay,          // 今 ON か OFF か（外から教えてもらう）
+    onCheckedChange = onAllDayChange,  // 押されたら「こうなったよ」と外へ伝える
+)
+```
+
+⚠️ **`Switch` は自分では切り替わらない。** 指で押しても絵は変わらない。
+やることは「`onCheckedChange` を呼ぶ」だけ。
+
+```
+押す → onCheckedChange(true) → ViewModel が UiState.allDay を true にする
+     → StateFlow が流れる → 画面が描き直される → checked = true になって初めて絵が変わる
+```
+
+**遠回りに見えるが、これが狙い。** 部品が自分の中に状態を持つと、「画面が知っている ON/OFF」と
+「部品が知っている ON/OFF」の 2 つができてズレる。状態を**上（ViewModel）へ持ち上げて
+1 か所にまとめる**ので、これを**状態ホイスティング**（hoisting＝持ち上げ）という。
+
+💡 だから `onCheckedChange = { }`（空のラムダ）を渡すと、**押しても永久に切り替わらない
+スイッチ**ができる。`@Preview`（§3-(69)）で見た目だけ確かめるときはこれで十分。
+
+💡 `onAllDayChange` をそのまま渡せるのは、両者の型が `(Boolean) -> Unit` で一致するから（§1-(74)）。
+
 ---
 
 ## §4 その他
