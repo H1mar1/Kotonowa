@@ -160,8 +160,8 @@ Firestore コンソールから消す**（コレクションを消してもイ�
 | 17-D-1/2 | `ScheduleEditViewModel`（入力の保持・`save()` の組み立て） | ✅ 08-15 |
 | 17-D-3 | `addItem` を呼び、結果を UiState に反映 | ✅ 08-16 |
 | 17-E-1 | `ScheduleEditScreen`（入力欄・保存/戻る・`@Preview`） | ✅ 08-16 |
-| 17-E-2 | 予定 / タスクの切り替えボタン | ⬜ |
-| 17-E-3 | 終日スイッチ（予定のときだけ出す） | ⬜ |
+| 17-E-2 | 予定 / タスクの切り替えボタン（`SingleChoiceSegmentedButtonRow`） | ✅ 08-17 |
+| 17-E-3 | 終日スイッチ（予定のときだけ出す） | ✅ 08-16 |
 | 17-E-4 | `isSaved` を見て `onSaved()` を呼ぶ（`LaunchedEffect`） | ✅ 08-16 |
 | 17-F | `NavHost` に登録し、一覧の「＋」から開けるようにする | ✅ 08-16 |
 | 17 後半 | 日時（`startAt` / `endAt` / `dueAt`）の入力 | ⬜ |
@@ -171,11 +171,20 @@ Firestore コンソールから消す**（コレクションを消してもイ�
 保存後に一覧を読み直す処理は**書いていない**。`observeItems` の Flow（Step 15-F）が
 Firestore の変更を拾って勝手に流してくれるため。
 
+**17-E は 2026-08-17 に完了。** 予定/タスクの切り替えと終日スイッチが入り、
+**タスクが作れるようになった**（それまでは `itemType` が `EVENT` から動かなかった）。
+Step 16-D-3-d の色分けを実データで確認できたのもこの時点。
+
+入力部品はすべて**状態を持たない**。`OutlinedTextField` の `value`/`onValueChange`、
+`Switch` の `checked`/`onCheckedChange`、`SegmentedButton` の `selected`/`onClick` は
+どれも同じ形で、**今の値は UiState から渡し、変化は ViewModel へ返す**（状態ホイスティング）。
+画面側に `remember` の状態を持たせないこと。持たせると UiState とズレる。
+
 **現状の制限（17 後半で解消する）**
 
 - 日時は `ScheduleEditViewModel` で「今から 1 時間」に固定。UiState にはまだ持っていない
 - そのため一覧は `sortAt` 昇順で**新しく作ったものほど下**に来る
-- `ScheduleItemType` は UiState にあるが画面から変えられないので、**タスクは作れない**（17-E-2 待ち）
+- 終日を ON にしても、保存される時刻は「今から 1 時間」のまま（`allDay` の旗が立つだけ）
 
 **画面遷移の分担。** 画面には `navController` を渡さず、**`() -> Unit` の呼び鈴だけ**を持たせる。
 
