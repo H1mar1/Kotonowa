@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,8 +84,23 @@ private fun ScheduleEditContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // TODO 17-E-2: 予定 / タスクの切り替えボタン
-        //   uiState.itemType を見て、押されたら onItemTypeChange を呼ぶ
+
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = uiState.itemType == ScheduleItemType.EVENT,
+                onClick = { onItemTypeChange(ScheduleItemType.EVENT) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            ) {
+                Text("予定")
+            }
+            SegmentedButton(
+                selected = uiState.itemType == ScheduleItemType.TASK,
+                onClick = { onItemTypeChange(ScheduleItemType.TASK) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            ) {
+                Text("タスク")
+            }
+        }
 
         OutlinedTextField(
             value = uiState.title,

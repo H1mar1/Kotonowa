@@ -248,6 +248,42 @@ FloatingActionButton(onClick = onAddClick())    // ❌ ここで「鳴らして�
 **画面は「押されたよ」と鳴らすだけ、どこへ飛ぶかは地図（NavHost）が決める。**
 ViewModel が `isSaved` を立てるだけで画面遷移を知らないのと、まったく同じ分担。
 
+### (78) そのまま渡すか、`{ }` で包むか — 呼び鈴の渡し方 2 通り
+
+(74) の呼び鈴（`() -> Unit` など）を渡すとき、書き方が 2 通りある。**見分ける基準は
+「渡したい材料があるかどうか」**。
+
+```kotlin
+onCheckedChange = onAllDayChange                          // ① そのまま渡す
+onClick = { onItemTypeChange(ScheduleItemType.EVENT) }    // ② 包んで渡す
+```
+
+| | いつ使うか | 中で起きること |
+|---|---|---|
+| ① そのまま | **受け取る材料と、渡す材料が一致している** | `Switch` が `true` を作って `onAllDayChange(true)` を呼ぶ |
+| ② 包む | **こちらで材料を決めて渡したい** | `onClick` は材料を渡してくれないので、`EVENT` を自分で書く |
+
+②が必要な理由は、型を並べると分かる。
+
+```
+onClick が求める型     : () -> Unit          ← 材料なしで呼ばれる
+onItemTypeChange の型  : (ScheduleItemType) -> Unit   ← 材料が要る
+```
+
+**形が違うのでそのままでは渡せない。** `{ }` で包み、その中で材料を書き足すことで
+「材料なしで呼べる作業メモ」に変換している。
+
+⚠️ **包むときに `()` を書き忘れない。**
+
+```kotlin
+onClick = { onItemTypeChange(ScheduleItemType.EVENT) }   // ✅ 押されたら呼ぶ
+onClick = { onItemTypeChange }                           // ❌ 名前を置いただけ。何も起きない
+```
+
+`()` があって初めて「やって！」の合図になる（§1-③）。後者は警告すら出ないことがある。
+
+💡 §1-⑲ の `viewModel::onEmailChange` は①の仲間。材料の形が一致しているのでそのまま渡せる。
+
 ### (52) `"名前"` と `名前` — クオートの有無で世界が変わる
 
 同じ綴りでも、`"..."` で囲むかどうかで**別世界のもの**を指す。Firestore を触るコードで頻出。
