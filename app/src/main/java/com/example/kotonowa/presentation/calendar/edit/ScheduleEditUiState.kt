@@ -1,5 +1,9 @@
 package com.example.kotonowa.presentation.calendar.edit
 
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.temporal.ChronoUnit
+
 /**
  * 作成画面で「予定」と「タスク」のどちらを作ろうとしているか。
  *
@@ -31,7 +35,9 @@ data class ScheduleEditUiState(
     val isSaved: Boolean = false,
     val errorMessage: String? = null,
 
-    // TODO 17 後半: 日時（startAt / endAt / dueAt）はここに足す。
-    //   前半は ViewModel 側で「今から1時間」の固定値にして経路を通す。
+    val startDate: LocalDate = LocalDate.now(),
+    val startTime: LocalTime = LocalTime.now().truncatedTo(ChronoUnit.HOURS).plusHours(1),
+    val endDate: LocalDate = startDate,
+    val endTime: LocalTime = startTime.plusHours(1),
 
-)
+    )
