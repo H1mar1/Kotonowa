@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.ui.theme.KotonowaTheme
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 /**
  * 予定/タスクの作成画面。
@@ -35,6 +38,10 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
  * @param onSaved 保存が終わったときに呼ばれる呼び鈴。前の画面に戻るのに使う。
  * @param onNavigateBack 「戻る」を押したときに呼ばれる呼び鈴。
  */
+
+private val DATE_FORMATTER = DateTimeFormatter.ofPattern("M/d(E)")
+private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+
 @Composable
 fun ScheduleEditScreen(
     onSaved: () -> Unit,
@@ -151,6 +158,42 @@ private fun ScheduleEditContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("戻る")
+        }
+    }
+}
+
+/**
+ * 「ラベル ｜ 日付 ｜ 時刻」の 1 行。
+ *
+ * 予定の開始/終了とタスクの期限で使い回す。
+ * 押されたことを伝えるだけで、ダイアログを出すのは呼ぶ側の仕事。
+ */
+@Composable
+private fun DateTimeField(
+    label: String,
+    date: LocalDate,
+    time: LocalTime,
+    showTime: Boolean,
+    onDateClick: () -> Unit,
+    onTimeClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDateClick) {
+                Text(date.format(DATE_FORMATTER))
+            }
+            if (showTime) {
+                TextButton(onClick = onTimeClick) {
+                    Text(time.format(TIME_FORMATTER))
+                }
+            }
+
         }
     }
 }

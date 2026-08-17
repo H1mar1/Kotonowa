@@ -39,7 +39,6 @@ class ScheduleEditViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ScheduleEditUiState())
     val uiState: StateFlow<ScheduleEditUiState> = _uiState.asStateFlow()
-
     private val calendarId = authRepository.currentUser?.uid
     fun onItemTypeChange(value: ScheduleItemType) {
         _uiState.update {
