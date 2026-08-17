@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import javax.inject.Inject
@@ -39,7 +42,12 @@ class ScheduleEditViewModel @Inject constructor(
 
     private val calendarId = authRepository.currentUser?.uid
     fun onItemTypeChange(value: ScheduleItemType) {
-        _uiState.update { it.copy(itemType = value) }
+        _uiState.update {
+            it.copy(
+                itemType = value,
+                allDay = it.allDay && value == ScheduleItemType.EVENT
+            )
+        }
     }
 
     fun onTitleChange(value: String) {
@@ -53,6 +61,23 @@ class ScheduleEditViewModel @Inject constructor(
     fun onAllDayChange(value: Boolean) {
         _uiState.update { it.copy(allDay = value) }
     }
+
+    fun onStartDateChange(value: LocalDate) {
+        _uiState.update { it.copy(startDate = value) }
+    }
+
+    fun onStartTimeChange(value: LocalTime) {
+        _uiState.update { it.copy(startTime = value) }
+    }
+
+    fun onEndDateChange(value: LocalDate) {
+        _uiState.update { it.copy(endDate = value) }
+    }
+
+    fun onEndTimeChange(value: LocalTime) {
+        _uiState.update { it.copy(endTime = value) }
+    }
+
 
     /**
      * 入力された内容を 1 件保存する。
@@ -74,6 +99,8 @@ class ScheduleEditViewModel @Inject constructor(
         viewModelScope.launch {
             val now = Instant.now()
 
+            val startTime = if (state.allDay) LocalTime.MIN else state.startTime
+            val endTime = if (state.allDay) LocalTime.of(23, 59) else state.endTime
             val item = when (state.itemType) {
                 ScheduleItemType.EVENT -> ScheduleItem.Event(
                     id = UUID.randomUUID().toString(),
@@ -83,8 +110,8 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
-                    startAt = now,
-                    endAt = now.plus(1, ChronoUnit.HOURS),
+                    startAt = state.startDate.toInstant(startTime),
+                    endAt = state.endDate.toInstant(endTime),
                     allDay = state.allDay,
                 )
 
@@ -96,7 +123,7 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
-                    dueAt = now.plus(1, ChronoUnit.HOURS),
+                    dueAt = state.startDate.toInstant(state.startTime),
                     isCompleted = false,
                 )
             }
@@ -115,3 +142,7 @@ class ScheduleEditViewModel @Inject constructor(
         }
     }
 }
+
+/** 画面で選んだ「日付」と「時刻」を、端末のタイムゾーンで 1 つの [Instant] にする。 */
+private fun LocalDate.toInstant(time: LocalTime): Instant =
+    atTime(time).atZone(ZoneId.systemDefault()).toInstant()
