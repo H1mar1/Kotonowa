@@ -62,6 +62,11 @@ fun ScheduleEditScreen(
         onTitleChange = viewModel::onTitleChange,
         onDescriptionChange = viewModel::onDescriptionChange,
         onAllDayChange = viewModel::onAllDayChange,
+        // TODO(G-4): 押されたら日付/時刻ピッカーを出す
+        onStartDateClick = {},
+        onStartTimeClick = {},
+        onEndDateClick = {},
+        onEndTimeClick = {},
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
         modifier = modifier,
@@ -81,6 +86,10 @@ private fun ScheduleEditContent(
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onAllDayChange: (Boolean) -> Unit,
+    onStartDateClick:() -> Unit,
+    onStartTimeClick :() -> Unit,
+    onEndDateClick: () -> Unit,
+    onEndTimeClick :() -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -130,12 +139,30 @@ private fun ScheduleEditContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-            ) {
+            )
+            {
                 Text("終日")
                 Switch(
                     checked = uiState.allDay,
                     onCheckedChange = onAllDayChange,
                 )
+            }
+        }
+
+        when (uiState.itemType) {
+            ScheduleItemType.EVENT -> {
+                DateTimeField(
+                    label = "開始",
+                    date = uiState.startDate,
+                    time = uiState.startTime,
+                    showTime = !uiState.allDay,
+                    onDateClick = onStartDateClick,
+                    onTimeClick = onStartTimeClick,
+                )
+            }
+
+            ScheduleItemType.TASK -> {
+                // TODO: 期限の DateTimeField を出す
             }
         }
 
@@ -208,6 +235,10 @@ private fun ScheduleEditContentPreview() {
             onTitleChange = {},
             onDescriptionChange = {},
             onAllDayChange = {},
+            onStartDateClick = {},
+            onStartTimeClick = {},
+            onEndDateClick = {},
+            onEndTimeClick = {},
             onSaveClick = {},
             onNavigateBack = {},
         )
