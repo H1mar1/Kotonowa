@@ -16,6 +16,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
@@ -241,8 +243,11 @@ private fun DateSelectDialog(
     onConfirm: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // TODO(G-4-3-1a): rememberDatePickerState() で「選んでいる途中」の状態を作る（§3-(82)）
-    //   initialSelectedDateMillis に initialDate をミリ秒に直して渡す（§4-(61) の変換表）
+    val pickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    )
 
     DatePickerDialog(
         onDismissRequest = onDismiss,
@@ -261,8 +266,10 @@ private fun DateSelectDialog(
                 Text("キャンセル")
             }
         },
+
     ) {
         // TODO(G-4-3-1d): DatePicker(state = 上で作った状態) を置く
+
     }
 }
 
