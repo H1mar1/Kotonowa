@@ -835,6 +835,52 @@ Switch(
 
 💡 `onAllDayChange` をそのまま渡せるのは、両者の型が `(Boolean) -> Unit` で一致するから（§1-(74)）。
 
+### (82) `rememberXxxState()` — 部品が自分で持つ「下書き」
+
+```kotlin
+val pickerState = rememberDatePickerState(initialSelectedDateMillis = ...)
+DatePicker(state = pickerState)
+```
+
+日付ピッカーは「どの日をハイライトしているか」「今どの月を表示しているか」を
+自分で覚えていないと動けない。その覚え書きが `DatePickerState` で、
+作るのが `rememberDatePickerState()`（`remember` 系＝§3-⑪）。
+
+`initial〇〇` という名前の引数は**最初の1回だけ**使われる。あとから引数の値を変えても、
+画面の中の状態は書き変わらない（`remember` されているため）。
+
+**(76) の状態ホイスティングと矛盾しないのか。** しない。区別は「**保存される値かどうか**」。
+
+| | 持ち主 | 例 |
+|---|---|---|
+| アプリのデータ | UiState（ViewModel） | 確定した開始日時。Firestore に保存される |
+| 部品の下書き | `rememberXxxState()` | ダイアログの中でぐるぐる選んでいる途中の値 |
+
+ダイアログを「キャンセル」で閉じたら下書きは捨てる。OK を押したときだけ
+ViewModel に渡して、そこで初めてアプリのデータになる。
+
+### (83) スロット — 「中身」を引数で渡す
+
+```kotlin
+DatePickerDialog(
+    onDismissRequest = onDismiss,
+    confirmButton = { TextButton(onClick = ...) { Text("OK") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } },
+) {
+    DatePicker(state = pickerState)
+}
+```
+
+`confirmButton = { ... }` の `{ }` はラムダ（§1-⑥）だが、中に書くのは**部品**。
+つまり「ここに置く中身を、丸ごと引数として渡している」。この差込口を**スロット**という。
+
+Compose の部品は「OK ボタンを出す」ではなく「**OK ボタンの位置に、あなたがくれた物を置く**」
+という作りになっている。だからボタンの文字も色も呼ぶ側が自由に決められる。
+
+最後の `{ }` が `()` の外に出ているのは、`content`（最後の引数）が同じくスロットだから。
+**最後の引数がラムダのときはカッコの外に出せる**という Kotlin の決まりで、
+`Column { }` や `Button { }` が読みやすいのもこれのおかげ。
+
 ---
 
 ## §4 その他
@@ -1083,6 +1129,25 @@ LocalTime.now().truncatedTo(ChronoUnit.HOURS) // 14:00
 半端になる。**入力の既定値には、切り捨ててから使う。**
 
 💡 `.plusHours(1)` と組み合わせると「次の正時」が作れる（14:23 → 14:00 → 15:00）。
+
+**エポックミリ秒 ⇄ `LocalDate`（ピッカーとのやりとり）**
+
+`DatePicker` は日付を `Long`（1970-01-01 からのミリ秒）で受け渡しする。しかもその値は
+**UTC の 0 時ちょうど**と決められている。
+
+```kotlin
+// LocalDate → ミリ秒（ピッカーに渡す）
+date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+// ミリ秒 → LocalDate（ピッカーから受け取る）
+Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+```
+
+⚠️ ここだけは `ZoneId.systemDefault()` ではなく **`ZoneOffset.UTC`** を使う。
+保存のときに端末のタイムゾーンを使う（`toInstant()`）のとは逆なので混乱しやすいが、
+**相手（ピッカー）が UTC と決めているから、それに合わせる**というだけのこと。
+日本（UTC+9）では `systemDefault()` でもたまたま同じ日付になるが、
+UTC より西の国では 1 日ずれる。
 
 ### (67) `DateTimeFormatter` — 日時を「読める文字」にする型紙
 
@@ -1407,6 +1472,27 @@ Firestore には文字列も日時も真偽値も混ぜて渡すので、中身�
 
 型の見張りが効かないぶん、**Map に詰める行は自分で見比べて確認する**必要がある。
 `Map<String, Any?>` を扱うときの心構えとして覚えておく。
+
+### (84) `?.let { }` — 「あれば、それを `it` として使う」
+
+```kotlin
+state.selectedDateMillis?.let { onDateSelected(it) }
+```
+
+`?.`（㊻）は「あれば、その〜」。`let`（レット）は「受け取った値を `it` という名前で
+`{ }` の中に配る」だけの命令。合わせて読むと
+
+> `selectedDateMillis` が **null でなければ**、その値を `it` として `{ }` を実行する。null なら何もしない。
+
+`if (x != null) { 使う }` と同じことを 1 行で書ける。`?:`（⑮）との使い分けは以下の通り。
+
+| | 意味 |
+|---|---|
+| `x ?: 既定値` | null のとき**代わりの値**を出したい |
+| `x?.let { }` | null のとき**何もしなくていい** |
+
+⚠️ `let` の `{ }` の中の `it` は、外側の `it`（例えば `update { }` の `it`）を隠す（§1-(73)）。
+入れ子になるときは `?.let { millis -> ... }` と名前を付けた方が安全。
 
 ---
 
