@@ -169,6 +169,20 @@ list.map { item -> item.title }  // 同じ意味
 💡 だから「流れてきたら○○する」という処理は、**必ず `{ }` の中に書く**。
 外に出したくなったら、それは設計を間違えている合図。
 
+⚠️ この決まりは `val`（①）にも同じく効く。`{ }` の中で作った名前は、その `{ }` の外からは見えない。
+
+```kotlin
+Dialog(
+    confirmButton = {
+        pickerState   // ❌ 見えない（別の { } で作られたため）
+    },
+) {
+    val pickerState = rememberDatePickerState()
+}
+```
+
+複数の `{ }` から読みたい値は、**それら全部より外側**で作る。上の例なら `Dialog(` の前。
+
 ### (73) `it` の入れ子 — 外側の `it` は内側に隠される
 
 ㊿ の通り `it` は「材料が 1 個のときの省略名」。**ラムダの中にラムダを書くと `it` が 2 回出てくる**ことがある。
@@ -1132,7 +1146,17 @@ LocalTime.now().truncatedTo(ChronoUnit.HOURS) // 14:00
 
 **エポックミリ秒 ⇄ `LocalDate`（ピッカーとのやりとり）**
 
-`DatePicker` は日付を `Long`（1970-01-01 からのミリ秒）で受け渡しする。しかもその値は
+「エポック（epoch）」＝起点・紀元。コンピュータの世界では **1970-01-01 00:00:00 UTC** を
+時刻の原点と決めていて、そこからの経過ミリ秒を数えれば、どんな日時も `Long` 1 つで表せる。
+
+| 時刻 | エポックミリ秒 |
+|---|---|
+| 1970-01-01 00:00:00 UTC | `0` |
+| 1970-01-01 00:00:01 UTC | `1000`（1 秒 = 1000 ミリ秒） |
+| 2026-08-20 00:00:00 UTC | `1787529600000` |
+
+`DatePicker` が日付をこの形で受け渡しするのは、**どこでも同じ意味を持つただの数**だから。
+`LocalDate` のような Java の日時型に依存せずに済む。しかも渡す値は
 **UTC の 0 時ちょうど**と決められている。
 
 ```kotlin
@@ -1142,6 +1166,37 @@ date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 // ミリ秒 → LocalDate（ピッカーから受け取る）
 Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
 ```
+
+**行き（`LocalDate` → `Long`）のはしご。** 足りない情報を足しながら登る。
+
+| 書いたところまで | 手に持っているもの | 足された情報 |
+|---|---|---|
+| `date` | 2026-08-20（`LocalDate`） | — |
+| `.atStartOfDay(ZoneOffset.UTC)` | 2026-08-20 00:00 ±0（`ZonedDateTime`） | **何時か**＋**どこの時計か** |
+| `.toInstant()` | 世界共通の時刻（`Instant`） | — |
+| `.toEpochMilli()` | 1787529600000（`Long`） | — |
+
+**帰り（`Long` → `LocalDate`）のはしご。** 今度は情報を捨てながら降りる。
+
+| 書いたところまで | 手に持っているもの | 捨てた情報 |
+|---|---|---|
+| `Instant.ofEpochMilli(millis)` | 世界共通の時刻（`Instant`） | — |
+| `.atZone(ZoneOffset.UTC)` | 2026-08-20 00:00 ±0（`ZonedDateTime`） | — |
+| `.toLocalDate()` | 2026-08-20（`LocalDate`） | **時刻とタイムゾーン** |
+
+- `atStartOfDay`（その日の始まり）＝ 0 時を足す
+- `toEpochMilli`（エポックからのミリ秒にして）／`ofEpochMilli`（エポックからのミリ秒から作る）
+- `of〇〇` は「〜から作る」、`to〇〇` は「〜に変換する」。**どちら向きかが名前に出ている**
+
+**`ZoneId` と `ZoneOffset` の違い**
+
+| 型 | 何を表すか | 例 |
+|---|---|---|
+| `ZoneId` | **地域の名前**。夏時間の切り替え規則まで含む | `Asia/Tokyo`, `Europe/London` |
+| `ZoneOffset` | **ズレの数そのもの**。規則は持たない | `+09:00`, `±0` |
+
+`ZoneOffset` は `ZoneId` の一種（継承している）なので、`ZoneId` を受け取る場所にそのまま渡せる。
+`ZoneOffset.UTC` は「ズレ 0」を表す定数（全部大文字＝§5-㉓）。
 
 ⚠️ ここだけは `ZoneId.systemDefault()` ではなく **`ZoneOffset.UTC`** を使う。
 保存のときに端末のタイムゾーンを使う（`toInstant()`）のとは逆なので混乱しやすいが、
