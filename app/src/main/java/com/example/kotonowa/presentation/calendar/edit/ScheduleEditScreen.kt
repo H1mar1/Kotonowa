@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -62,11 +63,10 @@ fun ScheduleEditScreen(
         onTitleChange = viewModel::onTitleChange,
         onDescriptionChange = viewModel::onDescriptionChange,
         onAllDayChange = viewModel::onAllDayChange,
-        // TODO(G-4): 押されたら日付/時刻ピッカーを出す
-        onStartDateClick = {},
-        onStartTimeClick = {},
-        onEndDateClick = {},
-        onEndTimeClick = {},
+        onStartDateClick = { viewModel.onPickerOpen(PickerTarget.START_DATE) },
+        onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
+        onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
+        onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
         modifier = modifier,
@@ -86,10 +86,10 @@ private fun ScheduleEditContent(
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onAllDayChange: (Boolean) -> Unit,
-    onStartDateClick:() -> Unit,
-    onStartTimeClick :() -> Unit,
+    onStartDateClick: () -> Unit,
+    onStartTimeClick: () -> Unit,
     onEndDateClick: () -> Unit,
-    onEndTimeClick :() -> Unit,
+    onEndTimeClick: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -222,6 +222,47 @@ private fun DateTimeField(
             }
 
         }
+    }
+}
+
+/**
+ * 日付を選ぶダイアログ。
+ *
+ * ぐるぐる選んでいる途中の値はこのダイアログ自身が持ち（§3-(82)）、
+ * OK が押されたときだけ [onConfirm] で外に渡す。キャンセルなら途中の値は捨てる。
+ *
+ * @param initialDate ダイアログを開いたときに最初に選ばれている日
+ * @param onConfirm OK が押されたときに、選ばれた日を渡して呼ぶ呼び鈴
+ * @param onDismiss ダイアログを閉じたいときに鳴らす呼び鈴
+ */
+@Composable
+private fun DateSelectDialog(
+    initialDate: LocalDate,
+    onConfirm: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // TODO(G-4-3-1a): rememberDatePickerState() で「選んでいる途中」の状態を作る（§3-(82)）
+    //   initialSelectedDateMillis に initialDate をミリ秒に直して渡す（§4-(61) の変換表）
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    // TODO(G-4-3-1b): 選ばれたミリ秒を LocalDate に戻して onConfirm に渡す（§4-(84)）
+                    // TODO(G-4-3-1c): そのあと onDismiss() で閉じる
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        },
+    ) {
+        // TODO(G-4-3-1d): DatePicker(state = 上で作った状態) を置く
     }
 }
 

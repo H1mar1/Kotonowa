@@ -16,6 +16,20 @@ enum class ScheduleItemType {
 }
 
 /**
+ * 日付/時刻を選ぶダイアログのうち、いまどれを開いているか。
+ *
+ * 4 つの入力欄（開始・終了 × 日付・時刻）でダイアログを使い回すため、
+ * 「開いている / 閉じている」ではなく「どれを開いているか」で持つ。
+ * どれも開いていないときは null。
+ */
+enum class PickerTarget {
+    START_DATE,
+    START_TIME,
+    END_DATE,
+    END_TIME,
+}
+
+/**
  * 予定/タスクの作成画面の「今の状態」をまとめて表したもの。
  *
  * 画面（Composable）はこの箱だけを見て描き、
@@ -39,5 +53,8 @@ data class ScheduleEditUiState(
     val startTime: LocalTime = LocalTime.now().truncatedTo(ChronoUnit.HOURS).plusHours(1),
     val endDate: LocalDate = startDate,
     val endTime: LocalTime = startTime.plusHours(1),
+
+    /** 開いているピッカー。null ならどれも開いていない。 */
+    val pickerTarget: PickerTarget? = null,
 
     )

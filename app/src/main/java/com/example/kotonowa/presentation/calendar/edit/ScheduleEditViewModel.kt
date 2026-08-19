@@ -61,6 +61,21 @@ class ScheduleEditViewModel @Inject constructor(
         _uiState.update { it.copy(allDay = value) }
     }
 
+    /**
+     * 日付/時刻を選ぶダイアログを開く。
+     *
+     * どのダイアログを出すかは画面側が [PickerTarget] で伝えてくる。
+     * ここは旗を立てるだけで、ダイアログを描くのは画面の仕事。
+     */
+    fun onPickerOpen(target: PickerTarget) {
+        _uiState.update { it.copy(pickerTarget = target) }
+    }
+
+    /** 開いているダイアログを閉じる。選ばれた値は受け取らないので、何も変えずに旗だけ下ろす。 */
+    fun onPickerDismiss() {
+        _uiState.update { it.copy(pickerTarget = null) }
+    }
+
     fun onStartDateChange(value: LocalDate) {
         _uiState.update { it.copy(startDate = value) }
     }
