@@ -71,6 +71,11 @@ fun ScheduleEditScreen(
         onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
         onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
         onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
+        onStartDateChange = viewModel::onStartDateChange,
+        onStartTimeChange = viewModel::onStartTimeChange,
+        onEndDateChange = viewModel::onEndDateChange,
+        onEndTimeChange = viewModel::onEndTimeChange,
+        onPickerDismiss = viewModel::onPickerDismiss,
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
         modifier = modifier,
@@ -94,6 +99,11 @@ private fun ScheduleEditContent(
     onStartTimeClick: () -> Unit,
     onEndDateClick: () -> Unit,
     onEndTimeClick: () -> Unit,
+    onStartDateChange: (LocalDate) -> Unit,
+    onStartTimeChange: (LocalTime) -> Unit,
+    onEndDateChange: (LocalDate) -> Unit,
+    onEndTimeChange: (LocalTime) -> Unit,
+    onPickerDismiss: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -163,6 +173,9 @@ private fun ScheduleEditContent(
                     onDateClick = onStartDateClick,
                     onTimeClick = onStartTimeClick,
                 )
+                // TODO(G-4-3-2d): 「終了」の行を足す
+                //   label = "終了"、date / time は uiState.endDate / uiState.endTime、
+                //   押されたときは onEndDateClick / onEndTimeClick
             }
 
             ScheduleItemType.TASK -> {
@@ -190,6 +203,27 @@ private fun ScheduleEditContent(
         ) {
             Text("戻る")
         }
+    }
+
+    // 開いている旗を見て、対応するダイアログを出す。
+    // ダイアログは画面の場所を取らない（別の窓に出る）ので Column の外に置く。
+    when (uiState.pickerTarget) {
+        PickerTarget.START_DATE -> DateSelectDialog(
+            initialDate = uiState.startDate,
+            onConfirm = onStartDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.END_DATE -> DateSelectDialog(
+            initialDate = uiState.endDate,
+            onConfirm = onEndDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        // 時刻のダイアログは G-4-3-3 で作る。null は「どれも開いていない」
+        PickerTarget.START_TIME,
+        PickerTarget.END_TIME,
+        null -> {}
     }
 }
 
@@ -294,6 +328,11 @@ private fun ScheduleEditContentPreview() {
             onStartTimeClick = {},
             onEndDateClick = {},
             onEndTimeClick = {},
+            onStartDateChange = {},
+            onStartTimeChange = {},
+            onEndDateChange = {},
+            onEndTimeChange = {},
+            onPickerDismiss = {},
             onSaveClick = {},
             onNavigateBack = {},
         )
