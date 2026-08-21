@@ -1204,6 +1204,16 @@ Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
 日本（UTC+9）では `systemDefault()` でもたまたま同じ日付になるが、
 UTC より西の国では 1 日ずれる。
 
+**⚠️ `Instant` という名前の型は 2 つある。** 自動 import（Alt+Enter）が別物を選ぶことがある。
+
+| import | 正体 |
+|---|---|
+| `java.time.Instant` | ✅ このプロジェクトで使う方。`ofEpochMilli` / `atZone` を持つ |
+| `kotlin.time.Instant` | ❌ Kotlin 標準ライブラリの別物。`atZone` が無い |
+
+`Unresolved reference: ofEpochMilli`（`ofEpochMilli` という名前が見つかりません）が出たら、
+まずファイル先頭の import を見る。候補が複数出たときは **`java.time.` で始まる方**を選ぶ。
+
 ### (67) `DateTimeFormatter` — 日時を「読める文字」にする型紙
 
 `Instant`（(61)）はコンピュータ用の時刻で、そのまま出すと

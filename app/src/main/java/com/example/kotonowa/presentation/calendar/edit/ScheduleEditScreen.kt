@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +32,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.Instant
 
 /**
  * 予定/タスクの作成画面。
@@ -254,8 +256,13 @@ private fun DateSelectDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    // TODO(G-4-3-1b): 選ばれたミリ秒を LocalDate に戻して onConfirm に渡す（§4-(84)）
-                    // TODO(G-4-3-1c): そのあと onDismiss() で閉じる
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val date = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneOffset.UTC)
+                            .toLocalDate()
+                        onConfirm(date)
+                    }
+                    onDismiss()
                 }
             ) {
                 Text("OK")
@@ -267,8 +274,8 @@ private fun DateSelectDialog(
             }
         },
 
-    ) {
-        // TODO(G-4-3-1d): DatePicker(state = 上で作った状態) を置く
+        ) {
+        DatePicker(state = pickerState)
 
     }
 }
