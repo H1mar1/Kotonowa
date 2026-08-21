@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +32,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.Instant
 
 /**
  * 予定/タスクの作成画面。
@@ -69,6 +71,11 @@ fun ScheduleEditScreen(
         onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
         onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
         onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
+        onStartDateChange = viewModel::onStartDateChange,
+        onStartTimeChange = viewModel::onStartTimeChange,
+        onEndDateChange = viewModel::onEndDateChange,
+        onEndTimeChange = viewModel::onEndTimeChange,
+        onPickerDismiss = viewModel::onPickerDismiss,
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
         modifier = modifier,
@@ -92,6 +99,11 @@ private fun ScheduleEditContent(
     onStartTimeClick: () -> Unit,
     onEndDateClick: () -> Unit,
     onEndTimeClick: () -> Unit,
+    onStartDateChange: (LocalDate) -> Unit,
+    onStartTimeChange: (LocalTime) -> Unit,
+    onEndDateChange: (LocalDate) -> Unit,
+    onEndTimeChange: (LocalTime) -> Unit,
+    onPickerDismiss: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -161,6 +173,9 @@ private fun ScheduleEditContent(
                     onDateClick = onStartDateClick,
                     onTimeClick = onStartTimeClick,
                 )
+                // TODO(G-4-3-2d): 「終了」の行を足す
+                //   label = "終了"、date / time は uiState.endDate / uiState.endTime、
+                //   押されたときは onEndDateClick / onEndTimeClick
             }
 
             ScheduleItemType.TASK -> {
@@ -188,6 +203,27 @@ private fun ScheduleEditContent(
         ) {
             Text("戻る")
         }
+    }
+
+    // 開いている旗を見て、対応するダイアログを出す。
+    // ダイアログは画面の場所を取らない（別の窓に出る）ので Column の外に置く。
+    when (uiState.pickerTarget) {
+        PickerTarget.START_DATE -> DateSelectDialog(
+            initialDate = uiState.startDate,
+            onConfirm = onStartDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.END_DATE -> DateSelectDialog(
+            initialDate = uiState.endDate,
+            onConfirm = onEndDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        // 時刻のダイアログは G-4-3-3 で作る。null は「どれも開いていない」
+        PickerTarget.START_TIME,
+        PickerTarget.END_TIME,
+        null -> {}
     }
 }
 
@@ -254,8 +290,13 @@ private fun DateSelectDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    // TODO(G-4-3-1b): 選ばれたミリ秒を LocalDate に戻して onConfirm に渡す（§4-(84)）
-                    // TODO(G-4-3-1c): そのあと onDismiss() で閉じる
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val date = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneOffset.UTC)
+                            .toLocalDate()
+                        onConfirm(date)
+                    }
+                    onDismiss()
                 }
             ) {
                 Text("OK")
@@ -267,8 +308,8 @@ private fun DateSelectDialog(
             }
         },
 
-    ) {
-        // TODO(G-4-3-1d): DatePicker(state = 上で作った状態) を置く
+        ) {
+        DatePicker(state = pickerState)
 
     }
 }
@@ -287,6 +328,11 @@ private fun ScheduleEditContentPreview() {
             onStartTimeClick = {},
             onEndDateClick = {},
             onEndTimeClick = {},
+            onStartDateChange = {},
+            onStartTimeChange = {},
+            onEndDateChange = {},
+            onEndTimeChange = {},
+            onPickerDismiss = {},
             onSaveClick = {},
             onNavigateBack = {},
         )

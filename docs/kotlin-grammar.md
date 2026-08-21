@@ -1204,6 +1204,16 @@ Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
 日本（UTC+9）では `systemDefault()` でもたまたま同じ日付になるが、
 UTC より西の国では 1 日ずれる。
 
+**⚠️ `Instant` という名前の型は 2 つある。** 自動 import（Alt+Enter）が別物を選ぶことがある。
+
+| import | 正体 |
+|---|---|
+| `java.time.Instant` | ✅ このプロジェクトで使う方。`ofEpochMilli` / `atZone` を持つ |
+| `kotlin.time.Instant` | ❌ Kotlin 標準ライブラリの別物。`atZone` が無い |
+
+`Unresolved reference: ofEpochMilli`（`ofEpochMilli` という名前が見つかりません）が出たら、
+まずファイル先頭の import を見る。候補が複数出たときは **`java.time.` で始まる方**を選ぶ。
+
 ### (67) `DateTimeFormatter` — 日時を「読める文字」にする型紙
 
 `Instant`（(61)）はコンピュータ用の時刻で、そのまま出すと
@@ -2065,6 +2075,31 @@ when (getString("type")) {
 ⚠️ この形では **`else` が必須**。`String` は `sealed`（㉘）ではないので、Kotlin は
 「候補がこれで全部」と保証できない。`"banana"` が入っている可能性を潰せないため。
 その `else` が、想定外のデータを `throw`（§6-㊺）で止める受け皿になる。
+
+### (85) `when` の枝をまとめる `,` と、`null` の枝
+
+`enum`（(72)）を `when` で分けるとき、**同じ扱いでよい枝は `,` で並べて 1 本にできる**。
+
+```kotlin
+when (uiState.pickerTarget) {
+    PickerTarget.START_DATE -> DateSelectDialog(...)
+    PickerTarget.END_DATE   -> DateSelectDialog(...)
+    PickerTarget.START_TIME,
+    PickerTarget.END_TIME   -> {}     // どちらも「まだ何もしない」
+    null                    -> {}     // 開いていない
+}
+```
+
+- `A, B -> ...` は「A のとき**または** B のとき」。`else` と違い、**候補を名指ししている**ので
+  あとで枝が増えたときにコンパイラが気づいてくれる
+- `-> {}` は「**この場合は何もしない**」。空の `{ }`（§1-⑥）を書く。省略はできない
+- 分けている値の型が `PickerTarget?`（`?` 付き＝§4-⑯）なら、**`null` も 1 つの枝**として書く。
+  「どれも開いていない」という状態を、うっかり忘れないようにするため
+
+⚠️ ここで `else -> {}` と書きたくなるが、**書かない方がいい**。`else` は「残り全部」なので、
+あとで `PickerTarget` に `DUE_DATE` を足したとき、**黙って `else` に吸い込まれて動かない**。
+名指しで並べておけば「`DUE_DATE` の枝がない」とコンパイルエラーになる。
+Step 16-D-3-d で `RowStyle` にまとめたのと同じ、**直し忘れを機械に見つけさせる**という考え方。
 
 ---
 
