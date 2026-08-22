@@ -173,9 +173,14 @@ private fun ScheduleEditContent(
                     onDateClick = onStartDateClick,
                     onTimeClick = onStartTimeClick,
                 )
-                // TODO(G-4-3-2d): 「終了」の行を足す
-                //   label = "終了"、date / time は uiState.endDate / uiState.endTime、
-                //   押されたときは onEndDateClick / onEndTimeClick
+                DateTimeField(
+                    label = "終了",
+                    date = uiState.endDate,
+                    time = uiState.endTime,
+                    showTime = !uiState.allDay,
+                    onDateClick = onEndDateClick,
+                    onTimeClick = onEndTimeClick,
+                )
             }
 
             ScheduleItemType.TASK -> {
