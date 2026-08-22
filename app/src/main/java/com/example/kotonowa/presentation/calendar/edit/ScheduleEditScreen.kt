@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar.edit
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -17,7 +19,11 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -225,9 +231,18 @@ private fun ScheduleEditContent(
             onDismiss = onPickerDismiss,
         )
 
-        // 時刻のダイアログは G-4-3-3 で作る。null は「どれも開いていない」
-        PickerTarget.START_TIME,
-        PickerTarget.END_TIME,
+        PickerTarget.START_TIME -> TimeSelectDialog(
+            initialTime = uiState.startTime,
+            onConfirm = onStartTimeChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.END_TIME -> TimeSelectDialog(
+            initialTime = uiState.endTime,
+            onConfirm = onEndTimeChange,
+            onDismiss = onPickerDismiss,
+        )
+
         null -> {}
     }
 }
@@ -316,6 +331,57 @@ private fun DateSelectDialog(
         ) {
         DatePicker(state = pickerState)
 
+    }
+}
+
+/**
+ * 時刻を選ぶダイアログ。
+ *
+ * [DateSelectDialog] と役割は同じで、扱うものが日付ではなく時刻というだけ。
+ * 選んでいる途中の値はこのダイアログ自身が持ち（§3-(82)）、
+ * OK が押されたときだけ [onConfirm] で外に渡す。
+ *
+ * 日付のときのようなエポックミリ秒の変換は要らない。
+ * [TimePickerState] は「何時」「何分」をそのままの数で持っているため。
+ *
+ * @param initialTime ダイアログを開いたときに最初に選ばれている時刻
+ * @param onConfirm OK が押されたときに、選ばれた時刻を渡して呼ぶ呼び鈴
+ * @param onDismiss ダイアログを閉じたいときに鳴らす呼び鈴
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeSelectDialog(
+    initialTime: LocalTime,
+    onConfirm: (LocalTime) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val pickerState = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+        is24Hour = true,
+    )
+
+
+    TimePickerDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("時刻を選択") },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(LocalTime.of(pickerState.hour, pickerState.minute))
+                    onDismiss()
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        },
+    ) {
+        TimePicker(state = pickerState)
     }
 }
 
