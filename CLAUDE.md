@@ -67,7 +67,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映まで動作（2026-08-16）。**
+**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 日時を指定した作成→保存→一覧反映まで動作（2026-08-22）。**
 
 ### Phase 2 の進捗
 
@@ -77,7 +77,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 14 | `domain/repository/ScheduleRepository`（interface） | ✅ |
 | 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
 | 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
-| 17 | 作成画面（`presentation/calendar/edit/`） | ⬅️ 進行中 |
+| 17 | 作成画面（`presentation/calendar/edit/`） | ⬅️ 進行中（日時入力まで完了） |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -164,7 +164,14 @@ Firestore コンソールから消す**（コレクションを消してもイ�
 | 17-E-3 | 終日スイッチ（予定のときだけ出す） | ✅ 08-16 |
 | 17-E-4 | `isSaved` を見て `onSaved()` を呼ぶ（`LaunchedEffect`） | ✅ 08-16 |
 | 17-F | `NavHost` に登録し、一覧の「＋」から開けるようにする | ✅ 08-16 |
-| 17 後半 | 日時（`startAt` / `endAt` / `dueAt`）の入力 | ⬜ |
+| 17-G-1/2 | 入力した日時を `save()` で使う（UiState に日付・時刻を持つ） | ✅ 08-19 |
+| 17-G-3 | `DateTimeField`（「開始 ｜ 8/21(金) ｜ 15:00」の行） | ✅ 08-19 |
+| 17-G-4-1/2 | `PickerTarget`（enum）でどのピッカーを開くか持つ | ✅ 08-19 |
+| 17-G-4-3-1 | `DateSelectDialog`（`DatePickerDialog` + `DatePicker`） | ✅ 08-21 |
+| 17-G-4-3-2 | 4 つの入力欄から呼び出す＋「終了」の行 | ✅ 08-22 |
+| 17-G-4-3-3 | `TimeSelectDialog`（`TimePickerDialog` + `TimePicker`） | ✅ 08-22 |
+| 17-H | タスクの「期限」の行 | ⬜ |
+| 17-I | 開始 > 終了 のバリデーション | ⬜ |
 
 **17-F まで完了した時点で経路が 1 本通った（2026-08-16 に動作確認）。**
 ＋ → 入力 → 保存 → 一覧に反映、までをエミュレータで確認済み。
@@ -180,11 +187,33 @@ Step 16-D-3-d の色分けを実データで確認できたのもこの時点。
 どれも同じ形で、**今の値は UiState から渡し、変化は ViewModel へ返す**（状態ホイスティング）。
 画面側に `remember` の状態を持たせないこと。持たせると UiState とズレる。
 
-**現状の制限（17 後半で解消する）**
+**17-G は 2026-08-22 に完了。** 開始・終了の日付と時刻を選んで保存できるようになり、
+「今から 1 時間」に固定されていた制限がすべて解消した。一覧も選んだ日時の順に並ぶ。
 
-- 日時は `ScheduleEditViewModel` で「今から 1 時間」に固定。UiState にはまだ持っていない
-- そのため一覧は `sortAt` 昇順で**新しく作ったものほど下**に来る
-- 終日を ON にしても、保存される時刻は「今から 1 時間」のまま（`allDay` の旗が立つだけ）
+日付と時刻でピッカーの扱いが違う。
+
+| | 覚え書きの型 | 選ばれた値 | 取り出し方 |
+|---|---|---|---|
+| 日付 | `DatePickerState` | `selectedDateMillis`（`Long?`） | `?.let` ＋ `Instant.ofEpochMilli` → `atZone(ZoneOffset.UTC)` → `toLocalDate()` |
+| 時刻 | `TimePickerState` | `hour` / `minute`（`Int`） | `LocalTime.of(hour, minute)` の 1 行 |
+
+日付側で `ZoneOffset.UTC` を使うのは、**ピッカーが UTC の 0 時と決めて数値を渡してくる**ため。
+保存時に端末のタイムゾーンを使う（`ScheduleEditViewModel` の `toInstant`）のとは逆なので注意。
+
+`TimePickerDialog` は Material3 1.4.0 にある（自作の `AlertDialog` は不要）。ただし
+**`title` に既定値が無く必須**。省略すると `android.app.TimePickerDialog` と区別できず
+「None of the following candidates is applicable」になる。
+`TimePicker` / `rememberTimePickerState` は実験中の API なので
+`@OptIn(ExperimentalMaterial3Api::class)` が要る。
+
+ダイアログを出す `when (uiState.pickerTarget)` は **`else` を書かず 5 本の枝を名指し**する。
+`DUE_DATE` を足したときに黙って `else` に吸い込まれず、コンパイルエラーで気づけるため。
+
+**残っている制限**
+
+- タスクの「期限」の行が画面に無い。`save()` は `dueAt` に**開始の入力を流用**しているので
+  保存自体はできるが、期限だけを変えられない（17-H で解消する）
+- 終了日時が開始より前でも保存できてしまう（17-I）
 
 **画面遷移の分担。** 画面には `navController` を渡さず、**`() -> Unit` の呼び鈴だけ**を持たせる。
 
