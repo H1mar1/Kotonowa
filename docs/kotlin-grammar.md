@@ -2101,6 +2101,36 @@ when (uiState.pickerTarget) {
 名指しで並べておけば「`DUE_DATE` の枝がない」とコンパイルエラーになる。
 Step 16-D-3-d で `RowStyle` にまとめたのと同じ、**直し忘れを機械に見つけさせる**という考え方。
 
+### (86) `@OptIn(...)` — 「まだ固まっていない API を、承知の上で使う」宣言
+
+```kotlin
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeSelectDialog(...) { ... }
+```
+
+ライブラリの作者は、**まだ形が変わるかもしれない機能**に「実験中」の札を付けておくことがある。
+Material3 では `@ExperimentalMaterial3Api` がその札。`TimePicker` と
+`rememberTimePickerState` には付いていて、`DatePicker` にはもう付いていない
+（先に固まったため）。
+
+札が付いた機能をそのまま使うと、コンパイラが
+
+> This declaration is experimental and its usage should be marked with '@OptIn'
+> （この機能は実験中です。使うなら '@OptIn' を付けてください）
+
+と警告する。`@OptIn` は「**将来この API の書き方が変わっても文句を言いません**」という
+こちらからの返事。付ければ警告が消える。
+
+- `OptIn`（オプトイン）＝「自分から選んで参加する」
+- `::class`（§4-⑲ の `::` の仲間）＝「その型そのもの」を渡す書き方。
+  `ExperimentalMaterial3Api::class` で「この札のことです」と名指ししている
+- 付ける場所は、その API を使う**関数の上**が基本。ファイル全体に効かせることもできるが、
+  範囲は狭いほどよい（どこで実験的機能を使っているかが見える）
+
+⚠️ 消えるのは**警告だけ**で、リスクは消えない。ライブラリを上げたときに
+この関数がコンパイルエラーになる可能性がある、と知っておく。
+
 ---
 
 ## 追記のしかた（Claude 向け）
