@@ -77,12 +77,14 @@ fun ScheduleEditScreen(
         onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
         onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
         onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
-        // TODO(H-4-2): 期限の 4 本を渡す。Click は onPickerOpen(...) を { } で包み、
-        //   Change は viewModel:: でそのまま渡す（上の 8 本と同じ形）
+        onDueDateClick = { viewModel.onPickerOpen(PickerTarget.DUE_DATE) },
+        onDueTimeClick = { viewModel.onPickerOpen(PickerTarget.DUE_TIME) },
         onStartDateChange = viewModel::onStartDateChange,
         onStartTimeChange = viewModel::onStartTimeChange,
         onEndDateChange = viewModel::onEndDateChange,
         onEndTimeChange = viewModel::onEndTimeChange,
+        onDueDateChange = viewModel::onDueDateChange,
+        onDueTimeChange = viewModel::onDueTimeChange,
         onPickerDismiss = viewModel::onPickerDismiss,
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
@@ -196,11 +198,15 @@ private fun ScheduleEditContent(
             }
 
             ScheduleItemType.TASK -> {
-                // TODO(H-4-4): 「期限」の DateTimeField を 1 つ出す
-                //   label = "期限"、date / time は uiState.dueDate / uiState.dueTime
-                //   押されたときは onDueDateClick / onDueTimeClick
-                //   showTime は？ タスクに「終日」は無い（onItemTypeChange で allDay は
-                //   必ず false に戻される）ので、ここは常に出してよい
+                // タスクに「終日」は無いので showTime は常に true
+                DateTimeField(
+                    label = "期限",
+                    date = uiState.dueDate,
+                    time = uiState.dueTime,
+                    showTime = true,
+                    onDateClick = onDueDateClick,
+                    onTimeClick = onDueTimeClick,
+                )
             }
         }
 
@@ -253,9 +259,18 @@ private fun ScheduleEditContent(
             onDismiss = onPickerDismiss,
         )
 
-        // TODO(H-4-5): DUE_DATE / DUE_TIME の枝を足す
-        //   START_DATE / START_TIME の枝と同じ形。渡すのは
-        //   uiState.dueDate / uiState.dueTime と onDueDateChange / onDueTimeChange
+        PickerTarget.DUE_DATE -> DateSelectDialog(
+            initialDate = uiState.dueDate,
+            onConfirm = onDueDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.DUE_TIME -> TimeSelectDialog(
+            initialTime = uiState.dueTime,
+            onConfirm = onDueTimeChange,
+            onDismiss = onPickerDismiss,
+        )
+
         null -> {}
     }
 }
@@ -412,11 +427,14 @@ private fun ScheduleEditContentPreview() {
             onStartTimeClick = {},
             onEndDateClick = {},
             onEndTimeClick = {},
-            // TODO(H-4-3): 増やした 4 本に空の { } を渡す
+            onDueDateClick = {},
+            onDueTimeClick = {},
             onStartDateChange = {},
             onStartTimeChange = {},
             onEndDateChange = {},
             onEndTimeChange = {},
+            onDueDateChange = {},
+            onDueTimeChange = {},
             onPickerDismiss = {},
             onSaveClick = {},
             onNavigateBack = {},
