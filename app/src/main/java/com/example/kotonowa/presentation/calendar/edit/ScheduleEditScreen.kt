@@ -77,6 +77,8 @@ fun ScheduleEditScreen(
         onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
         onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
         onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
+        // TODO(H-4-2): 期限の 4 本を渡す。Click は onPickerOpen(...) を { } で包み、
+        //   Change は viewModel:: でそのまま渡す（上の 8 本と同じ形）
         onStartDateChange = viewModel::onStartDateChange,
         onStartTimeChange = viewModel::onStartTimeChange,
         onEndDateChange = viewModel::onEndDateChange,
@@ -105,10 +107,14 @@ private fun ScheduleEditContent(
     onStartTimeClick: () -> Unit,
     onEndDateClick: () -> Unit,
     onEndTimeClick: () -> Unit,
+    onDueDateClick: () -> Unit,
+    onDueTimeClick: () -> Unit,
     onStartDateChange: (LocalDate) -> Unit,
     onStartTimeChange: (LocalTime) -> Unit,
     onEndDateChange: (LocalDate) -> Unit,
     onEndTimeChange: (LocalTime) -> Unit,
+    onDueDateChange: (LocalDate) -> Unit,
+    onDueTimeChange: (LocalTime) -> Unit,
     onPickerDismiss: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
@@ -190,7 +196,11 @@ private fun ScheduleEditContent(
             }
 
             ScheduleItemType.TASK -> {
-                // TODO: 期限の DateTimeField を出す
+                // TODO(H-4-4): 「期限」の DateTimeField を 1 つ出す
+                //   label = "期限"、date / time は uiState.dueDate / uiState.dueTime
+                //   押されたときは onDueDateClick / onDueTimeClick
+                //   showTime は？ タスクに「終日」は無い（onItemTypeChange で allDay は
+                //   必ず false に戻される）ので、ここは常に出してよい
             }
         }
 
@@ -243,6 +253,9 @@ private fun ScheduleEditContent(
             onDismiss = onPickerDismiss,
         )
 
+        // TODO(H-4-5): DUE_DATE / DUE_TIME の枝を足す
+        //   START_DATE / START_TIME の枝と同じ形。渡すのは
+        //   uiState.dueDate / uiState.dueTime と onDueDateChange / onDueTimeChange
         null -> {}
     }
 }
@@ -399,6 +412,7 @@ private fun ScheduleEditContentPreview() {
             onStartTimeClick = {},
             onEndDateClick = {},
             onEndTimeClick = {},
+            // TODO(H-4-3): 増やした 4 本に空の { } を渡す
             onStartDateChange = {},
             onStartTimeChange = {},
             onEndDateChange = {},
