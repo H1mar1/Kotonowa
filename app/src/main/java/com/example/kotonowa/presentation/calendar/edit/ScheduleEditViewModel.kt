@@ -92,6 +92,14 @@ class ScheduleEditViewModel @Inject constructor(
         _uiState.update { it.copy(endTime = value) }
     }
 
+    fun onDueTimeChange(value: LocalTime) {
+        _uiState.update { it.copy(dueTime = value) }
+    }
+
+    fun onDueDateChange(value: LocalDate) {
+        _uiState.update { it.copy(dueDate = value) }
+    }
+
 
     /**
      * 入力された内容を 1 件保存する。

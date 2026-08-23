@@ -27,6 +27,8 @@ enum class PickerTarget {
     START_TIME,
     END_DATE,
     END_TIME,
+    DUE_DATE,
+    DUE_TIME,
 }
 
 /**
@@ -53,6 +55,8 @@ data class ScheduleEditUiState(
     val startTime: LocalTime = LocalTime.now().truncatedTo(ChronoUnit.HOURS).plusHours(1),
     val endDate: LocalDate = startDate,
     val endTime: LocalTime = startTime.plusHours(1),
+    val dueDate: LocalDate = LocalDate.now(),
+    val dueTime: LocalTime = LocalTime.of(23, 59),
 
     /** 開いているピッカー。null ならどれも開いていない。 */
     val pickerTarget: PickerTarget? = null,

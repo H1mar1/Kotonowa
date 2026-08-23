@@ -77,10 +77,14 @@ fun ScheduleEditScreen(
         onStartTimeClick = { viewModel.onPickerOpen(PickerTarget.START_TIME) },
         onEndDateClick = { viewModel.onPickerOpen(PickerTarget.END_DATE) },
         onEndTimeClick = { viewModel.onPickerOpen(PickerTarget.END_TIME) },
+        onDueDateClick = { viewModel.onPickerOpen(PickerTarget.DUE_DATE) },
+        onDueTimeClick = { viewModel.onPickerOpen(PickerTarget.DUE_TIME) },
         onStartDateChange = viewModel::onStartDateChange,
         onStartTimeChange = viewModel::onStartTimeChange,
         onEndDateChange = viewModel::onEndDateChange,
         onEndTimeChange = viewModel::onEndTimeChange,
+        onDueDateChange = viewModel::onDueDateChange,
+        onDueTimeChange = viewModel::onDueTimeChange,
         onPickerDismiss = viewModel::onPickerDismiss,
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
@@ -105,10 +109,14 @@ private fun ScheduleEditContent(
     onStartTimeClick: () -> Unit,
     onEndDateClick: () -> Unit,
     onEndTimeClick: () -> Unit,
+    onDueDateClick: () -> Unit,
+    onDueTimeClick: () -> Unit,
     onStartDateChange: (LocalDate) -> Unit,
     onStartTimeChange: (LocalTime) -> Unit,
     onEndDateChange: (LocalDate) -> Unit,
     onEndTimeChange: (LocalTime) -> Unit,
+    onDueDateChange: (LocalDate) -> Unit,
+    onDueTimeChange: (LocalTime) -> Unit,
     onPickerDismiss: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
@@ -190,7 +198,15 @@ private fun ScheduleEditContent(
             }
 
             ScheduleItemType.TASK -> {
-                // TODO: 期限の DateTimeField を出す
+                // タスクに「終日」は無いので showTime は常に true
+                DateTimeField(
+                    label = "期限",
+                    date = uiState.dueDate,
+                    time = uiState.dueTime,
+                    showTime = true,
+                    onDateClick = onDueDateClick,
+                    onTimeClick = onDueTimeClick,
+                )
             }
         }
 
@@ -240,6 +256,18 @@ private fun ScheduleEditContent(
         PickerTarget.END_TIME -> TimeSelectDialog(
             initialTime = uiState.endTime,
             onConfirm = onEndTimeChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.DUE_DATE -> DateSelectDialog(
+            initialDate = uiState.dueDate,
+            onConfirm = onDueDateChange,
+            onDismiss = onPickerDismiss,
+        )
+
+        PickerTarget.DUE_TIME -> TimeSelectDialog(
+            initialTime = uiState.dueTime,
+            onConfirm = onDueTimeChange,
             onDismiss = onPickerDismiss,
         )
 
@@ -399,10 +427,14 @@ private fun ScheduleEditContentPreview() {
             onStartTimeClick = {},
             onEndDateClick = {},
             onEndTimeClick = {},
+            onDueDateClick = {},
+            onDueTimeClick = {},
             onStartDateChange = {},
             onStartTimeChange = {},
             onEndDateChange = {},
             onEndTimeChange = {},
+            onDueDateChange = {},
+            onDueTimeChange = {},
             onPickerDismiss = {},
             onSaveClick = {},
             onNavigateBack = {},
