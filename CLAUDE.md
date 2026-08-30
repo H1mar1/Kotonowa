@@ -170,7 +170,7 @@ Firestore コンソールから消す**（コレクションを消してもイ�
 | 17-G-4-3-1 | `DateSelectDialog`（`DatePickerDialog` + `DatePicker`） | ✅ 08-21 |
 | 17-G-4-3-2 | 4 つの入力欄から呼び出す＋「終了」の行 | ✅ 08-22 |
 | 17-G-4-3-3 | `TimeSelectDialog`（`TimePickerDialog` + `TimePicker`） | ✅ 08-22 |
-| 17-H | タスクの「期限」の行 | ⬜ |
+| 17-H | タスクの「期限」の行 | ✅ 08-30 |
 | 17-I | 開始 > 終了 のバリデーション | ⬜ |
 
 **17-F まで完了した時点で経路が 1 本通った（2026-08-16 に動作確認）。**
@@ -206,13 +206,18 @@ Step 16-D-3-d の色分けを実データで確認できたのもこの時点。
 `TimePicker` / `rememberTimePickerState` は実験中の API なので
 `@OptIn(ExperimentalMaterial3Api::class)` が要る。
 
-ダイアログを出す `when (uiState.pickerTarget)` は **`else` を書かず 5 本の枝を名指し**する。
-`DUE_DATE` を足したときに黙って `else` に吸い込まれず、コンパイルエラーで気づけるため。
+ダイアログを出す `when (uiState.pickerTarget)` は **`else` を書かず枝を名指し**する。
+`17-H` で `DUE_DATE` / `DUE_TIME` を足したとき、黙って `else` に吸い込まれず
+「枝が足りない」とコンパイルエラーで気づけた（現在は 6 本＋ `null -> {}`）。
+
+**17-H は 2026-08-30 に完了。** タスクの期限を開始の入力から独立させた。
+`ScheduleEditUiState` に `dueDate` / `dueTime`（既定 23:59）を足し、TASK の枝に「期限」の
+`DateTimeField` を出し、`PickerTarget` に `DUE_DATE` / `DUE_TIME` を追加。最後に `save()` の
+`dueAt` を `startDate` 流用から `dueDate` / `dueTime` に差し替えた（H-5）。
+これで作成画面の日時入力（開始・終了・期限）はすべて独立した。
 
 **残っている制限**
 
-- タスクの「期限」の行が画面に無い。`save()` は `dueAt` に**開始の入力を流用**しているので
-  保存自体はできるが、期限だけを変えられない（17-H で解消する）
 - 終了日時が開始より前でも保存できてしまう（17-I）
 
 **画面遷移の分担。** 画面には `navController` を渡さず、**`() -> Unit` の呼び鈴だけ**を持たせる。
