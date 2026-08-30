@@ -117,12 +117,20 @@ class ScheduleEditViewModel @Inject constructor(
             _uiState.update { it.copy(errorMessage = "タイトルが入っていません") }
             return
         }
+        val startTime = if (state.allDay) LocalTime.MIN else state.startTime
+        val endTime = if (state.allDay) LocalTime.of(23, 59) else state.endTime
+
+        val startAt = state.startDate.toInstant(startTime)
+        val endAt = state.endDate.toInstant(endTime)
+
+        if (state.itemType == ScheduleItemType.EVENT && !(startAt < endAt)) {
+            _uiState.update { it.copy(errorMessage = "終了は開始より後にしてください") }
+            return
+        }
         _uiState.update { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
             val now = Instant.now()
 
-            val startTime = if (state.allDay) LocalTime.MIN else state.startTime
-            val endTime = if (state.allDay) LocalTime.of(23, 59) else state.endTime
             val item = when (state.itemType) {
                 ScheduleItemType.EVENT -> ScheduleItem.Event(
                     id = UUID.randomUUID().toString(),
@@ -132,8 +140,8 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
-                    startAt = state.startDate.toInstant(startTime),
-                    endAt = state.endDate.toInstant(endTime),
+                    startAt = startAt,
+                    endAt = endAt,
                     allDay = state.allDay,
                 )
 
@@ -145,7 +153,7 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
-                    dueAt = state.startDate.toInstant(state.startTime),
+                    dueAt = state.dueDate.toInstant(state.dueTime),
                     isCompleted = false,
                 )
             }
