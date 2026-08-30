@@ -145,7 +145,7 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
-                    dueAt = state.startDate.toInstant(state.startTime),
+                    dueAt = state.dueDate.toInstant(state.dueTime),
                     isCompleted = false,
                 )
             }
