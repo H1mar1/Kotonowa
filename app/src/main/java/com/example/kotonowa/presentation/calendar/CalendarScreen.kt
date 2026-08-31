@@ -48,6 +48,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun CalendarScreen(
     onAddClick: () -> Unit,
+    onItemClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -86,7 +87,10 @@ fun CalendarScreen(
                         items = uiState.items,
                         key = { item -> item.id },
                     ) { item ->
-                        ScheduleItemRow(item = item)
+                        ScheduleItemRow(
+                            item = item,
+                            onClick = { onItemClick(item.id) },
+                        )
                     }
                 }
             }
@@ -118,6 +122,7 @@ private data class RowStyle(
 @Composable
 private fun ScheduleItemRow(
     item: ScheduleItem,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rowStyle = when (item) {
@@ -157,7 +162,10 @@ private fun ScheduleItemRow(
     }
 
 
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        onClick = onClick
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
@@ -269,7 +277,8 @@ private fun ScheduleItemRowPreview() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PREVIEW_ITEMS.forEach { item ->
-                ScheduleItemRow(item = item)
+                ScheduleItemRow(item = item,
+                    onClick = {})
             }
         }
     }
