@@ -68,7 +68,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 ## 現在の状態
 
 **Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
-行タップ→詳細→削除まで実装（2026-09-02、実機確認 18-F が残り）。**
+行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。**
 
 ### Phase 2 の進捗
 
@@ -79,7 +79,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
 | 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
 | 17 | 作成画面（`presentation/calendar/edit/`） | ✅ |
-| 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ⬅️ 進行中（18-A〜E 完了・実機確認 18-F が残り） |
+| 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -244,7 +244,7 @@ Step 18 以降の画面も同じ形で足すこと。
 | 18-B/C | `ScheduleDetailUiState` ＋ `ScheduleDetailViewModel`（`load()` / `delete()`） | ✅ 09-01 |
 | 18-D | `ScheduleDetailScreen`（`Screen` ＋ `Content` の2段） | ✅ 09-01 |
 | 18-E | `NavHost` に `composable(SCHEDULE_DETAIL)` を登録 | ✅ 09-02 |
-| 18-F | 実機で「行タップ→詳細→削除→一覧へ戻る」を確認 | ⬅️ 残り |
+| 18-F | 実機で「行タップ→詳細→削除→一覧へ戻る」を確認 | ✅ 09-03 |
 
 **18-A。** `ScheduleItemRow` に `onClick`、`CalendarScreen` に `onItemClick(id)` を足し、
 `Card` の押せる版に繋いだ。`Routes` に `SCHEDULE_DETAIL`（`"schedule_detail/{itemId}"`）と
@@ -276,6 +276,15 @@ Step 18 以降の画面も同じ形で足すこと。
 
 削除後に一覧から行を消す処理は**書いていない**。`observeItems` の Flow（Step 15-F）が
 Firestore の変更を拾って流してくれる（作成時と同じ）。
+
+**18-F は 2026-09-03 に Mac 上のエミュレータ（Pixel_7 / Android 16）で確認した。**
+これまでの Windows 環境の記述（PowerShell・`adb.exe` のフルパス）とは別マシン。
+Mac では JDK が入っておらず `./gradlew` がそのままでは失敗するため、
+**Android Studio 同梱の JBR を `JAVA_HOME` に指定**する必要があった
+（`/Applications/Android Studio.app/Contents/jbr/Contents/Home`）。
+一覧→＋→保存→行タップ→詳細→削除→一覧へ自動で戻る、の一連を確認し、
+削除後に一覧に残らないこと・Logcat に `FATAL EXCEPTION` や Firestore 関連のエラーが
+出ないことを確認した。**これで Step 18（詳細・削除画面）は完了。**
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
