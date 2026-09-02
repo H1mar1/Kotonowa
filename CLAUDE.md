@@ -67,7 +67,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 日時を指定した作成→保存→一覧反映まで動作（2026-08-22）。**
+**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
+行タップ→詳細→削除まで実装（2026-09-02、実機確認 18-F が残り）。**
 
 ### Phase 2 の進捗
 
@@ -77,7 +78,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 14 | `domain/repository/ScheduleRepository`（interface） | ✅ |
 | 15 | `data/repository/ScheduleRepositoryImpl`（Firestore 実装） | ✅ |
 | 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
-| 17 | 作成画面（`presentation/calendar/edit/`） | ⬅️ 進行中（日時入力まで完了） |
+| 17 | 作成画面（`presentation/calendar/edit/`） | ✅ |
+| 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ⬅️ 進行中（18-A〜E 完了・実機確認 18-F が残り） |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -233,6 +235,47 @@ Step 16-D-3-d の色分けを実データで確認できたのもこの時点。
 `CalendarScreen` も同じで、「＋」が押されたら `onAddClick()` を鳴らすだけ。
 こうしておくと画面が単体で `@Preview` でき、遷移先を変えても画面側を触らずに済む。
 Step 18 以降の画面も同じ形で足すこと。
+
+#### Step 18 の内訳（詳細・削除画面）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 18-A | 一覧の行タップを `NavHost` まで通す | ✅ 09-01 |
+| 18-B/C | `ScheduleDetailUiState` ＋ `ScheduleDetailViewModel`（`load()` / `delete()`） | ✅ 09-01 |
+| 18-D | `ScheduleDetailScreen`（`Screen` ＋ `Content` の2段） | ✅ 09-01 |
+| 18-E | `NavHost` に `composable(SCHEDULE_DETAIL)` を登録 | ✅ 09-02 |
+| 18-F | 実機で「行タップ→詳細→削除→一覧へ戻る」を確認 | ⬅️ 残り |
+
+**18-A。** `ScheduleItemRow` に `onClick`、`CalendarScreen` に `onItemClick(id)` を足し、
+`Card` の押せる版に繋いだ。`Routes` に `SCHEDULE_DETAIL`（`"schedule_detail/{itemId}"`）と
+文字列を組み立てる `scheduleDetail(id)` ヘルパーを追加。この時点では着地先が無いので押しても何も起きない。
+
+**18-B/C。** `ScheduleDetailViewModel` は `SavedStateHandle` から
+`checkNotNull(savedStateHandle["itemId"])` で `itemId` を取り出す（詳細画面は必ず `itemId` 付きで
+開かれるので、無ければ navigate の書き間違い＝バグ。静かに握りつぶさず即落とす。grammar §(87)）。
+`init` で `load()` → `getItem` の結果を `onSuccess`/`onFailure` で `uiState` に反映。
+`delete()` は `save()` と同じく門番2つ（二度押し防止・`isDeleting`）→ `deleteItem` → 成功で `isDeleted`。
+`ScheduleDetailUiState` の `isLoading` は **`true` 始まり**（開いた瞬間 `getItem` が走るため。
+`CalendarUiState` が `false` 始まりだったのと逆）。削除は `isSaving`/`isSaved` と同じ形で `isDeleting`/`isDeleted`。
+
+**18-D。** `ScheduleEditScreen` と同じ2段構え（`Screen` = ViewModel 係、`Content` = 見た目係）。
+`ScheduleDetailContent` は条件だけの `when {}`（§5-(64)）で `isLoading` → `item == null` → それ以外 を出し分け。
+本体は `when (item)` で Event / Task の日時文字列を組み立て（`CalendarScreen` の `subText` とほぼ同じ）、
+タイトル・日時・メモ・エラー・削除ボタン・戻るボタンを縦に並べる。
+`description` / `errorMessage` は一度ローカル `val` に受けてから `if (x != null)`（スマートキャストのため）。
+
+**案B の判断。** Preview 用データ（`PREVIEW_EVENT` / `PREVIEW_TASK`）と日時フォーマッタは
+**この画面が自前で持つ**。`PREVIEW_ITEMS` は `CalendarScreen` に `private`、詳細は1件表示で必要な形も違う。
+3画面目で同じものが要るようになったら共通ファイルに切り出す（今は早い）。
+
+**18-E。** `composable(Routes.SCHEDULE_DETAIL)` に
+`arguments = listOf(navArgument("itemId") { type = NavType.StringType })` を宣言。
+`onNavigateBack` / `onDeleted` はどちらも `popBackStack()`（行き先を決めるのは `NavHost` だけ、の分担）。
+`itemId` は画面に渡さない。Hilt が `hiltViewModel()` を作るとき、ルートの `{itemId}` を
+`SavedStateHandle` に自動で詰めるので、ViewModel が直接拾える。
+
+削除後に一覧から行を消す処理は**書いていない**。`observeItems` の Flow（Step 15-F）が
+Firestore の変更を拾って流してくれる（作成時と同じ）。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
