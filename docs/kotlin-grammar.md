@@ -1237,6 +1237,32 @@ if (!startAt.isBefore(endAt)) { /* エラーにして中断する */ }
 ⚠️ Firestore の `.whereLessThan(...)`（§5-(53)）と「名前が述語」という発想は同じ。
 ただしあちらはサーバーへの問い合わせ、こちらは**手元にある 2 つの値の比較**で、別物。
 
+### (87) `checkNotNull(x)` と `handle["key"]` — 「あるはず」を取り出す
+
+**`handle["key"]`（角カッコ取り出し）**
+`List` の `list[0]` と同じ書き方だが、`SavedStateHandle` のような**名札で引く箱**にも使える。
+`savedStateHandle["itemId"]` は「`itemId` という名札の中身をちょうだい」。
+中身が無いこともあるので、返ってくる型は `String?`（§4-⑯。null かもしれない）。
+
+**`checkNotNull(x)`**
+「`x` は絶対 null じゃないはず。もし null なら、その場で例外を投げて落とす」。
+
+| 書き方 | null だったとき | いつ使うか |
+|---|---|---|
+| `x ?: 既定値`（§4-⑮） | 代わりの値で**続行する** | null が正常な場合。受け皿がある |
+| `checkNotNull(x)` | `IllegalStateException` で**止める** | null なら**プログラムのバグ**。続けても意味がない |
+
+```kotlin
+private val itemId: String = checkNotNull(savedStateHandle["itemId"])
+```
+
+詳細画面は必ず `"schedule_detail/{itemId}"` の形で開かれる。`itemId` が無いのは
+「navigate の書き方を間違えた」ときだけなので、静かに握りつぶさず**すぐ気づけるように落とす**。
+戻り値は `String?` から **`String`（null でない）** に変わるので、以降 `?.` を書かずに済む。
+
+💡 似た名前に `requireNotNull`（同じ動作。メッセージ用途が少し違うだけ）、
+`check(条件)` / `require(条件)`（null 限定でなく、一般の条件を確かめる）がある。
+
 ### (67) `DateTimeFormatter` — 日時を「読める文字」にする型紙
 
 `Instant`（(61)）はコンピュータ用の時刻で、そのまま出すと

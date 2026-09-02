@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
 import com.example.kotonowa.presentation.auth.signup.SignUpScreen
@@ -18,6 +19,10 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val SCHEDULE_EDIT = "schedule_edit"
+
+    const val SCHEDULE_DETAIL = "schedule_detail/{itemId}"
+
+    fun scheduleDetail(itemId:String)="schedule_detail/$itemId"
 
     const val SIGN_UP = "sign_up"
 
@@ -78,7 +83,8 @@ fun KotonowaNavHost(
 
         composable(Routes.HOME) {
             CalendarScreen(
-                onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) }
+                onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
+                onItemClick = {id ->navController.navigate(Routes.scheduleDetail(id))}
             )
         }
 
