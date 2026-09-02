@@ -3,14 +3,16 @@ package com.example.kotonowa.presentation.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.kotonowa.domain.model.ScheduleItem
+import androidx.navigation.navArgument
 import com.example.kotonowa.presentation.auth.login.LoginScreen
 import com.example.kotonowa.presentation.auth.passwordreset.PasswordResetScreen
 import com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.calendar.CalendarScreen
+import com.example.kotonowa.presentation.calendar.detail.ScheduleDetailScreen
 import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
@@ -22,7 +24,7 @@ object Routes {
 
     const val SCHEDULE_DETAIL = "schedule_detail/{itemId}"
 
-    fun scheduleDetail(itemId:String)="schedule_detail/$itemId"
+    fun scheduleDetail(itemId: String) = "schedule_detail/$itemId"
 
     const val SIGN_UP = "sign_up"
 
@@ -84,7 +86,7 @@ fun KotonowaNavHost(
         composable(Routes.HOME) {
             CalendarScreen(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
-                onItemClick = {id ->navController.navigate(Routes.scheduleDetail(id))}
+                onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) }
             )
         }
 
@@ -118,6 +120,18 @@ fun KotonowaNavHost(
                     navController.popBackStack()
                 }
 
+            )
+        }
+
+        composable(
+            route = Routes.SCHEDULE_DETAIL,
+            arguments = listOf(
+                navArgument("itemId") { type = NavType.StringType },
+            ),
+        ) {
+            ScheduleDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onDeleted = { navController.popBackStack() },
             )
         }
     }
