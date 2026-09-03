@@ -154,6 +154,29 @@ Firestore コンソールから消す**（コレクションを消してもイ�
 **仮「＋」ボタン**（`CalendarViewModel.addDummyItem`）は **2026-08-16 に廃止**。
 「＋」は作成画面を開くだけになった（Step 17-F）。
 
+**Firestore セキュリティルールを本設計した（2026-09-04）。** 要件定義書 §7 のバックログ項目。
+それまでの `allow read, write: if request.auth != null;`（ログインしていれば誰の予定/タスクでも
+読み書きできる）を、`events` コレクションに絞った所有者ベースのルールに置き換えた。
+
+```
+match /events/{eventId} {
+  allow read, update, delete: if request.auth != null
+    && request.auth.uid == resource.data.calendarId;
+  allow create: if request.auth != null
+    && request.auth.uid == request.resource.data.calendarId
+    && request.auth.uid == request.resource.data.createdBy;
+}
+```
+
+Phase2 は個人カレンダーの `calendarId` がそのユーザーの `uid` そのもの（要件定義書 §4）なので、
+「`calendarId` が自分の `uid` と一致するか」がそのまま「自分の予定/タスクか」の判定になる。
+`create` だけ `createdBy` も自分と一致することを追加で要求している。`calendarId` は「どの部屋に
+置くか」、`createdBy` は「誰が置いたと名乗るか」で、Kotlin 側のチェックを迂回して直接 Firestore に
+書き込まれた場合に `createdBy` を詐称されるのを防ぐため。
+`calendars` / `users` / `invites` はまだコードから一度も書き込んでいない（Phase3 以降で使う）ため、
+ルールを書いていない（Firestore はマッチしないパスをデフォルトで拒否する）。
+コンソールに貼り替え、実機で読み込み・作成・更新・削除が引き続き動くことを確認した。
+
 #### Step 17 の内訳
 
 | | 内容 | 状態 |
@@ -439,8 +462,10 @@ Firestore のコレクション構造は `docs/requirements.md` §4 が正。要
   Phase1 では Auth しか使っておらず、データベース自体が存在しなかった。
   作成には **Blaze プラン（従量課金）が必須**だったため 2026-08-12 にアップグレード済み。
   無料枠内なら実費はほぼ 0 円だが、GCP の予算設定は**アラートのみで自動停止はしない**。
-- Firestore のセキュリティルールは未設計（テストモードのまま）。
-  **テストモードは作成から30日（＝2026-09-11 まで）で書き込みが拒否される**ので、Phase3 までに本設計する。
+- ~~Firestore のセキュリティルールは未設計（テストモードのまま）。テストモードは作成から30日
+  （＝2026-09-11 まで）で書き込みが拒否される。~~ → **2026-09-04 に本設計・適用済み**（`events` を
+  所有者（`calendarId`）ベースで絞るルールに変更。詳細は Step 18 直後の記述を参照）。
+  `calendars` / `users` / `invites` 向けのロールベース認可は Phase3 で共有機能を実装する際に設計する。
 
 ## ドキュメント
 
