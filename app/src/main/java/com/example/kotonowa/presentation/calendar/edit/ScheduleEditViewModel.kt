@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar.edit
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.ScheduleItem
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.lang.System.load
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -18,6 +20,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.log
 
 /**
  * 予定/タスクの作成画面の頭脳。
@@ -34,12 +37,71 @@ class ScheduleEditViewModel @Inject constructor(
 
     private val scheduleRepository: ScheduleRepository, // 予定/タスクを出し入れする窓口
     private val authRepository: AuthRepository, // ログイン中のユーザーを知る窓口
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
 
     private val _uiState = MutableStateFlow(ScheduleEditUiState())
     val uiState: StateFlow<ScheduleEditUiState> = _uiState.asStateFlow()
     private val calendarId = authRepository.currentUser?.uid
+
+    private val itemId: String? = savedStateHandle["itemId"]
+
+    private var originalItem: ScheduleItem? = null
+
+    init {
+        if (itemId != null) {
+            load(itemId)
+        }
+    }
+
+    private fun load(itemId: String) {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        viewModelScope.launch {
+            scheduleRepository.getItem(itemId)
+                .onSuccess { item ->
+                    originalItem = item
+                    val zone = ZoneId.systemDefault()
+
+                    _uiState.update {
+                        when (item) {
+                            is ScheduleItem.Event -> it.copy(
+                                isLoading = false,
+                                itemType = ScheduleItemType.EVENT,
+                                title = item.title,
+                                description = item.description ?: "",
+
+                                allDay = item.allDay,
+                                startDate = item.startAt.atZone(zone).toLocalDate(),
+                                startTime = item.startAt.atZone((zone)).toLocalTime(),
+                                endDate = item.endAt.atZone(zone).toLocalDate(),
+                                endTime = item.endAt.atZone(zone).toLocalTime(),
+                            )
+
+                            is ScheduleItem.Task -> it.copy(
+                                isLoading = false,
+                                itemType = ScheduleItemType.TASK,
+                                title = item.title,
+                                description = item.description ?: "",
+
+                                dueDate = item.dueAt.atZone(zone).toLocalDate(),
+                                dueTime = item.dueAt.atZone(zone).toLocalTime(),
+                            )
+                        }
+
+                    }
+                }
+                .onFailure {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "データの読み込みに失敗しました"
+                        )
+                    }
+                }
+        }
+    }
+
     fun onItemTypeChange(value: ScheduleItemType) {
         _uiState.update {
             it.copy(
@@ -112,6 +174,7 @@ class ScheduleEditViewModel @Inject constructor(
 
         val id = calendarId ?: return
         val state = _uiState.value
+        val original = originalItem
         if (state.isSaving) return
         if (state.title.isBlank()) {
             _uiState.update { it.copy(errorMessage = "タイトルが入っていません") }
@@ -133,11 +196,11 @@ class ScheduleEditViewModel @Inject constructor(
 
             val item = when (state.itemType) {
                 ScheduleItemType.EVENT -> ScheduleItem.Event(
-                    id = UUID.randomUUID().toString(),
-                    calendarId = id,
+                    id = original?.id ?: UUID.randomUUID().toString(),
+                    calendarId = original?.calendarId ?: id,
+                    createdBy = original?.createdBy ?: id,
                     title = state.title,
                     description = state.description.ifBlank { null },
-                    createdBy = id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
                     startAt = startAt,
@@ -146,11 +209,11 @@ class ScheduleEditViewModel @Inject constructor(
                 )
 
                 ScheduleItemType.TASK -> ScheduleItem.Task(
-                    id = UUID.randomUUID().toString(),
-                    calendarId = id,
+                    id = original?.id ?: UUID.randomUUID().toString(),
+                    calendarId = original?.calendarId ?: id,
                     title = state.title,
                     description = state.description.ifBlank { null },
-                    createdBy = id,
+                    createdBy = original?.createdBy ?: id,
                     reminderMinutesBefore = null,
                     updatedAt = now,
                     dueAt = state.dueDate.toInstant(state.dueTime),
@@ -158,7 +221,11 @@ class ScheduleEditViewModel @Inject constructor(
                 )
             }
 
-            scheduleRepository.addItem(item)
+            val result = if (original == null)
+                scheduleRepository.addItem(item)
+            else scheduleRepository.updateItem(item)
+
+            result
                 .onSuccess { _uiState.update { it.copy(isSaving = false, isSaved = true) } }
                 .onFailure {
                     _uiState.update {
