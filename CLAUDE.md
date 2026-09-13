@@ -39,6 +39,25 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 - 記号は読み方を日本語で示す（`.` は「〜の」、`?:` は「〜がなければ」）。
 - 「よくある書き方です」「お決まりです」で済ませない。
 
+### 2.6 コードを出す前に「何の動きを作っているのか」を先に説明する（2026-09-12 追加）
+
+**コード（穴埋め・骨組み・ヒントを含む）を提示する前に、必ずその前置きを書く。**
+「書き方」から始めると、ユーザーは何のために手を動かしているのか分からないまま写すことになる。
+
+順番は必ず以下にする。
+
+1. **ユーザー目線の動き** — これができると**アプリ上で何が起きるようになるのか**を1〜2行で。
+   例：「編集画面を開いたら、前に保存した内容が最初から入力欄に入っている」
+2. **全体の流れ** — どこから呼ばれ、どの順で動き、どこへ繋がるか。矢印の図か表で示す。
+   たとえを添える（編集画面＝白紙の用紙、`load`＝倉庫から前の紙を取ってくる係）。
+3. **出てくる箱の役割** — 変数・プロパティが**それぞれ何のためにあるか**を表で。
+   「なぜ別々に持つ必要があるのか」まで書く（例：`originalItem` は `_uiState` と違い、ユーザーが触らない部分を覚えておく係）。
+4. **そのうえでコード／穴埋めを出す**（§2.5 の文法解説つき）。
+
+⚠️ **画面上で何も変わらない作業のときは、それを明言する。**
+「今は配管を作っている段階なので、実機では何も変わりません」と先に言っておく。
+言わないと「書いたのに動かない＝失敗した」と誤解させる（§3 の土台作りの話と同じ）。
+
 ### 3. 毎回「今どこ・次に何を・なぜ繋がるか」を示す
 
 ユーザーが全体像を見失わないよう、**各ステップの説明に必ず以下3点を含める**。
@@ -68,7 +87,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 ## 現在の状態
 
 **Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
-行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。**
+行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。
+Step 19（編集）に着手中（2026-09-12〜）。ViewModel 側（19-A〜D）はできており、残りは画面の導線（19-E）。**
 
 ### Phase 2 の進捗
 
@@ -80,6 +100,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 | 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
 | 17 | 作成画面（`presentation/calendar/edit/`） | ✅ |
 | 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ✅ |
+| 19 | 編集画面（作成画面 `presentation/calendar/edit/` を 1 枚で 2 役） | 🔧 19-E 残り |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -308,6 +329,75 @@ Mac では JDK が入っておらず `./gradlew` がそのままでは失敗す�
 一覧→＋→保存→行タップ→詳細→削除→一覧へ自動で戻る、の一連を確認し、
 削除後に一覧に残らないこと・Logcat に `FATAL EXCEPTION` や Firestore 関連のエラーが
 出ないことを確認した。**これで Step 18（詳細・削除画面）は完了。**
+
+#### Step 19 の内訳（編集画面）
+
+**画面はもう 1 枚作らない。作成画面（`presentation/calendar/edit/`）を 1 枚で 2 役にする。**
+`itemId` 付きで開かれたら編集モード、無ければ作成モード。入力欄・バリデーション・日時ピッカーは
+まったく同じものが要るので、2 枚に分けると Step 17 で作ったものを丸ごと複製することになる。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 19-A | `Routes` に `SCHEDULE_EDIT_ITEM`（`"schedule_edit/{itemId}"`）＋ `scheduleEditItem(id)` | ✅ 09-12 |
+| 19-B | `ScheduleEditUiState` に `isLoading`（**`false` 始まり**） | ✅ 09-12 |
+| 19-C | `ScheduleEditViewModel` が `itemId` を受け取り、`load()` で入力欄を埋める | ✅ 09-13 |
+| 19-D | `save()` を「新規追加」と「上書き」に分ける | ✅ 09-13 |
+| 19-E | 詳細画面に「編集」ボタン＋`NavHost` に `composable(SCHEDULE_EDIT_ITEM)` を登録 | ⬜ |
+
+**19-B。** `isLoading` が `false` 始まりなのは、**作成モードでは読み込み自体が起きない**ため
+（`ScheduleDetailUiState` が `true` 始まりだったのと逆）。編集モードのときだけ `load()` の先頭で立てる。
+
+**19-C。** `SavedStateHandle` から `itemId` を取るのは詳細画面と同じだが、
+**`checkNotNull` は使わない**（grammar §4-(87)）。この画面は「＋」からも開かれるので、
+`itemId` が無いのは**バグではなく作成モード**。`private val itemId: String?` のまま持ち、
+`init` で `if (itemId != null) load(itemId)`。
+`if` の中で確定した値を**引数で渡す**ので、`load` の中では `String`（`?` なし）として扱える。
+
+`load()` は `getItem` の結果を `originalItem`（`var`）に控え、`ScheduleItem` → `ScheduleEditUiState` へ
+**逆詰め替え**する。`_uiState.update { }` の答えを `when (item)` そのものにしているので
+（grammar §5-㊳）、Event / Task の枝を書き漏らすとコンパイルエラーになる。
+
+| 変換 | 書き方 | 理由 |
+|---|---|---|
+| `Instant` → 日付欄・時刻欄 | `atZone(zone).toLocalDate()` / `.toLocalTime()` | 入力欄は日付と時刻が別（grammar §4-(89)） |
+| `description`（`String?`）→ 入力欄（`String`） | `?: ""` | 保存時の `ifBlank { null }` の逆変換 |
+| `zone` | `ZoneId.systemDefault()` | 入力したときと同じ時計で戻さないとズレる。UTC はピッカー用 |
+
+`isCompleted` は移さない（編集画面に完了のチェックが無い）。`copy()` は書かなかった項目を
+そのまま残すので、Task の枝で `allDay` / 開始・終了を書かなくてよい（grammar §7-㉗）。
+
+**19-D。** Firestore の保存先は `.document(item.id)`（`ScheduleRepositoryImpl.kt:37`）なので、
+**id が書類の住所**。編集で新しい UUID を作ると別の書類になり、上書きではなく 1 件増える。
+
+```kotlin
+id         = original?.id         ?: UUID.randomUUID().toString()
+calendarId = original?.calendarId ?: id      // id はログイン中の uid（175 行目）
+createdBy  = original?.createdBy  ?: id
+val result = if (original == null) addItem(item) else updateItem(item)
+```
+
+| | Firestore の命令 | 書類が無いとき |
+|---|---|---|
+| `addItem` | `.set(map)` | 新しく作る |
+| `updateItem` | `.update(map)` | **エラー**（存在する時だけ書き換える） |
+
+編集は「必ず元の書類がある」場面なので `updateItem`。無ければ異常（消された後に保存した等）として
+気づける方がよい。`originalItem` は `var` なので、`save()` の冒頭で `val original` に写して固定する
+（grammar §4-(65) の `var` の項）。`_uiState.value` を `val state` に受けるのと同じ理由。
+
+⚠️ **`calendarId` / `createdBy` を「自分の uid」で埋め直さず、元の値を引き継ぐこと。**
+Phase2 は 3 つとも同じ値なので取り違えても動いてしまうが、Phase3 の共有カレンダーでは
+`calendarId`＝共有カレンダーの id、`createdBy`＝作った個人の uid で**別の値**になる。
+埋め直すと予定が共有カレンダーから自分の個人カレンダーへ移動し、
+セキュリティルールの `create`（`request.auth.uid == createdBy`）にも弾かれる。
+型がどちらも `String` なので**コンパイラは取り違えを見つけられない**。
+`id` / `calendarId` / `createdBy` の 3 行は縦に読み、左の名前と `original?.〇〇` の綴りを目で照合する。
+
+💡 `save()` 175 行目の `val id = calendarId ?: return` の `id` は**ログイン中のユーザーの uid**で、
+組み立て側の `id =`（予定の id）とは別物。紛らわしいので `val uid` への改名を検討中。
+
+**この Step で文法メモに追記したもの** … §7-(88)（コンストラクタの `val` あり/なし）、
+§4-(89)（`Instant` を `LocalDate` / `LocalTime` にバラす）、§4-(65) に `var` のスマートキャストの項。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
