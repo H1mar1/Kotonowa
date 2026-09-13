@@ -47,6 +47,7 @@ data class ScheduleEditUiState(
     val description: String = "",
     val allDay: Boolean = false,
 
+   val isLoading: Boolean=false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val errorMessage: String? = null,

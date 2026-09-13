@@ -1214,6 +1214,43 @@ UTC より西の国では 1 日ずれる。
 `Unresolved reference: ofEpochMilli`（`ofEpochMilli` という名前が見つかりません）が出たら、
 まずファイル先頭の import を見る。候補が複数出たときは **`java.time.` で始まる方**を選ぶ。
 
+### (89) `Instant` を `LocalDate` / `LocalTime` に**バラす**
+
+(61) の「登るはしご」（`LocalDate` + `LocalTime` → `Instant`）の**逆向き**。
+保存されている `Instant` を、画面の入力欄（日付の欄・時刻の欄）に戻すときに使う。
+
+```kotlin
+val zone = ZoneId.systemDefault()
+
+val date = item.startAt.atZone(zone).toLocalDate()   // 2026-09-12
+val time = item.startAt.atZone(zone).toLocalTime()   // 15:00
+```
+
+| 書いたところまで | 手に持っているもの | 捨てた情報 |
+|---|---|---|
+| `item.startAt` | 世界共通の時刻（`Instant`） | — |
+| `.atZone(zone)` | 2026-09-12 15:00 +09:00（`ZonedDateTime`） | — |
+| `.toLocalDate()` | 2026-09-12（`LocalDate`） | **時刻とタイムゾーン** |
+| `.toLocalTime()` | 15:00（`LocalTime`） | **日付とタイムゾーン** |
+
+**同じ `Instant` から 2 回バラす。** 日付だけの箱と時刻だけの箱は別物（(61) の表）なので、
+`startDate` と `startTime` を埋めるには `toLocalDate()` と `toLocalTime()` を 1 回ずつ呼ぶ。
+
+⚠️ **`atZone` を飛ばして `Instant` から直接は取れない。** `Instant` は「地球上のこの瞬間」しか
+持っておらず、「何日の何時か」は**どこの時計で見るかを決めるまで存在しない**（(61) 冒頭の理由）。
+
+⚠️ **ここで使うのは `ZoneId.systemDefault()`**（端末のタイムゾーン）。
+`ZoneOffset.UTC` を使うのはピッカーと数値をやりとりするときだけ（(61) の末尾）。
+
+| 場面 | どのゾーンか | なぜ |
+|---|---|---|
+| 入力を保存する（`toInstant`） | `systemDefault()` | ユーザーは自分の国の時計で入力している |
+| 保存値を入力欄に戻す（ここ） | `systemDefault()` | 入力したときと同じ時計で見ないと値がズレる |
+| ピッカーとミリ秒をやりとり | `ZoneOffset.UTC` | **相手が UTC と決めている**から合わせるだけ |
+
+💡 `zone` は 1 回 `val` に受けて使い回す（§1-①）。`atZone(ZoneId.systemDefault())` を
+4 回も 6 回も書くと、長いうえに 1 か所だけ直し忘れる事故が起きる。
+
 ### (84) `isBefore` / `isAfter` — 日時どうしの前後を比べる
 
 `java.time` の型（`Instant` / `LocalDate` / `LocalTime` など）は、大小を
@@ -1351,6 +1388,34 @@ when {
 
 💡 同じ対処は `@Composable` の中で何度も同じ値を読むときにも有効
 （毎回取り直す無駄が減る）。§3-㉜ の「値を先に取り出しておく」と同じ発想。
+
+**もう 1 つの原因：`var` のプロパティ。**
+
+```kotlin
+private var originalItem: ScheduleItem? = null
+
+if (originalItem != null) {
+    val x = originalItem.id     // ❌ 効かない
+}
+```
+
+> `Smart cast to 'ScheduleItem' is impossible, because 'originalItem' is a mutable property`
+> （`originalItem` は書き換えられる変数なので、スマートキャストできません）
+
+`var`（§1-①）は**中身が入れ替わる箱**。確かめた次の行で別のコルーチン（§2-⑩）が
+書き換えているかもしれないので、Kotlin は「中身あり」を保証しない。
+
+対処は同じで、**ローカルの `val` に 1 回受ける**。
+
+```kotlin
+val original = originalItem      // ここで中身を固定する
+if (original != null) {
+    val x = original.id          // ✅ 効く
+}
+```
+
+💡 `_uiState.value` を `val state` に受ける（`save()` の冒頭）のも同じ発想。
+「**判定に使う値は、判定の前に 1 回だけ取り出して固定する**」と覚える。
 
 ### ⑰ `as` — 型を言い換える
 
@@ -2179,6 +2244,38 @@ Material3 では `@ExperimentalMaterial3Api` がその札。`TimePicker` と
 
 ⚠️ 消えるのは**警告だけ**で、リスクは消えない。ライブラリを上げたときに
 この関数がコンパイルエラーになる可能性がある、と知っておく。
+
+### (88) コンストラクタの `val` あり / なし — 「持ち続ける」か「その場で使い捨てる」か
+
+`class 〇〇(...)` のカッコの中に書く引数は、**`val` を付けるかどうかで寿命が変わる**。
+
+```kotlin
+class ScheduleEditViewModel @Inject constructor(
+    private val scheduleRepository: ScheduleRepository, // ずっと持っておく
+    savedStateHandle: SavedStateHandle,                 // 作られる瞬間だけ使う
+) : ViewModel() {
+
+    private val itemId: String? = savedStateHandle["itemId"]   // ← ここでは使える
+}
+```
+
+| 書き方 | 正体 | いつまで使えるか |
+|---|---|---|
+| `val x: T` / `private val x: T` | **プロパティ**（クラスが持つ箱。§1-①） | クラスが生きている間ずっと |
+| `x: T`（`val` なし） | **ただの材料** | **作られる瞬間だけ**（プロパティの `=` の右と `init { }` の中） |
+
+`val` なしの引数をあとから関数の中で使おうとすると、こうなる。
+
+> `Unresolved reference: savedStateHandle`
+> （`savedStateHandle` という名前が見つかりません）
+
+**なぜ使い分けるのか。** `scheduleRepository` は保存や削除のたびに使うので持ち続ける必要がある。
+`savedStateHandle` は**開かれたときに `itemId` を 1 回取り出すだけ**で、それ以降は用がない。
+持ち続けると「あとから中身が変わるのでは」と読む人に思わせるうえ、
+本来 1 か所で済むはずの取り出しがあちこちに散らばる元になる。**使い終わった材料は残さない。**
+
+💡 `private` は「このクラスの中だけで使う」という印（§4-㊱ のファイル限定の `private` と同じ発想）。
+画面から `viewModel.scheduleRepository` と触られては困るので付けている。
 
 ---
 

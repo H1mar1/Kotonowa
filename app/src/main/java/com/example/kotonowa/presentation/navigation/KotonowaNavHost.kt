@@ -22,6 +22,11 @@ object Routes {
     const val HOME = "home"
     const val SCHEDULE_EDIT = "schedule_edit"
 
+    // Step 19-A: 編集用ルート（SCHEDULE_DETAIL / scheduleDetail と同じ形）
+    const val SCHEDULE_EDIT_ITEM = "schedule_edit/{itemId}"
+
+    fun scheduleEditItem(itemId: String) = "schedule_edit/$itemId"
+
     const val SCHEDULE_DETAIL = "schedule_detail/{itemId}"
 
     fun scheduleDetail(itemId: String) = "schedule_detail/$itemId"
@@ -132,7 +137,13 @@ fun KotonowaNavHost(
             ScheduleDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onDeleted = { navController.popBackStack() },
+                // TODO(Step 19-E): 編集ボタンを押したら
+                //   navController.navigate(Routes.scheduleEditItem(id)) で編集画面へ飛ばす
             )
         }
+
+        // TODO(Step 19-E): composable(route = Routes.SCHEDULE_EDIT_ITEM, arguments = ...) を追加する。
+        //   Routes.SCHEDULE_DETAIL の composable ブロック（すぐ上）が書き方のお手本。
+        //   ScheduleEditScreen 自体は今のままで OK（itemId は Hilt が SavedStateHandle に詰めてくれる）
     }
 }

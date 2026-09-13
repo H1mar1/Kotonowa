@@ -130,6 +130,11 @@ private fun ScheduleDetailContent(
                     Text(message, color = MaterialTheme.colorScheme.error)
                 }
 
+                // TODO(Step 19-E): 「編集」ボタンを追加する。onEditClick: () -> Unit を
+                //   ScheduleDetailContent / ScheduleDetailScreen の引数に足し、
+                //   KotonowaNavHost 側で navController.navigate(Routes.scheduleEditItem(id)) を渡す
+                //   （onDeleteClick / onNavigateBack と同じ「呼び鈴」の形。行き先は NavHost だけが知る）。
+
                 Button(
                     onClick = onDeleteClick,
                     enabled = !uiState.isDeleting
