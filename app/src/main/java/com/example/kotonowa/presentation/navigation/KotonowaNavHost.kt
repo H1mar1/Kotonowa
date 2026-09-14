@@ -141,9 +141,6 @@ fun KotonowaNavHost(
             )
         }
 
-        // TODO(Step 19-E): composable(route = Routes.SCHEDULE_EDIT_ITEM, arguments = ...) を追加する。
-        //   Routes.SCHEDULE_DETAIL の composable ブロック（すぐ上）が書き方のお手本。
-        //   ScheduleEditScreen 自体は今のままで OK（itemId は Hilt が SavedStateHandle に詰めてくれる）
         composable(
             route = Routes.SCHEDULE_EDIT_ITEM,
             arguments = listOf(

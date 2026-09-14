@@ -1,6 +1,5 @@
 package com.example.kotonowa.data.repository
 
-import androidx.compose.animation.core.snap
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.google.firebase.firestore.DocumentSnapshot
