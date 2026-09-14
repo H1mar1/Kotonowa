@@ -88,7 +88,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 **Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
 行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。
-Step 19（編集）に着手中（2026-09-12〜）。ViewModel 側（19-A〜D）はできており、残りは画面の導線（19-E）。**
+Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧→詳細→編集→上書き保存が通った。
+Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。**
 
 ### Phase 2 の進捗
 
@@ -100,7 +101,8 @@ Step 19（編集）に着手中（2026-09-12〜）。ViewModel 側（19-A〜D）
 | 16 | カレンダー画面（`presentation/calendar/`） | ✅ |
 | 17 | 作成画面（`presentation/calendar/edit/`） | ✅ |
 | 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ✅ |
-| 19 | 編集画面（作成画面 `presentation/calendar/edit/` を 1 枚で 2 役） | 🔧 19-E 残り |
+| 19 | 編集画面（作成画面 `presentation/calendar/edit/` を 1 枚で 2 役） | ✅ |
+| 20 | 詳細画面を 1 件購読（`observeItem`）に変更 | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -342,7 +344,8 @@ Mac では JDK が入っておらず `./gradlew` がそのままでは失敗す�
 | 19-B | `ScheduleEditUiState` に `isLoading`（**`false` 始まり**） | ✅ 09-12 |
 | 19-C | `ScheduleEditViewModel` が `itemId` を受け取り、`load()` で入力欄を埋める | ✅ 09-13 |
 | 19-D | `save()` を「新規追加」と「上書き」に分ける | ✅ 09-13 |
-| 19-E | 詳細画面に「編集」ボタン＋`NavHost` に `composable(SCHEDULE_EDIT_ITEM)` を登録 | ⬜ |
+| 19-E | 詳細画面に「編集」ボタン＋`NavHost` に `composable(SCHEDULE_EDIT_ITEM)` を登録 | ✅ 09-15 |
+| 19-F | 実機で「詳細→編集→内容が埋まる→保存で上書き」を確認 | ✅ 09-15 |
 
 **19-B。** `isLoading` が `false` 始まりなのは、**作成モードでは読み込み自体が起きない**ため
 （`ScheduleDetailUiState` が `true` 始まりだったのと逆）。編集モードのときだけ `load()` の先頭で立てる。
@@ -396,8 +399,66 @@ Phase2 は 3 つとも同じ値なので取り違えても動いてしまうが�
 💡 `save()` 175 行目の `val id = calendarId ?: return` の `id` は**ログイン中のユーザーの uid**で、
 組み立て側の `id =`（予定の id）とは別物。紛らわしいので `val uid` への改名を検討中。
 
+**19-E。** 詳細画面に `onEditClick: (String) -> Unit` を足し、`Button` から `onEditClick(item.id)` を鳴らす。
+`NavHost` 側が `{ editId -> navController.navigate(Routes.scheduleEditItem(editId)) }` で行き先を決める
+（一覧の `onItemClick` と同じ形）。**`ScheduleEditScreen` は 1 文字も変えていない** — `itemId` は
+Hilt が `hiltViewModel()` を作るときに `SavedStateHandle` へ詰めるので、画面は知らなくてよい。
+
+`"schedule_edit"`（作成）と `"schedule_edit/{itemId}"`（編集）は**区切りの数が違うので共存できる**。
+「＋」は前者、「編集」は後者に着地する。
+
+**19-F は 2026-09-15 にエミュレータ（Pixel_7）で確認した。** 詳細→編集→入力欄が既存の内容で
+埋まる→タイトルを変えて保存→**一覧の行が書き換わる（増えない）**まで、EVENT と TASK の両方で確認。
+Logcat に `FATAL EXCEPTION` / Firestore のエラーは出ていない。**これで Step 19 は完了。**
+
+⚠️ **既知の問題（次に直す）。保存後に戻った詳細画面が、編集前の古い内容のまま表示される。**
+`ScheduleDetailViewModel.load()` は `init` でしか走らないが、`popBackStack()` で戻ったときの
+詳細画面は**バックスタックに残っていた同じ ViewModel** なので `init` が再実行されない。
+一覧が自動更新されるのは `observeItems` の Flow（Step 15-F）が効いているからで、
+詳細画面は 1 回きりの `getItem` なので取り残される。直し方の候補は 3 つ
+（保存後に一覧まで戻す／画面が再表示されたときに読み直す／`getItem` をやめて 1 件を購読する）。
+
+**ハマりどころ：全角スペース（U+3000）。** 日本語入力のまま `=` の後にスペースを打つと混入し、
+`Syntax error: Expecting an expression` になる。見た目で判別できないので、
+エラーの列番号に何も無いように見えたらこれを疑う。`grep -n '　' <file>` で見つかる。
+
 **この Step で文法メモに追記したもの** … §7-(88)（コンストラクタの `val` あり/なし）、
 §4-(89)（`Instant` を `LocalDate` / `LocalTime` にバラす）、§4-(65) に `var` のスマートキャストの項。
+
+#### Step 20 の内訳（詳細画面を購読にする）
+
+**Step 19 の既知の問題（保存後に戻った詳細画面が古いまま）への対処。**
+`popBackStack()` で戻った詳細画面はバックスタックに残っていた**同じ ViewModel** なので
+`init` が再実行されず、1 回きりの `getItem` では取り残される。一覧が自動更新されるのは
+`observeItems` の Flow（Step 15-F）が効いているからで、**同じ仕組みを 1 件版にも広げた。**
+
+| | 内容 | 状態 |
+|---|---|---|
+| 20-A | `ScheduleRepository` に `observeItem(itemId): Flow<ScheduleItem?>` | ✅ 09-15 |
+| 20-B | `ScheduleRepositoryImpl.observeItem`（`callbackFlow` ＋ `document(itemId)`） | ✅ 09-15 |
+| 20-C | `ScheduleDetailViewModel.load()` を `getItem` から `collect` に変更 | ✅ 09-15 |
+| 20-D | 実機で「編集→保存→詳細が新しくなる」を確認 | ✅ 09-15 |
+
+**選択肢は 3 つあった**（A: 保存後に一覧まで戻す ／ B: 再表示時に読み直す ／ C: 1 件を購読する）。
+**C を選んだ理由**は、Step 15-F で作った「Firestore の変更が勝手に流れてくる」という考え方に
+アプリ全体を揃えられるため。他端末の変更も自動で届くので Phase3 の共有カレンダーでそのまま活きる。
+
+**戻り値を `Flow<ScheduleItem?>`（`?` 付き）にした理由。** 削除されたとき「無くなった」を
+流す必要がある。`Flow<ScheduleItem>` では削除を表現できない。`null` が流れると
+`ScheduleDetailContent` の `item == null` の枝（§5-(64)）が「見つかりませんでした」を出す。
+
+**`Result` で包まない理由。** 1 回きりの `getItem` は `Result.failure(e)` を返すが、
+流れ続ける `Flow` は `close(error)` で管を閉じ、`collect` 側の `try`/`catch` に飛ばす（§6-㉔）。
+`Flow<Result<T>>` は二重の封筒になって読みにくい。`observeItems` も同じ方針。
+
+**一覧版との違いは 3 点だけ。** `whereEqualTo(...)` → `document(itemId)`、
+`snapshot?.documents?.mapNotNull` → `snapshot != null && snapshot.exists()` の 2 段構え、
+流すものが `List` ではなく 1 件（または `null`）。単一ドキュメントの見張りは**書類が消えたときにも
+呼ばれる**ので、`exists()` の確認が要る。
+
+⚠️ **`getItem` は残す。** 編集画面（`ScheduleEditViewModel.load()`）が使い続ける。
+入力欄は「開いた瞬間の 1 回」だけ読めばよく、**入力中に外から流れてくると打った内容が消える**。
+「1 回きり」と「購読」は用途で使い分ける。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 

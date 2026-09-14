@@ -38,6 +38,7 @@ import java.time.format.DateTimeFormatter
 fun ScheduleDetailScreen(
     onNavigateBack: () -> Unit,
     onDeleted: () -> Unit,
+    onEditClick:(String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ScheduleDetailViewModel = hiltViewModel(),
 ) {
@@ -52,6 +53,7 @@ fun ScheduleDetailScreen(
         uiState = uiState,
         onDeleteClick = viewModel::delete,
         onNavigateBack = onNavigateBack,
+        onEditClick = onEditClick,
         modifier = modifier,
     )
 }
@@ -64,6 +66,7 @@ fun ScheduleDetailScreen(
 private fun ScheduleDetailContent(
     uiState: ScheduleDetailUiState,
     onDeleteClick: () -> Unit,
+    onEditClick: (String) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -135,6 +138,10 @@ private fun ScheduleDetailContent(
                 //   KotonowaNavHost 側で navController.navigate(Routes.scheduleEditItem(id)) を渡す
                 //   （onDeleteClick / onNavigateBack と同じ「呼び鈴」の形。行き先は NavHost だけが知る）。
 
+                Button(onClick = {onEditClick(item.id)},
+                    enabled =  !uiState.isDeleting,) {
+                    Text("編集")
+                }
                 Button(
                     onClick = onDeleteClick,
                     enabled = !uiState.isDeleting
@@ -190,6 +197,7 @@ private fun ScheduleDetailContentEventPreview() {
             uiState = ScheduleDetailUiState(item = PREVIEW_EVENT, isLoading = false),
             onDeleteClick = {},
             onNavigateBack = {},
+            onEditClick = {},
         )
     }
 }
@@ -202,6 +210,7 @@ private fun ScheduleDetailContentTaskPreview() {
             uiState = ScheduleDetailUiState(item = PREVIEW_TASK, isLoading = false),
             onDeleteClick = {},
             onNavigateBack = {},
+            onEditClick = {},
         )
     }
 }

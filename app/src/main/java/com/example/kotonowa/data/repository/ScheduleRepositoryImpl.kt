@@ -112,6 +112,24 @@ class ScheduleRepositoryImpl @Inject constructor(
             registration.remove()
         }
     }
+
+    override fun observeItem(itemId: String): Flow<ScheduleItem?> = callbackFlow {
+        val registration = firestore.collection(COLLECTION_EVENTS)
+            .document(itemId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val item = if (snapshot != null && snapshot.exists()) {
+                    runCatching { snapshot.toScheduleItem() }.getOrNull()
+                } else {
+                    null
+                }
+                trySend(item)
+            }
+        awaitClose { registration.remove() }
+    }
 }
 
 /**

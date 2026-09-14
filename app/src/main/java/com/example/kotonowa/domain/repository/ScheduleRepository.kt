@@ -21,6 +21,8 @@ interface ScheduleRepository {
 
     suspend fun getItem(itemId: String): Result<ScheduleItem> //1件を取得
 
+    fun observeItem(itemId: String): Flow<ScheduleItem?>
+
     fun observeItems(
         calendarId: String,
         from: Instant,
