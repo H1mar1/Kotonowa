@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -44,19 +45,19 @@ class ScheduleDetailViewModel @Inject constructor(
     private fun load() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-
-            scheduleRepository.getItem(itemId)
-                .onSuccess { item -> _uiState.update { it.copy(item = item, isLoading = false) } }
-                .onFailure {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = "読み込めません"
-                        )
+            try {
+                scheduleRepository.observeItem(itemId)
+                    .collect { item ->
+                        _uiState.update { it.copy(item = item, isLoading = false) }
                     }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, errorMessage = "読み込めません")
                 }
+            }
         }
     }
+
 
     /** itemId の 1 件を削除する。成功したら isDeleted を立てる（画面がそれを見て戻る）。 */
     fun delete() {
