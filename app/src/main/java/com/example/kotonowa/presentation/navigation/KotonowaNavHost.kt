@@ -137,13 +137,23 @@ fun KotonowaNavHost(
             ScheduleDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onDeleted = { navController.popBackStack() },
-                // TODO(Step 19-E): 編集ボタンを押したら
-                //   navController.navigate(Routes.scheduleEditItem(id)) で編集画面へ飛ばす
+                onEditClick = { editId -> navController.navigate(Routes.scheduleEditItem(editId)) },
             )
         }
 
         // TODO(Step 19-E): composable(route = Routes.SCHEDULE_EDIT_ITEM, arguments = ...) を追加する。
         //   Routes.SCHEDULE_DETAIL の composable ブロック（すぐ上）が書き方のお手本。
         //   ScheduleEditScreen 自体は今のままで OK（itemId は Hilt が SavedStateHandle に詰めてくれる）
+        composable(
+            route = Routes.SCHEDULE_EDIT_ITEM,
+            arguments = listOf(
+                navArgument("itemId") { type = NavType.StringType },
+            ),
+        ) {
+            ScheduleEditScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
     }
 }
