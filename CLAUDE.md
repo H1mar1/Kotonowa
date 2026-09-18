@@ -90,7 +90,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。
 Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧→詳細→編集→上書き保存が通った。
 Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。
-Step 21 で一覧の行からタスクの完了/未完了を切り替えられるようにした（2026-09-19）。**
+Step 21 で一覧の行からタスクの完了/未完了を切り替えられるようにした（2026-09-19）。
+Step 22 で `TopAppBar` にログアウトボタンを復活させた（2026-09-19）。**
 
 ### Phase 2 の進捗
 
@@ -105,6 +106,7 @@ Step 21 で一覧の行からタスクの完了/未完了を切り替えられ�
 | 19 | 編集画面（作成画面 `presentation/calendar/edit/` を 1 枚で 2 役） | ✅ |
 | 20 | 詳細画面を 1 件購読（`observeItem`）に変更 | ✅ |
 | 21 | タスクの完了チェック（一覧の行の `Checkbox`） | ✅ |
+| 22 | ログアウトボタンの復活（`TopAppBar`） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -496,6 +498,38 @@ Firestore に保存 → Flow で流れてくる → `checked = item.isCompleted`
 
 **Step 16-D-3-d で作った `RowStyle` の色分けと打ち消し線が、ここで初めて実データで切り替わる。**
 
+#### Step 22 の内訳（ログアウトボタンの復活）
+
+**Step 16-E で `HomeScreen` を消したときに失われた機能の復活。** Phase1 で作った
+`AuthRepository.logout()` が、久しぶりに画面から呼ばれるようになった。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 22-A | `CalendarViewModel.logout()`（旧 `HomeViewModel` から移植） | ✅ 09-19 |
+| 22-B | `CalendarScreen` に `TopAppBar` ＋ 呼び鈴 `onLogout` | ✅ 09-19 |
+| 22-C | `KotonowaNavHost` で行き先を決める（`popUpTo` ＋ `inclusive`） | ✅ 09-19 |
+| 22-D | 実機確認 | ✅ 09-19 |
+
+**`logout()` に `suspend` が要らない。** `AuthRepository.kt` は `fun logout()`。Firebase の
+`signOut()` は端末内のログイン情報を消すだけで**通信しない**ため（`login` などが
+`suspend fun …: Result<User>` なのと対照的）。だから `viewModelScope.launch { }` も不要。
+
+```kotlin
+onLogout = {
+    navController.navigate(Routes.LOGIN) {
+        popUpTo(Routes.HOME) { inclusive = true }
+    }
+}
+```
+
+⚠️ **`inclusive = true` が肝。** これが無いとカレンダー画面が履歴に残り、ログアウト後に
+端末の「戻る」で中身が見えてしまう。認証を重視するこのアプリでは看過できない。
+ログイン成功時に `popUpTo(Routes.LOGIN) { inclusive = true }` で LOGIN を消すのと同じ形。
+
+画面側は `viewModel.logout()` → `onLogout()` の順に呼ぶだけで**行き先を知らない**
+（削除された `HomeScreen` と同じ形）。`TopAppBar` は実験中の API なので
+`@OptIn(ExperimentalMaterial3Api::class)` が要る（grammar §7-(86)、§3-(90) に追記）。
+
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
 - 個人カレンダーの `calendarId` は**そのユーザーの `uid`**。`calendars` コレクションは作らない
@@ -535,6 +569,40 @@ Credential Manager（`androidx.credentials`）を使っている。`GoogleSignIn
 - キャンセル・アカウント0件は**例外**で飛んでくる。`try/catch` で受けないとアプリが落ちる。
   `catch` は具体的な型（`GetCredentialCancellationException` → `NoCredentialException`）を先に、
   おおまかな `GetCredentialException` を最後に置く。
+
+### 検証環境のハマりどころ（2026-09-19 追記）
+
+**アプリは正常なのにログイン・サインアップだけ「ネットワークに接続できません」で失敗する。**
+2026-09-19 に発生。原因は**エミュレータが起動時の DNS サーバーを握ったままだったこと**。
+
+エミュレータは起動時の Mac の DNS を `netsimd --host-dns=…` に固定する。
+起動しっぱなしのまま Mac のネットワークが変わると、**もう存在しないルーターに
+問い合わせ続ける**。Firebase はホスト名で通信するので、名前解決に失敗して
+`FirebaseNetworkException` → `AuthRepositoryImpl` が「ネットワークに接続できません」と日本語化する。
+
+**切り分け手順**（アプリ側を疑う前にこれを流す）
+
+```bash
+ADB=~/Library/Android/sdk/platform-tools/adb
+$ADB shell ping -c 2 8.8.8.8              # IP 直打ち → 通れば回線は生きている
+$ADB shell ping -c 2 www.googleapis.com   # unknown host なら DNS の問題
+ps -ax | grep netsimd                     # --host-dns=… が起動時の値
+scutil --dns | grep nameserver            # Mac の「今の」DNS。上と食い違えば確定
+```
+
+**対処：エミュレータを DNS 指定で起動し直す**（DNS 転送先は起動時に決まるので再起動が要る）。
+
+```bash
+$ADB emu kill                             # 正規に終了（qemu が残らないことを確認）
+cd ~/Library/Android/sdk/emulator
+./emulator -avd Pixel_7 -dns-server 192.168.1.253 -no-snapshot-load &
+```
+
+⚠️ **`ping` での検証は単発にしない。** 起動直後は `Netsim Wifi … CANCELLED` の影響で
+1 回だけ失敗することがある（実際に誤診しかけた）。3 回試して判断する。
+また `identitytoolkit.googleapis.com` は **ICMP を返さない**ので、ping が無応答でも異常ではない。
+
+💡 コールドブート（`-no-snapshot-load`）するとエミュレータ内のログイン状態は消える。
 
 ### 検証環境のハマりどころ（2026-08-12 追記）
 
