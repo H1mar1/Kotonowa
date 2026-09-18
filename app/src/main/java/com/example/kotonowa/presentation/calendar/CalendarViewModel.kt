@@ -83,4 +83,18 @@ class CalendarViewModel @Inject constructor(
             }
         }
     }
+
+    fun toggleCompleted(task: ScheduleItem.Task){
+        viewModelScope.launch {
+            val update=task.copy(
+                isCompleted = !task.isCompleted,
+                updatedAt = Instant.now(),
+            )
+            scheduleRepository.updateItem(update)
+                .onFailure {
+                    _uiState.update { it.copy(errorMessage = "更新できませんでした") }
+                }
+        }
+    }
+
 }

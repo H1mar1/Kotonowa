@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
@@ -90,6 +92,7 @@ fun CalendarScreen(
                         ScheduleItemRow(
                             item = item,
                             onClick = { onItemClick(item.id) },
+                            onToggleCompleted = viewModel::toggleCompleted,
                         )
                     }
                 }
@@ -123,6 +126,7 @@ private data class RowStyle(
 private fun ScheduleItemRow(
     item: ScheduleItem,
     onClick: () -> Unit,
+    onToggleCompleted: (ScheduleItem.Task) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rowStyle = when (item) {
@@ -168,6 +172,11 @@ private fun ScheduleItemRow(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (item is ScheduleItem.Task) {
+                    Checkbox(
+                        checked = item.isCompleted,
+                        onCheckedChange = { onToggleCompleted(item) })
+                }
                 Surface(
                     color = rowStyle.badgeColor,
                     contentColor = rowStyle.badgeContentColor,
@@ -277,8 +286,10 @@ private fun ScheduleItemRowPreview() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PREVIEW_ITEMS.forEach { item ->
-                ScheduleItemRow(item = item,
-                    onClick = {})
+                ScheduleItemRow(
+                    item = item,
+                    onClick = {},
+                    onToggleCompleted = {},)
             }
         }
     }
