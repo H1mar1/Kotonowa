@@ -6,16 +6,16 @@ import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
-import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -37,17 +37,37 @@ class CalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CalendarUiState())
 
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
-
     val calendarId = authRepository.currentUser?.uid
 
+    private var observeJob: Job? = null
+
     init {
-        observeThisMonth()
+        observeMonth(_uiState.value.currentMonth)
     }
+    /** 前の月へ。升目の表示を変え、その月を購読し直す。 */
+    fun showPreviousMonth(){
+        val month=_uiState.value.currentMonth.minusMonths(1)
+        _uiState.update { it.copy(currentMonth = month) }
+        observeMonth(month)
+    }
+
+    /** 次の月へ。 */
+    fun showNextMonth(){
+       val month=_uiState.value.currentMonth.plusMonths(1)
+        _uiState.update { it.copy(currentMonth = month) }
+        observeMonth(month)
+    }
+
+    /** 升目の日付を選ぶ。下の一覧を絞るだけなので、購読は張り直さない。 */
+    fun selectDate(date: LocalDate){
+        _uiState.update { it.copy(selectedDate = date) }
+    }
+
 
     /**
      * 今月の予定/タスクを監視し始める。
      */
-    private fun observeThisMonth() {
+    private fun observeMonth(month: YearMonth) {
         // ログインしていなければ calendarId が無く、読み込みようがない
         if (calendarId == null) {
             _uiState.update {
@@ -60,12 +80,15 @@ class CalendarViewModel @Inject constructor(
         }
 
         val zone = ZoneId.systemDefault()
-        val month = YearMonth.now(zone)
+
         val from = month.atDay(1).atStartOfDay(zone).toInstant()
         val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()
 
+        observeJob?.cancel()
 
-        viewModelScope.launch {
+        _uiState.update { it.copy(isLoading = true) }
+
+        observeJob =  viewModelScope.launch {
             try {
                 scheduleRepository.observeItems(calendarId, from, to)
                     .collect { list ->

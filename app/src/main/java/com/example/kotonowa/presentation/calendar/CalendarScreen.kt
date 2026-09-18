@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar
 
+import android.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -38,6 +40,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
+import java.time.Month
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -313,6 +317,59 @@ private fun ScheduleItemRowPreview() {
                     onClick = {},
                     onToggleCompleted = {},)
             }
+        }
+    }
+}
+
+@Composable
+private fun MonthHeader(
+    month: YearMonth,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier= Modifier,
+){
+    Row(
+        modifier=modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ){
+        TextButton(onClick = onPrevious) {
+            Text("<")
+        }
+
+        Text(
+            text = "${month.year}年${month.monthValue}月",
+            style = MaterialTheme.typography.titleMedium,
+           modifier= Modifier.padding(horizontal = 16.dp),
+        )
+        TextButton(onClick = onNext) {
+            Text(">")
+        }
+    }
+}
+
+@Composable
+private fun WeekdayHeader(modifier: Modifier= Modifier){
+    Row(modifier=modifier.fillMaxWidth()) {
+        listOf("日","月","火","水","木","金","土").forEach {
+            label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier= Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MonthHeaderPreview(){
+    KotonowaTheme {
+        Column {
+            MonthHeader(month= YearMonth.of(2026,9), onPrevious = {}, onNext = {})
+            WeekdayHeader()
         }
     }
 }
