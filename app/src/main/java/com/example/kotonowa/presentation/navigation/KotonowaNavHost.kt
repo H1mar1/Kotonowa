@@ -91,7 +91,13 @@ fun KotonowaNavHost(
         composable(Routes.HOME) {
             CalendarScreen(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
-                onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) }
+                onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },
+                onLogout = {
+                    navController.navigate(Routes.LOGIN) {
+                        // カレンダー画面を履歴から消し、「戻る」でログイン後の画面に戻れないようにする
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                },
             )
         }
 
