@@ -1,6 +1,8 @@
 package com.example.kotonowa.presentation.calendar
 
 import com.example.kotonowa.domain.model.ScheduleItem
+import java.time.LocalDate
+import java.time.YearMonth
 
 /**
  * カレンダー画面の「今の状態」をまとめて表したもの。
@@ -11,6 +13,11 @@ import com.example.kotonowa.domain.model.ScheduleItem
 data class CalendarUiState(
 
     val items: List<ScheduleItem> = emptyList(),
+
+    val currentMonth: YearMonth=YearMonth.now(),
+
+    val selectedDate: LocalDate= LocalDate.now(),
+
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
