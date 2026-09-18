@@ -16,11 +16,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,10 +50,12 @@ import java.time.format.DateTimeFormatter
  * 画面は [CalendarUiState] を見て描くだけで、
  * 取得やエラー判断は [CalendarViewModel] が行う。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
+    onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -58,6 +63,23 @@ fun CalendarScreen(
 
     Scaffold(
         modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {Text("ことのわ")},
+                actions = {
+                    TextButton(
+                        onClick={
+                            viewModel.logout()
+                            onLogout()
+                        }
+                    ){
+                        Text("ログアウト")
+                    }
+
+                }
+
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
                 Text("＋")

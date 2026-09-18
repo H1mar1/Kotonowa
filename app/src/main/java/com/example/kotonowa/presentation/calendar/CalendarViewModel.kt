@@ -97,4 +97,10 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /** ログアウトする。画面遷移は知らない（旗も立てず、呼ばれたら消すだけ）。 */
+    fun logout(){
+        authRepository.logout()
+    }
+
+
 }

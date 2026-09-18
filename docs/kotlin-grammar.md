@@ -849,6 +849,46 @@ Switch(
 
 💡 `onAllDayChange` をそのまま渡せるのは、両者の型が `(Boolean) -> Unit` で一致するから（§1-(74)）。
 
+### (90) `Scaffold` の `topBar` / `TopAppBar` — 画面の骨組みに部品を差し込む
+
+`Scaffold`（スキャフォールド＝足場）は**画面の骨組み**を作る部品。
+`CalendarScreen` では既に `floatingActionButton`（「＋」ボタン）で使っている。
+同じ形の差込口（**スロット**、§3-(83)）が上下に用意されている。
+
+| 受け口 | 置かれる場所 |
+|---|---|
+| `topBar` | 画面のいちばん上（帯） |
+| `floatingActionButton` | 右下に浮くボタン |
+| 最後の `{ }`（`content`） | 残りの領域 |
+
+```kotlin
+Scaffold(
+    topBar = {
+        TopAppBar(
+            title = { Text("ことのわ") },
+            actions = {
+                TextButton(onClick = onLogout) { Text("ログアウト") }
+            },
+        )
+    },
+    floatingActionButton = { ... },
+) { innerPadding ->
+    // 中身
+}
+```
+
+- `title` も `actions` も**スロット**。文字列ではなく**部品を丸ごと渡す**ので `{ Text("…") }` と書く
+- **`actions` の中は横に並ぶ**（`Row`（§3-(75)）の中にいるのと同じ）。2 つ置けば左から順に並び、右端に寄る
+- `TopAppBar` は実験中の API なので **`@OptIn(ExperimentalMaterial3Api::class)`** が要る（§7-(86)）
+
+⚠️ **`innerPadding` を中身に付けるのを忘れないこと。** `topBar` を足すと画面の上が帯で
+埋まるため、`content` に渡される `innerPadding`（帯の高さぶんの余白）を
+`Modifier.padding(innerPadding)` で当てないと、**一覧の先頭が帯の下に隠れる**。
+`CalendarScreen` は既に書いてあるので、`topBar` を足すだけで自動的に下がる。
+
+💡 `title` に置くのは普通アプリ名や画面名。`actions` に置くのは**その画面で行える操作**
+（設定・ログアウトなど）。「＋」のような主要な操作は `floatingActionButton` に置く、と使い分ける。
+
 ### (82) `rememberXxxState()` — 部品が自分で持つ「下書き」
 
 ```kotlin
