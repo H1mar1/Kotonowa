@@ -89,7 +89,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 **Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
 行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。
 Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧→詳細→編集→上書き保存が通った。
-Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。**
+Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。
+Step 21 で一覧の行からタスクの完了/未完了を切り替えられるようにした（2026-09-19）。**
 
 ### Phase 2 の進捗
 
@@ -103,6 +104,7 @@ Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存�
 | 18 | 詳細・削除画面（`presentation/calendar/detail/`） | ✅ |
 | 19 | 編集画面（作成画面 `presentation/calendar/edit/` を 1 枚で 2 役） | ✅ |
 | 20 | 詳細画面を 1 件購読（`observeItem`）に変更 | ✅ |
+| 21 | タスクの完了チェック（一覧の行の `Checkbox`） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -459,6 +461,40 @@ Logcat に `FATAL EXCEPTION` / Firestore のエラーは出ていない。**こ�
 ⚠️ **`getItem` は残す。** 編集画面（`ScheduleEditViewModel.load()`）が使い続ける。
 入力欄は「開いた瞬間の 1 回」だけ読めばよく、**入力中に外から流れてくると打った内容が消える**。
 「1 回きり」と「購読」は用途で使い分ける。
+
+#### Step 21 の内訳（タスクの完了チェック）
+
+**`isCompleted` を切り替える手段がどこにも無かった**ため追加した。置き場所は
+「一覧の行 ／ 詳細画面 ／ 両方」から**一覧の行**を選択（いちばんよく使う動線で、手数が最少）。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 21-A | `CalendarViewModel.toggleCompleted(task)` | ✅ 09-16 |
+| 21-B | `ScheduleItemRow` にタスクのときだけ `Checkbox` を出す | ✅ 09-19 |
+| 21-C | `CalendarScreen` と `@Preview` の呼び出しを接続 | ✅ 09-19 |
+| 21-D | 実機確認（切り替え・色・打ち消し線） | ✅ 09-19 |
+
+**引数の型を `ScheduleItem.Task` にしている**（`ScheduleItem` ではない）。親には `isCompleted` が
+無く、`Event` を渡されても困る。**`Task` しか渡せない形にすれば、間違いが呼び出し側の
+コンパイルエラーになる**（§7-㉘ の考え方）。
+
+`task.copy(isCompleted = !task.isCompleted, updatedAt = Instant.now())` の 1 行で済むのは
+`data class` の `copy()`（§7-㉗）のおかげ。Step 19-D で `original?.id ?: …` と手で引き継いだのと対照的。
+
+**`onSuccess` を書いていない。** 成功してもやることが無いため（一覧の更新は `observeItems` の
+Flow が行う。Step 17-F と同じ）。**二度押し防止の門番も置いていない** — 連打されても
+「最後に押した状態」が残ればよく、画面遷移も伴わないため。`save()` / `delete()` とは用途が違う。
+
+**画面はチェックの状態を持たない。** `Checkbox` は押しても自分では切り替わらず、
+`onToggleCompleted(item)` を鳴らすだけ（§3-(76) 状態ホイスティング）。
+Firestore に保存 → Flow で流れてくる → `checked = item.isCompleted` が変わって初めて絵が変わる。
+
+`onCheckedChange = { onToggleCompleted(item) }` と `{ }` で包むのは、`Checkbox` が渡してくる
+`Boolean` を捨てて**タスクそのもの**を渡すため（§1-(78) の②）。反転の計算は ViewModel 側にある。
+隣の `onToggleCompleted = viewModel::toggleCompleted`（型が一致するのでそのまま渡す＝①）と
+対比になっている。
+
+**Step 16-D-3-d で作った `RowStyle` の色分けと打ち消し線が、ここで初めて実データで切り替わる。**
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
