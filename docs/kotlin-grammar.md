@@ -467,6 +467,39 @@ private fun observe(month: YearMonth) {
 💡 ViewModel が捨てられるときは `viewModelScope` が中の仕事を**全部まとめて止める**（⑩）ので、
 そのための `cancel()` は書かなくてよい。自分で止めるのは「**まだ生きているが、張り替えたい**」ときだけ。
 
+⚠️ **`cancel()` は「例外」の形で伝わる。`catch (e: Exception)` で受けてはいけない。**
+
+止められた `collect`（㉝）は **`CancellationException`**（キャンセルされました、という例外）を投げる。
+これは失敗ではなく「**こちらから意図して取り止めた**」という合図だが、
+`Exception` はすべての例外の親分格なので、`catch (e: Exception)` はこれごと拾ってしまう。
+
+```kotlin
+} catch (e: Exception) {
+    _uiState.update { it.copy(errorMessage = e.message) }   // ❌ 月を送るたびにエラー表示
+}
+```
+
+> 画面に `StandaloneCoroutine was cancelled` と出る（2026-09-20 に実際に発生）
+
+**対処は、キャンセルだけ先に受けてそのまま投げ直す。**
+
+```kotlin
+} catch (e: CancellationException) {
+    throw e                      // ← 握り潰さず、そのまま上へ通す
+} catch (e: Exception) {
+    _uiState.update { it.copy(errorMessage = "…") }
+}
+```
+
+- **順番が命。** 具体的な `CancellationException` を**上**、おおまかな `Exception` を**下**に置く（§6-㉕）
+- `throw e`（§6-㊺）で投げ直すのは、**キャンセルは仕組みが最後まで伝える必要がある**ため。
+  ここで止めると「止めたはずの処理が止まりきらない」状態になりうる
+- import は `kotlin.coroutines.cancellation.CancellationException`
+
+💡 **見分け方**：`catch` の中で「エラーを画面に出す」処理を書いているなら、
+その上に `CancellationException` の枝が要るか必ず考える。
+`suspend` を跨ぐ `try`/`catch`（§6-㉔）ではいつでも起きうる。
+
 ### (58) `StateFlow` — 「今の値」を必ず持っている管
 
 ㉝ の `Flow` は**流れてくるだけ**で、「今いくつ？」と聞いても答えられない（蛇口は水を出すが、
@@ -1679,6 +1712,32 @@ snapshot.documents.mapNotNull { doc -> runCatching { doc.toScheduleItem() }.getO
 綴りが同じだけで**まったく無関係**。
 
 💡 `emptyList()` は中身が0件のリストを作る命令（§1-③）。`?:`（⑮）の受け皿によく使う。
+
+### (95) `filter { }` — 条件に合うものだけ残す
+
+```kotlin
+val dayItems = items.filter { item -> その日のものか }
+```
+
+`filter`（フィルター＝濾す）は「**1 件ずつ見て、条件が成り立つものだけを集めた新しいリストを作る**」命令。
+`{ }` の中には「はい/いいえ」で答えられる条件を書く（§1-㊿。材料 1 つなので `it` も使える）。
+
+| 命令 | やること | 結果の件数 |
+|---|---|---|
+| `map`（§4-(55)） | 1 件ずつ**作り変える** | 元と**同じ**（3 件 → 3 件） |
+| `filter` | 1 件ずつ**残すか捨てるか決める** | 元**以下**（3 件 → 0〜3 件） |
+| `mapNotNull` | 作り変えて、`null` になったものを捨てる | 元以下 |
+
+```kotlin
+listOf(1, 2, 3, 4).filter { it > 2 }    // → [3, 4]
+```
+
+- **元のリストは変わらない。** 新しいリストが作られる（`map` と同じ）
+- 1 件も当てはまらなければ**空のリスト**が返る（`null` にはならない）。
+  だから受け取った側は `isEmpty()` で「0 件」を判定できる
+
+💡 **`filter` の後ろに `map` を繋げられる。** `items.filter { … }.map { … }` は
+「絞ってから作り変える」。逆順にもできるが、**先に絞った方が加工の回数が減る**。
 
 ### (93) `..` / `until` / `in` — 範囲と「入っているか」
 

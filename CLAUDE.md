@@ -91,7 +91,9 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧→詳細→編集→上書き保存が通った。
 Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。
 Step 21 で一覧の行からタスクの完了/未完了を切り替えられるようにした（2026-09-19）。
-Step 22 で `TopAppBar` にログアウトボタンを復活させた（2026-09-19）。**
+Step 22 で `TopAppBar` にログアウトボタンを復活させた（2026-09-19）。
+Step 23 で月の升目カレンダーを実装（2026-09-20）。仕様書 §5 の「月表示カレンダー＋下部に
+選択日の予定/タスク一覧」がこれで揃った。**
 
 ### Phase 2 の進捗
 
@@ -107,6 +109,7 @@ Step 22 で `TopAppBar` にログアウトボタンを復活させた（2026-09-
 | 20 | 詳細画面を 1 件購読（`observeItem`）に変更 | ✅ |
 | 21 | タスクの完了チェック（一覧の行の `Checkbox`） | ✅ |
 | 22 | ログアウトボタンの復活（`TopAppBar`） | ✅ |
+| 23 | 月の升目カレンダー（升目＋選択日で一覧を絞る） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -529,6 +532,56 @@ onLogout = {
 画面側は `viewModel.logout()` → `onLogout()` の順に呼ぶだけで**行き先を知らない**
 （削除された `HomeScreen` と同じ形）。`TopAppBar` は実験中の API なので
 `@OptIn(ExperimentalMaterial3Api::class)` が要る（grammar §7-(86)、§3-(90) に追記）。
+
+#### Step 23 の内訳（月の升目カレンダー）
+
+**仕様は「月表示カレンダー＋下部に選択日の予定/タスク一覧」**（`docs/requirements.md` の画面一覧）。
+升目は `LazyVerticalGrid` ではなく **`Column` ＋ `Row` ＋ `weight(1f)`** で組んだ。
+1 か月は最大 6 週 × 7 日と**件数が決まっており**、`Lazy`（見えている分だけ描く）の利点が無いため。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 23-A | `CalendarUiState` に `currentMonth` / `selectedDate` | ✅ 09-19 |
+| 23-B | `observeMonth(month)` に変更＋月移動＋購読の張り直し | ✅ 09-19 |
+| 23-C-1 | `MonthHeader` / `WeekdayHeader` | ✅ 09-19 |
+| 23-C-2 | `MonthGrid` / `DayCell` | ✅ 09-20 |
+| 23-C-3 | `datesWithItems` ＋ 画面への組み込み | ✅ 09-20 |
+| 23-D | 選択日で下の一覧を絞る（`filter`） | ✅ 09-20 |
+| 23-E | 実機確認 | ✅ 09-20 |
+
+**升目の作り方。** 1 日の曜日から `dayOfWeek.value % 7` で左端からのずれを出し、
+42 個（6 週 × 7 日）の `List<LocalDate?>` を作って `chunked(7)` で 6 段に配る。
+**42 個に固定**しているので、5 週で収まる月でも高さが変わらない。
+日曜始まりにするため `% 7` が要る（`DayOfWeek.value` は月曜が 1、日曜が 7）。grammar §4-(92)(93)(94)。
+
+**月を移動したら購読を張り直す。** `observeJob?.cancel()` → 新しい月で `observeItems` を `collect`。
+止めないと 2 本の管から交互に流れて一覧がちらつく（grammar §2-(91)）。
+**日付の選択では張り直さない** — `items` は月まるごと持っているので、`filter`（§4-(95)）で
+絞れば足りる。タップのたびに通信するのは無駄。
+
+**`datesWithItems`（点を打つ日）は ViewModel で作る。** `collect` の中で `items` から
+`Event` は `startAt`、`Task` は `dueAt` を取り、`toLocalDate()` して `Set` にする。
+`Set` なのは、同じ日に何件あっても点は 1 つでよく、升目 42 個ぶん `in` を呼ぶため。
+いっぽう **`dayItems`（選択日の絞り込み）は画面側**。新しい情報を作るのではなく、
+今ある `items` を見る角度を変えているだけだから。
+**「新しい情報を作るなら ViewModel、今ある情報を絞る/並べ替えるだけなら画面」**で使い分ける。
+
+⚠️ **`cancel()` を `catch (e: Exception)` で受けてはいけない**（2026-09-20 に実際に踏んだ）。
+止められた `collect` は `CancellationException` を投げるが、これは失敗ではなく
+「意図して取り止めた」合図。`Exception` で受けると画面に
+`StandaloneCoroutine was cancelled` と出て、しかも `when` の `message != null` の枝が
+先に当たるので**一覧がまったく描かれなくなる**。`catch (e: CancellationException) { throw e }` を
+`catch (e: Exception)` より**上**に置く（順番が命。§6-㉕）。grammar §2-(91) に追記済み。
+
+⚠️ **升目は `when` の外に出す。** 読み込み中やエラーでも**カレンダーの骨格は出したまま**にし、
+下半分だけ出し分ける。`when` の中に入れると読み込みのたびに升目が消えてちらつく。
+
+💡 終日や複数日にまたがる予定は、いまは**開始日にだけ**点が付き、その日にだけ一覧に出る。
+点と絞り込みで扱いが揃っているので破綻はしていない。必要になったら広げる。
+
+**この Step で文法メモに追記したもの** … §2-(91)（`Job` と `cancel`、キャンセル例外の扱い）、
+§4-(92)（`lengthOfMonth` / `dayOfWeek` / `dayOfMonth`）、§4-(93)（`..` / `until` / `in`）、
+§4-(94)（`Set` と `chunked`）、§4-(95)（`filter`）、§3-(90)（`Scaffold` の `topBar`）。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
