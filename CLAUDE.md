@@ -95,6 +95,7 @@ Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧�
 Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。
 Step 21 で一覧の行からタスクの完了/未完了を切り替えられるようにした（2026-09-19）。
 Step 22 で `TopAppBar` にログアウトボタンを復活させた（2026-09-19）。
+Step 25 で設定画面を作り、ログアウトをそこへ移した（2026-09-21）。`TopAppBar` は「設定」になった。
 Step 23 で月の升目カレンダーを実装（2026-09-20）。仕様書 §5 の「月表示カレンダー＋下部に
 選択日の予定/タスク一覧」がこれで揃った。**
 
@@ -113,6 +114,8 @@ Step 23 で月の升目カレンダーを実装（2026-09-20）。仕様書 §5 
 | 21 | タスクの完了チェック（一覧の行の `Checkbox`） | ✅ |
 | 22 | ログアウトボタンの復活（`TopAppBar`） | ✅ |
 | 23 | 月の升目カレンダー（升目＋選択日で一覧を絞る） | ✅ |
+| 24 | 升目の見た目の調整（今日・選択中・予定ありの出し分け） | ✅ |
+| 25 | 設定画面（プロフィール・通知設定の枠・ログアウト） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -627,6 +630,39 @@ onLogout = {
 
 💡 **升目の見た目は「塗り」「枠」「太さ」「点」の 4 つを別々の印として使い分けている。**
 状態が増えても、どれか 1 つを割り当てれば重ねて表現できる。
+
+#### Step 25 の内訳（設定画面）
+
+**仕様は「設定 ＝ プロフィール、通知設定、ログアウト」**（`docs/requirements.md` の画面一覧）。
+Step 16-E で `HomeScreen` を消して以来、置き場所の無かったログアウトがここに収まった。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 25-A | `SettingsViewModel`（`currentUser` を 1 回読む／`logout()`） | ✅ 09-20 |
+| 25-B | `SettingsScreen`（`Screen` ＋ `Content` の 2 段） | ✅ 09-20 |
+| 25-C | `Routes.SETTING` ＋ `NavHost` に登録 | ✅ 09-21 |
+| 25-D | `CalendarScreen` の `TopAppBar` を「設定」に差し替え | ✅ 09-21 |
+| 25-E | 実機確認 | ✅ 09-21 |
+
+**`StateFlow` を使っていない。** 表示するのはログイン中のプロフィールだけで、
+**画面が開いている間ずっと変わらない**ため、`val user: User? = authRepository.currentUser` と
+1 回読むだけにした（削除された `HomeViewModel` と同じ形）。
+**「変わるか変わらないか」で道具を選ぶ** — 変わらないものに管（Flow）を用意しても、
+流れるのは最初の 1 回だけで仕組みだけが増える。
+
+**通知設定は行だけ置き、`enabled = false` で押せなくして「準備中」と出す。**
+中身（WorkManager）がまだ無いので、押して空振りさせない。
+通知を実装する回に `enabled = true` にして行き先を繋ぐだけで完成する。
+
+⚠️ **ログアウト後の `popUpTo` は `HOME` を指す（`SETTING` ではない）。**
+履歴は `[LOGIN] → [HOME] → [SETTING]` と積まれているので、`popUpTo(SETTING)` だと
+**カレンダーが履歴に残り、戻るボタンで中身が見えてしまう**。`popUpTo(HOME) { inclusive = true }` で
+カレンダーごと消す。認証を重視するこのアプリで最も落としてはいけない確認項目。
+
+**ログアウトは「引っ越し」であって作り直しではない。** Step 22 で `CalendarScreen` に書いた
+`viewModel.logout()` → 呼び鈴 の 2 行と `popUpTo` の処理は、そのまま
+`SettingsScreen` と SETTING の `composable` へ移した。移したあと **`CalendarScreen` 側の
+`onLogout` と `CalendarViewModel.logout()` は削除**し、同じ処理が 2 か所に残らないようにした。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
