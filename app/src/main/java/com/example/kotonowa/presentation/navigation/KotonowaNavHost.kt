@@ -14,6 +14,7 @@ import com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.calendar.CalendarScreen
 import com.example.kotonowa.presentation.calendar.detail.ScheduleDetailScreen
 import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
+import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
 
@@ -36,6 +37,8 @@ object Routes {
     const val PASSWORD_RESET = "password_reset"
 
     const val SPLASH = "splash"
+
+    const val SETTING = "setting"
 }
 
 /**
@@ -92,12 +95,7 @@ fun KotonowaNavHost(
             CalendarScreen(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
                 onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },
-                onLogout = {
-                    navController.navigate(Routes.LOGIN) {
-                        // カレンダー画面を履歴から消し、「戻る」でログイン後の画面に戻れないようにする
-                        popUpTo(Routes.HOME) { inclusive = true }
-                    }
-                },
+                onSetting = {navController.navigate(Routes.SETTING)},
             )
         }
 
@@ -156,6 +154,17 @@ fun KotonowaNavHost(
             ScheduleEditScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SETTING) {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onLoggedOut = {
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                }
             )
         }
     }

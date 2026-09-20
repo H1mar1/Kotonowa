@@ -61,7 +61,7 @@ import java.time.format.DateTimeFormatter
 fun CalendarScreen(
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
-    onLogout: () -> Unit,
+    onSetting: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -73,13 +73,8 @@ fun CalendarScreen(
             TopAppBar(
                 title = { Text("ことのわ") },
                 actions = {
-                    TextButton(
-                        onClick = {
-                            viewModel.logout()
-                            onLogout()
-                        }
-                    ) {
-                        Text("ログアウト")
+                    TextButton(onClick = onSetting) {
+                        Text("設定⚙️")
                     }
 
                 }
