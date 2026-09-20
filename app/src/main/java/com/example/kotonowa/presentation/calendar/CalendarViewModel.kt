@@ -92,8 +92,19 @@ class CalendarViewModel @Inject constructor(
             try {
                 scheduleRepository.observeItems(calendarId, from, to)
                     .collect { list ->
+                        val dates = list.map { item ->
+                            when (item) {
+                                is ScheduleItem.Event -> item.startAt
+                                is ScheduleItem.Task -> item.dueAt
+                            }.atZone(zone).toLocalDate()
+                        }.toSet()
+
                         _uiState.update { state ->
-                            state.copy(items = list, isLoading = false)
+                            state.copy(
+                                items = list,
+                                datesWithItems = dates,
+                                isLoading = false,
+                            )
                         }
                     }
             } catch (e: Exception) {
