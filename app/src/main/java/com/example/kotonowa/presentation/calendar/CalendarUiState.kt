@@ -14,6 +14,9 @@ data class CalendarUiState(
 
     val items: List<ScheduleItem> = emptyList(),
 
+    /** 予定/タスクがある日。升目に点を打つのに使う。 */
+    val datesWithItems: Set<LocalDate> = emptySet(),
+
     val currentMonth: YearMonth=YearMonth.now(),
 
     val selectedDate: LocalDate= LocalDate.now(),

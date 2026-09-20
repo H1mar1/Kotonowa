@@ -1,6 +1,5 @@
 package com.example.kotonowa.presentation.calendar
 
-import android.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +35,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
-import java.time.Month
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,14 +67,14 @@ fun CalendarScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = {Text("ことのわ")},
+                title = { Text("ことのわ") },
                 actions = {
                     TextButton(
-                        onClick={
+                        onClick = {
                             viewModel.logout()
                             onLogout()
                         }
-                    ){
+                    ) {
                         Text("ログアウト")
                     }
 
@@ -92,16 +90,26 @@ fun CalendarScreen(
     ) { innerPadding ->
         val message = uiState.errorMessage
 
-
-
-        Box(
-            modifier = Modifier
+        Column(
+            modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentAlignment = Alignment.Center,
         ) {
-            // 上から順に試し、最初に当てはまった 1 つだけが描かれる（§5-(64)）
-            // 「まだ分からない」→「異常」→「空」→「正常」の順
+            MonthHeader(
+                month = uiState.currentMonth,
+                onPrevious = viewModel::showPreviousMonth,
+                onNext = viewModel::showNextMonth,
+            )
+
+            WeekdayHeader()
+
+            MonthGrid(
+                month = uiState.currentMonth,
+                selectedDate = uiState.selectedDate,
+                datesWithItems = uiState.datesWithItems,
+                onDateClick = viewModel::selectDate,
+            )
+
             when {
                 uiState.isLoading -> CircularProgressIndicator()
                 message != null -> Text(message)
@@ -315,7 +323,8 @@ private fun ScheduleItemRowPreview() {
                 ScheduleItemRow(
                     item = item,
                     onClick = {},
-                    onToggleCompleted = {},)
+                    onToggleCompleted = {},
+                )
             }
         }
     }
@@ -326,13 +335,13 @@ private fun MonthHeader(
     month: YearMonth,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    modifier: Modifier= Modifier,
-){
+    modifier: Modifier = Modifier,
+) {
     Row(
-        modifier=modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
-    ){
+    ) {
         TextButton(onClick = onPrevious) {
             Text("<")
         }
@@ -340,7 +349,7 @@ private fun MonthHeader(
         Text(
             text = "${month.year}年${month.monthValue}月",
             style = MaterialTheme.typography.titleMedium,
-           modifier= Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         TextButton(onClick = onNext) {
             Text(">")
@@ -349,15 +358,79 @@ private fun MonthHeader(
 }
 
 @Composable
-private fun WeekdayHeader(modifier: Modifier= Modifier){
-    Row(modifier=modifier.fillMaxWidth()) {
-        listOf("日","月","火","水","木","金","土").forEach {
-            label ->
+private fun WeekdayHeader(modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth()) {
+        listOf("日", "月", "火", "水", "木", "金", "土").forEach { label ->
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,
-                modifier= Modifier.weight(1f),
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** 月の升目。42 個（6 週 × 7 日）を作り、7 個ずつの段に配る。 */
+@Composable
+private fun MonthGrid(
+    month: YearMonth,
+    selectedDate: LocalDate,
+    datesWithItems: Set<LocalDate>,
+    onDateClick: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shift = month.atDay(1).dayOfWeek.value % 7
+
+    val cells:List<LocalDate?> = (0 until 42).map{index ->
+        val day=index-shift+1
+        if(day in 1..month.lengthOfMonth()) month.atDay(day) else null
+    }
+    Column(
+        modifier=modifier.fillMaxWidth()
+    ) {
+        cells.chunked(7).forEach { week ->
+            Row(modifier= Modifier.fillMaxWidth()) {
+                week.forEach { date ->
+                    DayCell(
+                        date=date,
+                        isSelected = date == selectedDate,
+                        hasItems=date != null && date in datesWithItems,
+                        onClick = { if (date != null) onDateClick(date) },
+                        modifier= Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 升目 1 個。日付が null なら空欄。 */
+@Composable
+private fun DayCell(
+    date: LocalDate?,
+    isSelected: Boolean,
+    hasItems: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier= Modifier,
+){
+    TextButton(
+        onClick=onClick,
+        enabled = date != null,
+        modifier = modifier,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = date?.dayOfMonth?.toString() ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if(isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = if(hasItems) "⚪" else " ",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if(hasItems) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -365,11 +438,28 @@ private fun WeekdayHeader(modifier: Modifier= Modifier){
 
 @Preview(showBackground = true)
 @Composable
-private fun MonthHeaderPreview(){
+private fun MonthHeaderPreview() {
     KotonowaTheme {
         Column {
-            MonthHeader(month= YearMonth.of(2026,9), onPrevious = {}, onNext = {})
+            MonthHeader(month = YearMonth.of(2026, 9), onPrevious = {}, onNext = {})
             WeekdayHeader()
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MonthGridPreview() {
+    KotonowaTheme {
+        Column {
+            MonthHeader(month = YearMonth.of(2026, 9), onPrevious = {}, onNext = {})
+            WeekdayHeader()
+            MonthGrid(
+                month = YearMonth.of(2026, 9),
+                selectedDate = LocalDate.of(2026, 9, 13),
+                datesWithItems = setOf(LocalDate.of(2026, 9, 3), LocalDate.of(2026, 9, 20)),
+                onDateClick = {},
+            )
         }
     }
 }
