@@ -90,6 +90,15 @@ fun CalendarScreen(
     ) { innerPadding ->
         val message = uiState.errorMessage
 
+        val zone= ZoneId.systemDefault()
+        val dayItems=uiState.items.filter {item ->
+            val date=when(item){
+                is ScheduleItem.Event -> item.startAt
+                is ScheduleItem.Task -> item.dueAt
+            }.atZone(zone).toLocalDate()
+            date == uiState.selectedDate
+        }
+
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -113,14 +122,14 @@ fun CalendarScreen(
             when {
                 uiState.isLoading -> CircularProgressIndicator()
                 message != null -> Text(message)
-                uiState.items.isEmpty() -> Text("今月の予定はありません")
+                dayItems.isEmpty() -> Text("この日の予定はありません")
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(
-                        items = uiState.items,
+                        items = dayItems,
                         key = { item -> item.id },
                     ) { item ->
                         ScheduleItemRow(
