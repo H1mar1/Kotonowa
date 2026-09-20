@@ -583,21 +583,23 @@ onLogout = {
 §4-(92)（`lengthOfMonth` / `dayOfWeek` / `dayOfMonth`）、§4-(93)（`..` / `until` / `in`）、
 §4-(94)（`Set` と `chunked`）、§4-(95)（`filter`）、§3-(90)（`Scaffold` の `topBar`）。
 
-#### Step 24（升目の見た目の調整）— 作業中
+#### Step 24（升目の見た目の調整）
 
 | | 内容 | 状態 |
 |---|---|---|
 | B-1 | 一覧に残りの高さを全部渡す（`Box` に `fillMaxWidth()` ＋ `weight(1f)`） | ✅ 09-20 |
-| B-2 | 今日の日付を**太字**にする | ⬜ |
-| B-3 | 選択中の日を**丸く塗る**（`Surface` ＋ `CircleShape`） | ⬜ |
-| B-4 | 升目の高さを固定する（`Modifier.height(56.dp)`） | ⬜ |
+| B-2 | 今日の日付を**太字**にする | ✅ 09-20 |
+| B-3 | 選択中の日を**丸く塗る**（`Surface` ＋ `CircleShape`） | ✅ 09-20 |
+| B-4 | 升目の高さを固定する（`Modifier.height(56.dp)`） | ✅ 09-20 |
+| B-5 | 点が切れるのを直す（`contentPadding = PaddingValues(0.dp)` ＋ `labelSmall`） | ✅ 09-20 |
+| B-6 | 今日に**枠線の丸**を常に付ける（`BorderStroke`） | ✅ 09-20 |
 
 **B-1 で分かったこと。** `Column` の中で `fillMaxSize()` を使うと「画面全部」を要求して
 はみ出す。「上の部品が取った**残り**」が欲しいときは `weight(1f)`。
 さらに **`weight` は縦しか決めない**ので、横は `fillMaxWidth()` を別に重ねる
 （付け忘れると `Box` が中身の幅しか持たず、中央寄せしたつもりが左に寄る）。grammar §3-(96)。
 
-**B-2〜B-4 は `DayCell` の書き換え 1 か所でまとめて片付く。** 設計は以下の通り。
+**B-2〜B-4 は `DayCell` の書き換え 1 か所で片付いた。** 設計は以下の通り。
 
 - **今日＝太字、選択中＝丸く塗る**と**役割を分ける**。同じ強調だと区別できない
 - `MonthGrid` で `val today = LocalDate.now()` を `forEach` の**外**に作り、
@@ -606,6 +608,22 @@ onLogout = {
   `if` で `Surface` ごと出し分けると、選択した瞬間に升目の大きさが変わってガタつく
 - `CircleShape` は縦横が同じでないと楕円になるので `Modifier.size(28.dp)` で正方形にしてから塗る
 - `color` と `contentColor` はペアで指定（選択中 `primary` / `onPrimary`、それ以外 `Color.Transparent` / `onSurface`）
+
+**B-5：予定マークの点が下で切れていた。** 原因は **`TextButton` が押しやすさのために
+自前の上下余白（約 16dp）を持っている**こと。升目の高さを 56dp に固定していたので、
+中身に使えるのは約 40dp しかなく、丸 28dp ＋ 点の行 約 20dp が収まらなかった。
+`contentPadding = PaddingValues(0.dp)` で余白を無くし、点の `style` を `labelSmall` に
+小さくして解決。**高さを増やす（64dp にする）方法もあるが、升目 6 段ぶん縦に伸びる**ので、
+まず内側の余白を疑う方がよい。
+
+**B-6：今日の印を「ずっと出る」形にした。** 太字だけでは主張が弱く、他の日を選ぶと
+埋もれてしまうため、**今日＝枠線の丸、選択中＝塗りつぶしの丸**と役割を分けた（grammar §3-(97)）。
+`border = if (isToday && !isSelected) BorderStroke(1.dp, primary) else null`。
+`!isSelected` を付けるのは、**選択中は同じ `primary` で塗りつぶされ、同色の枠線が埋もれる**ため。
+そのときは塗りつぶし＋太字で今日と分かる。
+
+💡 **升目の見た目は「塗り」「枠」「太さ」「点」の 4 つを別々の印として使い分けている。**
+状態が増えても、どれか 1 つを割り当てれば重ねて表現できる。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
