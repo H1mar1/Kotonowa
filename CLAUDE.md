@@ -583,6 +583,30 @@ onLogout = {
 §4-(92)（`lengthOfMonth` / `dayOfWeek` / `dayOfMonth`）、§4-(93)（`..` / `until` / `in`）、
 §4-(94)（`Set` と `chunked`）、§4-(95)（`filter`）、§3-(90)（`Scaffold` の `topBar`）。
 
+#### Step 24（升目の見た目の調整）— 作業中
+
+| | 内容 | 状態 |
+|---|---|---|
+| B-1 | 一覧に残りの高さを全部渡す（`Box` に `fillMaxWidth()` ＋ `weight(1f)`） | ✅ 09-20 |
+| B-2 | 今日の日付を**太字**にする | ⬜ |
+| B-3 | 選択中の日を**丸く塗る**（`Surface` ＋ `CircleShape`） | ⬜ |
+| B-4 | 升目の高さを固定する（`Modifier.height(56.dp)`） | ⬜ |
+
+**B-1 で分かったこと。** `Column` の中で `fillMaxSize()` を使うと「画面全部」を要求して
+はみ出す。「上の部品が取った**残り**」が欲しいときは `weight(1f)`。
+さらに **`weight` は縦しか決めない**ので、横は `fillMaxWidth()` を別に重ねる
+（付け忘れると `Box` が中身の幅しか持たず、中央寄せしたつもりが左に寄る）。grammar §3-(96)。
+
+**B-2〜B-4 は `DayCell` の書き換え 1 か所でまとめて片付く。** 設計は以下の通り。
+
+- **今日＝太字、選択中＝丸く塗る**と**役割を分ける**。同じ強調だと区別できない
+- `MonthGrid` で `val today = LocalDate.now()` を `forEach` の**外**に作り、
+  `isToday = date == today` を `DayCell` に渡す（42 回作り直さないため）
+- 選択中でない日も **`Color.Transparent` の `Surface` を置いたまま**にする。
+  `if` で `Surface` ごと出し分けると、選択した瞬間に升目の大きさが変わってガタつく
+- `CircleShape` は縦横が同じでないと楕円になるので `Modifier.size(28.dp)` で正方形にしてから塗る
+- `color` と `contentColor` はペアで指定（選択中 `primary` / `onPrimary`、それ以外 `Color.Transparent` / `onSurface`）
+
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
 - 個人カレンダーの `calendarId` は**そのユーザーの `uid`**。`calendars` コレクションは作らない

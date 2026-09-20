@@ -957,6 +957,63 @@ Scaffold(
 💡 `title` に置くのは普通アプリ名や画面名。`actions` に置くのは**その画面で行える操作**
 （設定・ログアウトなど）。「＋」のような主要な操作は `floatingActionButton` に置く、と使い分ける。
 
+### (96) 見た目を整える 4 つの道具（`Box` / `height` / `CircleShape` / `FontWeight`）
+
+**① `Box` — 重ねる入れ物**
+
+`Column`（縦）や `Row`（横）（§3-(75)）と並ぶ 3 つ目の入れ物。中身を**重ねて**置く。
+
+```kotlin
+Box(
+    contentAlignment = Alignment.Center,   // 中身をどこに寄せるか
+    modifier = Modifier.weight(1f),
+) {
+    Text("13")
+}
+```
+
+中身が 1 つだけなら「**置き場所を決めるための枠**」として使える。
+`Column` の中で `Modifier.weight(1f)` を付けた `Box` は「**残りの高さを全部もらう領域**」になる。
+
+**② `Modifier.height(48.dp)` — 高さを決める**
+
+| 書き方 | 意味 |
+|---|---|
+| `Modifier.height(48.dp)` | 高さを 48dp に固定する |
+| `Modifier.fillMaxWidth()` | 横幅いっぱいに広げる |
+| `Modifier.fillMaxSize()` | 縦横とも**親の全部**を要求する |
+| `Modifier.weight(1f)` | **残った**ぶんを分け合う（§3-(75)） |
+
+⚠️ **`Column` の中で `fillMaxSize()` を使うと、上の部品が取った残りを無視して
+「画面全部」を要求する**ので、はみ出して切れることがある。
+「上の部品のあとに残ったぶん」が欲しいときは **`weight(1f)`** を使う。
+
+**③ `CircleShape` — 真円の形**
+
+```kotlin
+Surface(shape = CircleShape, color = …) { … }
+```
+
+`MaterialTheme.shapes.small`（§3-(71) で角丸に使ったもの）と同じ「形」の指定。
+`CircleShape`（サークルシェイプ＝円の形）は**正円**。カレンダーで選択中の日を丸く塗るのに使う。
+import は `androidx.compose.foundation.shape.CircleShape`。
+
+💡 円にするには**縦横が同じ大きさ**である必要がある。縦長の領域に `CircleShape` を当てると
+楕円になるので、`Modifier.size(32.dp)`（縦横とも 32dp）のように正方形にしてから塗る。
+
+**④ `FontWeight.Bold` — 文字の太さ**
+
+```kotlin
+Text("13", fontWeight = FontWeight.Bold)
+```
+
+`style`（§3 で使ってきた `MaterialTheme.typography.…`）が**文字の大きさや行間のまとまり**を決めるのに対し、
+`fontWeight` は**太さだけ**を上書きする。`FontWeight.Bold`（太字）／`FontWeight.Normal`（普通）。
+import は `androidx.compose.ui.text.font.FontWeight`。
+
+💡 **「今日」と「選択中」は別々の表し方にする。** 同じ強調を使うと区別できない。
+例：今日＝**太字**、選択中＝**丸く塗る**。
+
 ### (82) `rememberXxxState()` — 部品が自分で持つ「下書き」
 
 ```kotlin
