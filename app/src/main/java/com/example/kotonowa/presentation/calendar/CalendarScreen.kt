@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
@@ -90,9 +94,9 @@ fun CalendarScreen(
     ) { innerPadding ->
         val message = uiState.errorMessage
 
-        val zone= ZoneId.systemDefault()
-        val dayItems=uiState.items.filter {item ->
-            val date=when(item){
+        val zone = ZoneId.systemDefault()
+        val dayItems = uiState.items.filter { item ->
+            val date = when (item) {
                 is ScheduleItem.Event -> item.startAt
                 is ScheduleItem.Task -> item.dueAt
             }.atZone(zone).toLocalDate()
@@ -121,10 +125,10 @@ fun CalendarScreen(
 
             Box(
                 contentAlignment = Alignment.Center,
-                modifier= Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-            ){
+            ) {
                 when {
                     uiState.isLoading -> CircularProgressIndicator()
                     message != null -> Text(message)
@@ -399,23 +403,26 @@ private fun MonthGrid(
     modifier: Modifier = Modifier,
 ) {
     val shift = month.atDay(1).dayOfWeek.value % 7
+    val today = LocalDate.now()
 
-    val cells:List<LocalDate?> = (0 until 42).map{index ->
-        val day=index-shift+1
-        if(day in 1..month.lengthOfMonth()) month.atDay(day) else null
+
+    val cells: List<LocalDate?> = (0 until 42).map { index ->
+        val day = index - shift + 1
+        if (day in 1..month.lengthOfMonth()) month.atDay(day) else null
     }
     Column(
-        modifier=modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         cells.chunked(7).forEach { week ->
-            Row(modifier= Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth()) {
                 week.forEach { date ->
                     DayCell(
-                        date=date,
+                        date = date,
                         isSelected = date == selectedDate,
-                        hasItems=date != null && date in datesWithItems,
+                        isToday = date == today,
+                        hasItems = date != null && date in datesWithItems,
                         onClick = { if (date != null) onDateClick(date) },
-                        modifier= Modifier.weight(1f)
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -428,27 +435,53 @@ private fun MonthGrid(
 private fun DayCell(
     date: LocalDate?,
     isSelected: Boolean,
+    isToday: Boolean,
     hasItems: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier= Modifier,
-){
+    modifier: Modifier = Modifier,
+) {
     TextButton(
-        onClick=onClick,
+        onClick = onClick,
         enabled = date != null,
-        modifier = modifier,
+        // TextButton は押しやすさのために自前の上下余白（約 16dp）を持っている。
+        // 升目は高さを 56dp に固定しているので、その余白ぶんだけ中身が入りきらず点が切れる。
+        contentPadding = PaddingValues(0.dp),
+        modifier = modifier.height(56.dp),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = date?.dayOfMonth?.toString() ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if(isSelected) MaterialTheme.colorScheme.primary
+            // 選択中の日だけ丸く塗る（B-3）。選択していない日も透明な Surface を置いたままにして、
+            // 選択した瞬間に升目の大きさが変わらないようにする。
+            Surface(
+                color = if (isSelected) MaterialTheme.colorScheme.primary
+                else Color.Transparent,
+                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary
                 else MaterialTheme.colorScheme.onSurface,
-            )
+                shape = CircleShape,
+                // 今日は枠線の丸で常に印を付ける（grammar §3-(97)）。
+                // 選択中は塗りつぶしになるので、そのときは枠を出さない（同じ色の線が埋もれるため）。
+                border = if (isToday && !isSelected) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                },
+                modifier = Modifier.size(28.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = date?.dayOfMonth?.toString() ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+
+                        fontWeight = if (isToday) FontWeight.Bold
+                        else FontWeight.Normal,
+                    )
+                }
+            }
+            // 点が無い日も空白を 1 文字置いて高さを揃える（空文字だと段の高さが変わる）。
+            // 空白のときは色が見えないので、色の出し分けは不要。
             Text(
-                text = if(hasItems) "⚪" else " ",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if(hasItems) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface,
+                text = if (hasItems) "❤️" else " ",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }

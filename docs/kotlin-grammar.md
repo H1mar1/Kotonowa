@@ -1014,6 +1014,38 @@ import は `androidx.compose.ui.text.font.FontWeight`。
 💡 **「今日」と「選択中」は別々の表し方にする。** 同じ強調を使うと区別できない。
 例：今日＝**太字**、選択中＝**丸く塗る**。
 
+### (97) `BorderStroke` — 枠線（太さと色をひとまとめにしたもの）
+
+```kotlin
+Surface(
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+    shape = CircleShape,
+) { … }
+```
+
+`BorderStroke`（ボーダーストローク＝境界線の一筆）は「**線の太さ**」と「**線の色**」の 2 つを
+1 つにまとめた値。`Surface`（§3-(71)）の `border` はこれを受け取る。
+
+| 受け口 | 渡すもの | 無しにしたいとき |
+|---|---|---|
+| `color` | 板の色 | `Color.Transparent`（透明） |
+| `border` | **`BorderStroke`** | **`null`**（`BorderStroke?` なので） |
+
+**枠線は `shape` の形に沿って引かれる。** `CircleShape`（§3-(96) ③）と組み合わせると
+**輪郭だけの丸**になる。
+
+```kotlin
+border = if (isToday) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+```
+
+読み下すと「今日なら 1dp の線を引き、そうでなければ枠なし」（§5-(68) 値を返す `if`）。
+
+💡 **「塗り」と「枠」は別々の印として使える。** カレンダーで
+**選択中＝塗りつぶし、今日＝枠線**とすると、両方が同じ日でも重ねて表現できる。
+§3-(96) ④の「今日と選択中は別の表し方にする」を、太字ではなく枠で実現する形。
+
+import は `androidx.compose.foundation.BorderStroke`。
+
 ### (82) `rememberXxxState()` — 部品が自分で持つ「下書き」
 
 ```kotlin
