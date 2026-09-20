@@ -6,6 +6,7 @@ import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,7 +87,7 @@ class CalendarViewModel @Inject constructor(
 
         observeJob?.cancel()
 
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
         observeJob =  viewModelScope.launch {
             try {
@@ -107,6 +108,10 @@ class CalendarViewModel @Inject constructor(
                             )
                         }
                     }
+            } catch (e: CancellationException) {
+                // 月を送ったときの observeJob?.cancel() で飛んでくる。
+                // 失敗ではなく「意図して取り止めた」合図なので、握り潰さず上へ通す（grammar §2-(91)）。
+                throw e
             } catch (e: Exception) {
                 _uiState.update { state ->
                     state.copy(

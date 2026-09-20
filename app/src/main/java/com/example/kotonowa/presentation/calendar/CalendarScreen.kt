@@ -90,6 +90,15 @@ fun CalendarScreen(
     ) { innerPadding ->
         val message = uiState.errorMessage
 
+        val zone= ZoneId.systemDefault()
+        val dayItems=uiState.items.filter {item ->
+            val date=when(item){
+                is ScheduleItem.Event -> item.startAt
+                is ScheduleItem.Task -> item.dueAt
+            }.atZone(zone).toLocalDate()
+            date == uiState.selectedDate
+        }
+
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -110,27 +119,36 @@ fun CalendarScreen(
                 onDateClick = viewModel::selectDate,
             )
 
-            when {
-                uiState.isLoading -> CircularProgressIndicator()
-                message != null -> Text(message)
-                uiState.items.isEmpty() -> Text("今月の予定はありません")
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(
-                        items = uiState.items,
-                        key = { item -> item.id },
-                    ) { item ->
-                        ScheduleItemRow(
-                            item = item,
-                            onClick = { onItemClick(item.id) },
-                            onToggleCompleted = viewModel::toggleCompleted,
-                        )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier= Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ){
+                when {
+                    uiState.isLoading -> CircularProgressIndicator()
+                    message != null -> Text(message)
+                    dayItems.isEmpty() -> Text("この日の予定はありません")
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(
+                            items = dayItems,
+                            key = { item -> item.id },
+                        ) { item ->
+                            ScheduleItemRow(
+                                item = item,
+                                onClick = { onItemClick(item.id) },
+                                onToggleCompleted = viewModel::toggleCompleted,
+                            )
+                        }
                     }
                 }
             }
+
+
         }
     }
 }
