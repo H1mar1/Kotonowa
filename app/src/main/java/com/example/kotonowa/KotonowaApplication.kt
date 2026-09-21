@@ -1,6 +1,7 @@
 package com.example.kotonowa
 
 import android.app.Application
+import com.example.kotonowa.data.local.createNotificationChannels
 import dagger.hilt.android.HiltAndroidApp
 
 /**
@@ -8,4 +9,9 @@ import dagger.hilt.android.HiltAndroidApp
  * Hilt が「材料を配る仕組み」を組み立てる起点になる。
  */
 @HiltAndroidApp
-class KotonowaApplication : Application()
+class KotonowaApplication : Application(){
+    override fun  onCreate(){
+        super.onCreate()
+        createNotificationChannels(this)
+    }
+}
