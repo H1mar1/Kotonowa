@@ -1055,6 +1055,50 @@ border = if (isToday) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else
 
 import は `androidx.compose.foundation.BorderStroke`。
 
+### (107) `DropdownMenu` — 押すと一覧が出る選択
+
+選択肢が多い・場所を取りたくないときに使う。`SegmentedButton`（横に全部並べる）との
+使い分けは「**選択肢の数**」。
+
+```kotlin
+Box {
+    TextButton(onClick = onOpen) {
+        Text("リマインダー：10分前")        // いま選ばれているものを表示
+    }
+
+    DropdownMenu(
+        expanded = uiState.isMenuOpen,     // 開いているか
+        onDismissRequest = onDismiss,      // 外側を押されたとき
+    ) {
+        DropdownMenuItem(
+            text = { Text("なし") },
+            onClick = { onSelect(null) },
+        )
+        DropdownMenuItem(
+            text = { Text("10分前") },
+            onClick = { onSelect(10) },
+        )
+    }
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `Box { }` | **重ねる入れ物**（§3-(96) ①）。メニューは「ボタンの上に浮く」ので同じ `Box` に入れる |
+| `expanded` | 開いているか（`Boolean`）。**部品は自分で開かない**（§3-(76) と同じ） |
+| `onDismissRequest` | **外側を押された／戻るを押された**ときに呼ばれる。閉じる処理をここに書く |
+| `DropdownMenuItem(text = { … }, onClick = { … })` | 1 項目。`text` はスロット（§3-(83)）なので `{ Text(…) }` と包む |
+
+⚠️ **`DropdownMenu` を `Box` の外に置くと、ボタンとは無関係の位置に出る。**
+「どのボタンから出たメニューか」は**同じ `Box` に入っていること**で決まる。
+
+⚠️ **選んでも自動では閉じない。** `onClick` の中で「値を変える」と「閉じる」の
+**両方**をやる必要がある（`Switch` が自分では切り替わらないのと同じ考え方）。
+
+💡 **開閉状態をどこに持つか。** このプロジェクトは日時ピッカーの開閉を
+`pickerTarget` として UiState に持たせている（Step 17-G-4）。同じ考え方で
+`isMenuOpen` も UiState に置くと、「画面は状態を持たない」方針が揃う。
+
 ### (82) `rememberXxxState()` — 部品が自分で持つ「下書き」
 
 ```kotlin
@@ -2732,6 +2776,173 @@ Android Studio も `Call requires API level 33` と警告する。
 
 💡 Android の世代名はアルファベット順のお菓子（`O`reo=26、`P`ie=28、`Q`…、`TIRAMISU`=33、
 `UPSIDE_DOWN_CAKE`=34）。数字を覚えるより定数名を使う方が安全。
+
+### (103) `CoroutineWorker` と `doWork()` — 「あとで OS に動かしてもらう処理」
+
+WorkManager に予約した時刻が来たとき、**OS が呼び出す処理**を書くクラス。
+
+```kotlin
+class ReminderWorker(
+    appContext: Context,
+    params: WorkerParameters,
+) : CoroutineWorker(appContext, params) {
+
+    override suspend fun doWork(): Result {
+        // ここが予約の時刻に呼ばれる
+        return Result.success()
+    }
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `CoroutineWorker` | **`suspend` が使える Worker**。中で通信や待ち時間のある処理を書ける（§2-⑨） |
+| `doWork()` | **実際にやること**。OS がこれを呼ぶ |
+| `Result.success()` | 終わり方。`success()` / `failure()`（やり直さない）／`retry()`（あとでもう一度） |
+
+⚠️ **`Result` の名前が 2 つある。** ここで返すのは `androidx.work.ListenableWorker.Result` で、
+Repository が返す `kotlin.Result`（§4-⑳）とは**別物**。import を間違えると
+`Type mismatch` になる。同じ綴りで別物、という §4-(61) の `Instant` と同じ罠。
+
+**材料は `inputData` で受け取る。** Worker は OS が作るので、コンストラクタに自由な引数を足せない。
+予約するときに渡した値を、`doWork()` の中で名札（文字列）を指定して取り出す。
+
+```kotlin
+val title = inputData.getString("title") ?: return Result.failure()
+```
+
+💡 名札は `"title"` のような**ただの文字列**なので、打ち間違えてもコンパイルは通る。
+`CHANNEL_ID_REMINDER` と同じく**定数にまとめる**のが安全（§4-(52)）。
+
+### (104) `@HiltWorker` と `Configuration.Provider` — OS が作るクラスに材料を配る
+
+**`Worker` は OS が作る**ので、普通の `@Inject`（Hilt が作るものに効く仕組み）は使えない。
+そこで「OS が作るときに Hilt が割り込む」仕掛けを入れる。
+
+```kotlin
+@HiltWorker
+class ReminderWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted params: WorkerParameters,
+    private val scheduleRepository: ScheduleRepository,   // ← Hilt が配る
+) : CoroutineWorker(appContext, params)
+```
+
+| 印 | 意味 |
+|---|---|
+| `@HiltWorker` | 「この Worker は Hilt 経由で作ります」の宣言 |
+| `@AssistedInject` | **一部は OS から、一部は Hilt から**材料を受け取る、という混合の形 |
+| `@Assisted` | その引数は**OS が渡すもの**（Hilt は触らない） |
+| 印の無い引数 | **Hilt が配るもの**（Repository など） |
+
+`assisted`（アシステッド＝手助けされた）＝「全部は自分で用意できないので、**足りない分だけ手伝って**もらう」。
+
+**アプリ側の準備も要る。**
+
+```kotlin
+class KotonowaApplication : Application(), Configuration.Provider {
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+}
+```
+
+- `HiltWorkerFactory` … **Worker の作り方を知っている工場**。Hilt が用意してくれる
+- `Configuration.Provider` … 「WorkManager の設定はこちらで用意します」という宣言
+
+⚠️ **WorkManager の既定の自動初期化を止める必要がある**（`AndroidManifest.xml` で
+`androidx.work.WorkManagerInitializer` を `tools:node="remove"`）。止めないと、
+**この工場を知らないまま先に初期化され**、Worker を作る瞬間に失敗する。
+
+⚠️ **失敗の出方が分かりにくい。** アプリ起動時ではなく、**予約の時刻が来て Worker が
+動こうとした瞬間**に落ちる。「通知が来ない」の原因がここにあることがある。
+
+💡 `lateinit var`（レイトイニット＝あとで初期化する）は「今は入れられないが、使う前に必ず入る」
+という宣言。Hilt が後から差し込むため `val` では書けない。
+
+### (105) `NotificationCompat` — 通知を 1 つ組み立てて出す
+
+チャンネル（(99)）は「郵便受け」、こちらは「**投函する手紙そのもの**」。
+
+```kotlin
+val notification = NotificationCompat.Builder(context, CHANNEL_ID_REMINDER)
+    .setSmallIcon(android.R.drawable.ic_dialog_info)   // 必須
+    .setContentTitle("会議")
+    .setContentText("15:00 から")
+    .setAutoCancel(true)
+    .build()
+
+NotificationManagerCompat.from(context).notify(通知id, notification)
+```
+
+| 部分 | 意味 |
+|---|---|
+| `Builder(context, チャンネルid)` | **どの郵便受けに入れるか**を最初に決める（§1-⑦ のメソッドチェーン） |
+| `setSmallIcon` | **必須**。省略すると**エラーも出ないまま通知が表示されない** |
+| `setContentTitle` / `setContentText` | 太字の見出しと本文 |
+| `setAutoCancel(true)` | タップしたら通知を消す |
+| `.build()` | 完成品を作る（ここでチェーンは終わり） |
+| `notify(通知id, 通知)` | **実際に出す**命令 |
+
+⚠️ **`notify` の第 1 引数「通知 id」は、チャンネル id とは別物。**
+こちらは `Int` で、**同じ id で 2 回出すと後の 1 つが前を上書きする**（増えない）。
+予定ごとに別々に出したいなら、予定の id から作った数値など**重複しない値**を渡す。
+
+⚠️ **`Compat` が付く理由。** 通知の作法は Android の世代ごとに変わってきた。
+`NotificationCompat`（コンパット＝互換）は**古い端末でも同じ書き方で動く**ようにした版。
+`android.app.Notification` を直接使うより安全なので、常にこちらを使う。
+
+💡 **通知が出ない 3 大原因**は、(99) のチャンネル未作成・(100) の権限未許可・
+この `setSmallIcon` の忘れ。エラーが出ないので、順に潰していくしかない。
+
+### (106) WorkManager に予約する（`OneTimeWorkRequest` / `enqueueUniqueWork`）
+
+「**この処理を、これくらい後にやって**」と OS に預ける仕組み。アプリが閉じていても実行される。
+
+```kotlin
+val data = workDataOf(
+    KEY_TITLE to "会議",              // 名札と値の組（§4-㉟ の mapOf と同じ形）
+    KEY_NOTIFICATION_ID to 123,
+)
+
+val request = OneTimeWorkRequestBuilder<ReminderWorker>()
+    .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)   // 何ミリ秒後か
+    .setInputData(data)
+    .build()
+
+WorkManager.getInstance(context).enqueueUniqueWork(
+    "reminder_abc123",                 // この予約の名前
+    ExistingWorkPolicy.REPLACE,        // 同じ名前が既にあったらどうするか
+    request,
+)
+```
+
+| 部分 | 意味 |
+|---|---|
+| `OneTimeWorkRequestBuilder<T>()` | **1 回だけ**動かす予約。`< >`（§4-㊼）に動かす Worker の型を入れる |
+| `setInitialDelay(数, 単位)` | **今から何後か**。時刻ではなく「**あとどれくらい**」で指定する |
+| `setInputData(data)` | Worker に渡す材料（`inputData` で受け取る。§8-(103)） |
+| `workDataOf("名札" to 値)` | 渡せるのは文字列・数値・真偽値など**単純な値だけ**。オブジェクトは渡せない |
+| `enqueueUniqueWork(名前, 方針, 予約)` | **名前を付けて**積む。同じ名前の予約は 1 つしか存在できない |
+| `ExistingWorkPolicy.REPLACE` | 同名があれば**古い方を捨てて置き換える**（`KEEP` なら古い方を残す） |
+| `cancelUniqueWork(名前)` | その名前の予約を**取り消す** |
+
+**名前を付けて積む理由。** 予定を編集したら、**古い予約を消して新しい予約に差し替える**必要がある。
+名前を `"reminder_" + 予定のid` のように決めておけば、`REPLACE` で自動的に入れ替わり、
+削除時は `cancelUniqueWork` で消せる。名前が無いと**古い通知が鳴り続ける**。
+
+⚠️ **時刻ぴったりには鳴らない。** WorkManager は端末の省電力の都合で**数分遅れることがある**。
+「だいたいこの頃」で困らない用途向け。分単位の正確さが要るなら `AlarmManager` の
+`setExactAndAllowWhileIdle` を使う（要件定義書 §2 が両方を挙げているのはこのため）。
+
+⚠️ **`setInitialDelay` は「時刻」ではなく「あとどれくらい」。**
+`Instant` から `Duration.between(now, 通知時刻).toMillis()` のように**差を計算して**渡す。
+過去の時刻になっていたら（計算結果がマイナス）予約しない、という判断も要る。
+
+💡 `@ApplicationContext`（Hilt）… `Context` を材料として受け取りたいときに付ける印。
+**アプリ全体の Context**（画面より長生き）が配られる。画面の Context を持ち続けると
+画面が閉じた後も参照が残るので、こちらを使う。
 
 ---
 
