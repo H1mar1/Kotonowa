@@ -26,13 +26,15 @@ fun createNotificationChannels(context: Context) {
     val channel = NotificationChannel(
         CHANNEL_ID_REMINDER,
         "リマインダー",
-        NotificationManager.IMPORTANCE_DEFAULT,
+        // HIGH にすると、音に加えて画面上部にポップアップする（grammar §8-(99)）。
+        // ⚠️ 一度作られたチャンネルの重要度は、ここを変えても反映されない。
+        // 開発中はアプリを入れ直し、実運用では CHANNEL_ID_REMINDER を変えて作り直す。
+        NotificationManager.IMPORTANCE_HIGH,
     )
     channel.description = "予定・タスクの時刻をお知らせします"
 
     // NotificationManager は OS が持っている「通知係」。自分では作らず借りてくる
     val manager = context.getSystemService(NotificationManager::class.java)
 
-    // ★3 作ったチャンネルを OS に登録する命令（grammar §8-(99) の例）
     manager.createNotificationChannel(channel)
 }
