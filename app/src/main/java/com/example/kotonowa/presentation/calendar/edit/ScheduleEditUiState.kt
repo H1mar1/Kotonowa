@@ -59,6 +59,20 @@ data class ScheduleEditUiState(
     val dueDate: LocalDate = LocalDate.now(),
     val dueTime: LocalTime = LocalTime.of(23, 59),
 
+    /**
+     * 何分前に通知するか。null は「通知なし」。
+     * ScheduleItem.reminderMinutesBefore にそのまま入る（Step 13 で用意した受け皿）。
+     */
+    // ★1 「数値、または通知なし」を表す型（§4-⑯）。既定は通知なし
+    val reminderMinutesBefore: Int? = null,
+
+    /**
+     * リマインダーの選択メニューが開いているか。
+     * ピッカーの開閉を pickerTarget で持っているのと同じ考え方（grammar §3-(107)）。
+     */
+    // ★2 開いている / 閉じている の 2 択。既定は閉じている
+    val isReminderMenuOpen: Boolean = false,
+
     /** 開いているピッカー。null ならどれも開いていない。 */
     val pickerTarget: PickerTarget? = null,
 

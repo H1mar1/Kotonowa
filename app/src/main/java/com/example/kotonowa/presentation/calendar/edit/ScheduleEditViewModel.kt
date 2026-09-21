@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.lang.System.load
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -20,7 +19,6 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import javax.inject.Inject
-import kotlin.math.log
 
 /**
  * 予定/タスクの作成画面の頭脳。
@@ -162,6 +160,32 @@ class ScheduleEditViewModel @Inject constructor(
         _uiState.update { it.copy(dueDate = value) }
     }
 
+    /**
+     * リマインダーの選択メニューを開く。旗を立てるだけで、メニューを描くのは画面の仕事。
+     * onPickerOpen と同じ形。
+     */
+    fun onReminderMenuOpen() {
+        _uiState.update { it.copy(isReminderMenuOpen = true) }
+    }
+
+    /** メニューを閉じる（外側を押されたとき）。何も選ばれていないので値は変えない。 */
+    fun onReminderMenuDismiss() {
+        _uiState.update { it.copy(isReminderMenuOpen = false) }
+    }
+
+    /**
+     * リマインダーを選ぶ。null は「通知なし」。
+     * 選んだら自動では閉じないので、値の変更と同時に閉じる（grammar §3-(107)）。
+     */
+    fun onReminderChange(value: Int?) {
+        _uiState.update {
+            it.copy(
+                reminderMinutesBefore = value,
+                isReminderMenuOpen = false,
+            )
+        }
+    }
+
 
     /**
      * 入力された内容を 1 件保存する。
@@ -201,7 +225,7 @@ class ScheduleEditViewModel @Inject constructor(
                     createdBy = original?.createdBy ?: id,
                     title = state.title,
                     description = state.description.ifBlank { null },
-                    reminderMinutesBefore = null,
+                    reminderMinutesBefore = state.reminderMinutesBefore,
                     updatedAt = now,
                     startAt = startAt,
                     endAt = endAt,
@@ -214,7 +238,7 @@ class ScheduleEditViewModel @Inject constructor(
                     title = state.title,
                     description = state.description.ifBlank { null },
                     createdBy = original?.createdBy ?: id,
-                    reminderMinutesBefore = null,
+                    reminderMinutesBefore = state.reminderMinutesBefore,
                     updatedAt = now,
                     dueAt = state.dueDate.toInstant(state.dueTime),
                     isCompleted = false,
