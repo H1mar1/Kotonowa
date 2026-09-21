@@ -89,7 +89,10 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2 進行中 — 作成→保存→一覧反映に加え、
+**Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
+完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
+次は Phase 3（共有カレンダー＋ロールベース認可）。以下は Phase 2 の経緯 —
+作成→保存→一覧反映に加え、
 行タップ→詳細→削除まで実装（2026-09-02）。Step 18 は 2026-09-03 の実機確認（18-F）で完了。
 Step 19（編集）は 2026-09-15 の実機確認（19-F）で完了 — 一覧→詳細→編集→上書き保存が通った。
 Step 20 で詳細画面を 1 件購読（`observeItem`）に変え、「保存後に戻った詳細画面が古いまま」を解消（2026-09-15）。
@@ -116,6 +119,7 @@ Step 23 で月の升目カレンダーを実装（2026-09-20）。仕様書 §5 
 | 23 | 月の升目カレンダー（升目＋選択日で一覧を絞る） | ✅ |
 | 24 | 升目の見た目の調整（今日・選択中・予定ありの出し分け） | ✅ |
 | 25 | 設定画面（プロフィール・通知設定の枠・ログアウト） | ✅ |
+| 26 | ローカル通知（WorkManager でリマインダーを予約） | ✅ |
 
 Step 15 の内訳：A/B 骨組み → C `addItem`/`toMap` → D `updateItem`/`deleteItem` →
 E `getItem`/`toScheduleItem` → F `observeItems`（`callbackFlow` + `addSnapshotListener`）。
@@ -664,6 +668,56 @@ Step 16-E で `HomeScreen` を消して以来、置き場所の無かったロ�
 `SettingsScreen` と SETTING の `composable` へ移した。移したあと **`CalendarScreen` 側の
 `onLogout` と `CalendarViewModel.logout()` は削除**し、同じ処理が 2 か所に残らないようにした。
 
+#### Step 26 の内訳（ローカル通知）— Phase 2 の最後
+
+**通知を出すには 4 つの仕組みが順に要る。どれが欠けてもエラーは出ず、静かに鳴らない。**
+
+| | 内容 | 状態 |
+|---|---|---|
+| 26-A | 依存追加（WorkManager 2.10.0 ＋ hilt-work 1.3.0） | ✅ 09-21 |
+| 26-B | 通知チャンネル（`data/local/NotificationChannels.kt`） | ✅ 09-21 |
+| 26-C | 通知権限（`POST_NOTIFICATIONS`） | ✅ 09-21 |
+| 26-D | `ReminderWorker`（通知を出す）＋ Hilt × WorkManager の初期化 | ✅ 09-22 |
+| 26-E | `ReminderScheduler` / `ReminderSchedulerImpl`（予約する係） | ✅ 09-22 |
+| 26-F | 作成画面のリマインダー選択（`DropdownMenu`） | ✅ 09-22 |
+| 26-G | 保存・削除と予約の連動 | ✅ 09-22 |
+| 26-H | 実機確認 | ✅ 09-22 |
+
+**構成。** `domain/repository/ReminderScheduler`（約束）と `data/local/ReminderSchedulerImpl`（実装）に
+分け、WorkManager に触れるのは data 層までにした。ViewModel は WorkManager を知らない
+（依存の向き `presentation → domain ← data` を保つ）。Repository と同じ形なので
+`RepositoryModule` に 1 行足すだけで繋がる。
+
+**Worker は OS が作るので普通の `@Inject` が効かない。** `@HiltWorker` ＋ `@AssistedInject` で
+「OS から来る分」と「Hilt が配る分」を分け、`KotonowaApplication` に `Configuration.Provider` を
+実装して `HiltWorkerFactory` を渡す。**マニフェストで WorkManager の既定の自動初期化を
+`tools:node="remove"` で止めるのを忘れないこと**（止めないと工場を知らないまま初期化され、
+Worker が動く瞬間に失敗する）。grammar §8-(103)(104)。
+
+**予約は名前を付けて積む。** `"reminder_<予定id>"` ＋ `ExistingWorkPolicy.REPLACE` にしたので、
+**編集時は古い予約が自動で置き換わる**。削除時は `cancelUniqueWork` で取り消す
+（`ScheduleDetailViewModel.delete()` の `onSuccess` に追加）。
+`reminderMinutesBefore` が null のときや通知時刻が過去のときは、`schedule()` の中で
+予約せず取り消すだけにしてある。だから「通知あり→なし」の変更も同じ経路で消える。
+
+⚠️ **予約は必ず `onSuccess` の中で行う。** 保存や削除が失敗したのに予約だけ動くと、
+実体の無い予定の通知が鳴る。`ReminderSchedulerImpl` は Firestore を見ないため。
+
+⚠️ **WorkManager は時刻ぴったりを保証しない**（省電力状態で数分遅れる）。
+分単位の正確さが要るようになったら `AlarmManager` の `setExactAndAllowWhileIdle` に寄せる。
+要件定義書 §2 が両方を挙げているのはこのため。
+
+**通知の重要度は `IMPORTANCE_DEFAULT`（音は鳴るがポップアップはしない）。**
+26-H で「音だけ鳴った」のはこの設計どおりの動作で、通知は通知領域に入っている。
+ポップアップさせたいなら `IMPORTANCE_HIGH` だが、⚠️ **作成済みチャンネルの重要度は
+コードを変えても反映されない**（ユーザー設定を上書きしないため）。
+変えるならチャンネル id を変えるか、アプリを入れ直す。grammar §8-(99)。
+
+**確認のしかた。** 最短の選択肢が「5分前」なので、**6〜7 分後の予定**を作って試す。
+5 分以内の予定だと通知時刻が過去になり、仕様どおり予約されない。
+鳴らないときは Logcat の `WM-WorkerWrapper`（Worker が動いたか）と
+`dumpsys notification`（通知が投稿されたか）を見ると、どこで止まっているか切り分けられる。
+
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 
 - 個人カレンダーの `calendarId` は**そのユーザーの `uid`**。`calendars` コレクションは作らない
@@ -791,8 +845,10 @@ Firestore SDK はオフライン時、端末内のキャッシュを返して裏
 - Hilt 2.60.1（KSP 2.2.10-2.0.2）、Navigation Compose 2.9.5
 - kotlinx-coroutines-play-services（Firebase の `Task` を `await()` で待つため）
 
+- WorkManager 2.10.0 ＋ androidx.hilt:hilt-work 1.3.0（ローカル通知。Step 26）
+
 ### これから導入（仕様書 §2 の予定）
-- WorkManager / AlarmManager（ローカル通知）— Phase2
+- AlarmManager（`setExactAndAllowWhileIdle`）— WorkManager の遅れが問題になったら
 - FCM + Cloud Functions（プッシュ通知）— Phase4
 - java.time（minSdk 26 なので desugaring 不要）
 
@@ -814,7 +870,7 @@ com.example.kotonowa/
 ```
 Phase0: セットアップ（Firebase疎通）      ← 完了
 Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 完了
-Phase2: 個人のスケジュール/タスク管理 + ローカル通知  ← 今ここ
+Phase2: 個人のスケジュール/タスク管理 + ローカル通知  ← 完了（2026-09-22）
 Phase3: 共有カレンダー + ロールベース認可
 Phase4: プッシュ通知
 ```
