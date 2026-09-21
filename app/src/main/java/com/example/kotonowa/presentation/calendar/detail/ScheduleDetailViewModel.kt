@@ -3,6 +3,7 @@ package com.example.kotonowa.presentation.calendar.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ScheduleDetailViewModel @Inject constructor(
     private val scheduleRepository: ScheduleRepository, // 予定/タスクを出し入れする窓口
+    private val reminderScheduler: ReminderScheduler,
     savedStateHandle: SavedStateHandle, // NavHost が渡してくる「宛名付きメモ」
 ) : ViewModel() {
 
@@ -65,7 +67,9 @@ class ScheduleDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             scheduleRepository.deleteItem(itemId)
-                .onSuccess { _uiState.update { it.copy(isDeleting = false, isDeleted = true) } }
+                .onSuccess {
+                    reminderScheduler.cancel(itemId)
+                    _uiState.update { it.copy(isDeleting = false, isDeleted = true) } }
                 .onFailure {
                     _uiState.update {
                         it.copy(

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
+import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,7 @@ class ScheduleEditViewModel @Inject constructor(
     private val scheduleRepository: ScheduleRepository, // 予定/タスクを出し入れする窓口
     private val authRepository: AuthRepository, // ログイン中のユーザーを知る窓口
     private val savedStateHandle: SavedStateHandle,
+    private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
 
@@ -250,7 +252,15 @@ class ScheduleEditViewModel @Inject constructor(
             else scheduleRepository.updateItem(item)
 
             result
-                .onSuccess { _uiState.update { it.copy(isSaving = false, isSaved = true) } }
+                .onSuccess {
+                    // 保存できてから予約する。失敗したのに予約すると、実体の無い通知が鳴る。
+                    // 編集時は ExistingWorkPolicy.REPLACE で古い予約が置き換わり、
+                    // 「通知なし」に変えた場合は schedule() の中で取り消される（grammar §8-(106)）。
+                    reminderScheduler.schedule(item)
+                    _uiState.update {
+                        it.copy(isSaving = false, isSaved = true)
+                    }
+                }
                 .onFailure {
                     _uiState.update {
                         it.copy(
