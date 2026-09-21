@@ -2,6 +2,7 @@ package com.example.kotonowa.presentation.calendar.edit
 
 import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -85,6 +88,9 @@ fun ScheduleEditScreen(
         onEndTimeChange = viewModel::onEndTimeChange,
         onDueDateChange = viewModel::onDueDateChange,
         onDueTimeChange = viewModel::onDueTimeChange,
+        onReminderChange = viewModel::onReminderChange,
+        onReminderMenuOpen = viewModel::onReminderMenuOpen,
+        onReminderMenuDismiss = viewModel::onReminderMenuDismiss,
         onPickerDismiss = viewModel::onPickerDismiss,
         onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
@@ -117,6 +123,9 @@ private fun ScheduleEditContent(
     onEndTimeChange: (LocalTime) -> Unit,
     onDueDateChange: (LocalDate) -> Unit,
     onDueTimeChange: (LocalTime) -> Unit,
+    onReminderChange: (Int?) -> Unit,
+    onReminderMenuOpen: () -> Unit,
+    onReminderMenuDismiss: () -> Unit,
     onPickerDismiss: () -> Unit,
     onSaveClick: () -> Unit,
     onNavigateBack: () -> Unit,
@@ -206,6 +215,38 @@ private fun ScheduleEditContent(
                     showTime = true,
                     onDateClick = onDueDateClick,
                     onTimeClick = onDueTimeClick,
+                )
+            }
+        }
+
+        // --- リマインダー（grammar §3-(107)） ---
+        // メニューはボタンの上に浮くので、同じ Box に入れる（§3-(96) ①）
+        Box {
+            TextButton(onClick = onReminderMenuOpen) {
+                // 選ばれていなければ「なし」、選ばれていればその分数を出す（§4-⑮）
+                Text("リマインダー：" + (uiState.reminderMinutesBefore?.let { "${it}分前" }
+                    ?: "なし"))
+            }
+
+            DropdownMenu(
+                expanded = uiState.isReminderMenuOpen,
+                onDismissRequest = onReminderMenuDismiss,
+            ) {
+                DropdownMenuItem(
+                    text = { Text("なし") },
+                    onClick = { onReminderChange(null) },
+                )
+                DropdownMenuItem(
+                    text = { Text("5分前") },
+                    onClick = { onReminderChange(5) },
+                )
+                DropdownMenuItem(
+                    text = { Text("10分前") },
+                    onClick = { onReminderChange(10) },
+                )
+                DropdownMenuItem(
+                    text = { Text("30分前") },
+                    onClick = { onReminderChange(30) },
                 )
             }
         }
@@ -435,6 +476,9 @@ private fun ScheduleEditContentPreview() {
             onEndTimeChange = {},
             onDueDateChange = {},
             onDueTimeChange = {},
+            onReminderChange = {},
+            onReminderMenuOpen = {},
+            onReminderMenuDismiss = {},
             onPickerDismiss = {},
             onSaveClick = {},
             onNavigateBack = {},
