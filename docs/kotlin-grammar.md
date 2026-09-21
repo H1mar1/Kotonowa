@@ -2636,6 +2636,105 @@ class ScheduleEditViewModel @Inject constructor(
 
 ---
 
+## §8 Android の仕組み（通知）
+
+### (99) 通知チャンネル — 「郵便受け」を先に設置する
+
+Android 8.0（API 26）以降、**通知は必ず「チャンネル」に属していないと表示されない**。
+チャンネルは「通知の種類」ごとの受け皿で、音を鳴らすか・どれくらい目立たせるかといった設定は
+**ユーザーがチャンネル単位で変更できる**（アプリ側からは上書きできない）。
+
+```kotlin
+val channel = NotificationChannel(
+    "reminder",                                  // ① id（コードから指す名前）
+    "リマインダー",                               // ② 設定画面に出る表示名
+    NotificationManager.IMPORTANCE_DEFAULT,      // ③ 重要度
+)
+val manager = getSystemService(NotificationManager::class.java)
+manager.createNotificationChannel(channel)
+```
+
+| 引数 | 何を渡すか |
+|---|---|
+| ① id | **コードから指すための文字列**。通知を作るときも同じ id を渡す（§4-(52) の「名札は文字列」と同じ話） |
+| ② 表示名 | 端末の「設定 → アプリ → 通知」に出る名前。**ユーザーが読む日本語** |
+| ③ 重要度 | `IMPORTANCE_HIGH`（音＋画面上部に出る）／`DEFAULT`（音あり）／`LOW`（音なし）など |
+
+**作る場所は `Application`。** どの画面より先に 1 回だけ走る場所（`KotonowaApplication`）で作る。
+**同じ id で何度呼んでも増えない**（2 回目以降は無視される）ので、毎回起動時に呼んで構わない。
+
+⚠️ **チャンネルを作らずに通知を出すと、エラーも出ないまま何も表示されない。**
+「通知が鳴らない」ときに最初に疑う場所。
+
+⚠️ **後から重要度を変えても、すでに作られたチャンネルには反映されない**（ユーザーの設定を
+アプリが勝手に上書きしないため）。変えたいときは id を変えるか、アプリを入れ直す。
+
+💡 `minSdk 26` を選んだ理由がこれ（要件定義書 §2）。API 26 未満に対応すると
+「チャンネルがある世界」と「ない世界」の分岐を書く必要がある。
+
+### (100) `POST_NOTIFICATIONS` — Android 13 以降は「許可」が要る
+
+通知チャンネルがあっても、**Android 13（API 33）以降はユーザーの許可が無いと通知が出ない**。
+
+- `AndroidManifest.xml` に `<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />` を書く
+- **さらに実行時にダイアログで尋ねる**（書いただけでは許可されない）
+- API 32 以下では**許可は不要**（宣言だけあっても無視される）
+
+⚠️ **「マニフェストに書いたのに通知が出ない」**はこの 2 段構えを忘れたときの典型。
+`INTERNET` のような昔からの権限は宣言だけで足りるが、**ユーザーに関わる権限は実行時に尋ねる**。
+
+### (101) 権限を実行時に尋ねる（`rememberLauncherForActivityResult`）
+
+**OS の画面（許可ダイアログなど）を呼び出して、結果を受け取る窓口**を作る仕組み。
+
+```kotlin
+val launcher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestPermission(),
+) { granted ->
+    // 許可されたら true、拒否されたら false が届く
+}
+
+launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+```
+
+| 部分 | 意味 |
+|---|---|
+| `rememberLauncherForActivityResult` | **呼び出し口を作って覚えておく**（`remember` 系＝§3-⑪。作り直さない） |
+| `contract = …RequestPermission()` | 「**何をしに行くか**」の種類。ここでは「権限を 1 つ尋ねる」 |
+| `{ granted -> }` | **結果が返ってきたときにやること**（§1-㊿）。`Boolean` が届く |
+| `launcher.launch(…)` | **実際に行かせる**命令。これを呼んだ瞬間にダイアログが出る |
+
+**なぜ 2 段構えなのか。** ダイアログの表示は**別のアプリ（OS）に行って帰ってくる**動作で、
+その間にこちらの画面は一度止まる。だから「行く前に受け取り口を用意しておく」必要がある。
+`launcher` を作った時点では**まだ何も起きない**（`Flow` のコールド（§2-(62)）に似た関係）。
+
+⚠️ **`launch()` を呼ぶ場所に注意。** 画面を描く途中（`@Composable` の本体）で直接呼ぶと、
+**再描画のたびに何度も実行される**。1 回だけ動かしたいときは `LaunchedEffect(Unit) { }`（§3-⑬）で包む。
+
+### (102) `Build.VERSION.SDK_INT` — 動いている Android の世代で分ける
+
+```kotlin
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `Build.VERSION.SDK_INT` | **いま動いている端末**の API レベル（数値） |
+| `Build.VERSION_CODES.TIRAMISU` | API 33（Android 13）を表す定数。**お菓子の名前**が付いている |
+
+`minSdk 26` は「**26 以上の端末で動く**」という意味なので、26〜最新までが混在する。
+**新しい世代にしか無い機能**を使うときは、この分岐で囲って古い端末では呼ばないようにする。
+
+⚠️ **囲わずに呼ぶと、古い端末では存在しない権限を要求して例外になる。**
+Android Studio も `Call requires API level 33` と警告する。
+
+💡 Android の世代名はアルファベット順のお菓子（`O`reo=26、`P`ie=28、`Q`…、`TIRAMISU`=33、
+`UPSIDE_DOWN_CAKE`=34）。数字を覚えるより定数名を使う方が安全。
+
+---
+
 ## 追記のしかた（Claude 向け）
 
 新しい文法が出たら、適切な §（節）に**次の丸数字**で追記する。

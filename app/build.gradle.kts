@@ -57,6 +57,10 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
+    // ローカル通知（Step 26）。WorkManager 本体と、Worker に Hilt から材料を配るための連携
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
