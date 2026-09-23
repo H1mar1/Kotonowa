@@ -2680,6 +2680,32 @@ class ScheduleEditViewModel @Inject constructor(
 
 ---
 
+### (108) 1 つのファイルに複数の型を書いてよい
+
+Kotlin は Java と違い、**ファイル名と型名を一致させなくてよい**。
+1 つのファイルに型をいくつ書いても構わない。
+
+```kotlin
+// Calendar.kt
+data class Calendar(...)
+
+enum class CalendarType { PERSONAL, SHARED }   // 同じファイルに 2 つ目
+```
+
+**どう使い分けるか。**
+
+| 置き方 | そうする場面 |
+|---|---|
+| 同じファイルに並べる | **片方だけでは意味をなさない**とき（`CalendarType` は `Calendar` の一部を説明する名札） |
+| ファイルを分ける | **単独で意味があり、あちこちから使う**とき（`MemberRole` は名簿・画面・ルール判定で単独で出てくる） |
+
+⚠️ `import` は**型の名前で**書く（`com.example.kotonowa.domain.model.CalendarType`）。
+ファイル名は関係ないので、`Calendar.kt` に入っていても `CalendarType` として直接 import できる。
+
+💡 `ScheduleItem.kt` の `Event` / `Task` は「同じファイルに並べる」ではなく
+**`sealed class` の中に入れ子**（§7-㉘）。入れ子なので `ScheduleItem.Event` と
+頭に親の名前が付く点が違う。`CalendarType` は入れ子ではないので `Calendar.` は付かない。
+
 ## §8 Android の仕組み（通知）
 
 ### (99) 通知チャンネル — 「郵便受け」を先に設置する
