@@ -89,7 +89,10 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 ## 現在の状態
 
-**Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
+**Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
+Step 27（ドメインモデル）と Step 28（`users` への自己登録）まで完了（2026-09-24）。
+
+Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
 次は Phase 3（共有カレンダー＋ロールベース認可）。以下は Phase 2 の経緯 —
 作成→保存→一覧反映に加え、
@@ -723,6 +726,98 @@ grammar §8-(99)。
 5 分以内の予定だと通知時刻が過去になり、仕様どおり予約されない。
 鳴らないときは Logcat の `WM-WorkerWrapper`（Worker が動いたか）と
 `dumpsys notification`（通知が投稿されたか）を見ると、どこで止まっているか切り分けられる。
+
+### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
+
+| Step | 内容 | 状態 |
+|---|---|---|
+| 27 | ドメインモデル（`Calendar` / `CalendarType` / `CalendarMember` / `MemberRole`） | ✅ 09-23 |
+| 28 | `users` コレクションへの自己登録（`UserRepository`） | ✅ 09-24 |
+| 29 | `CalendarRepository`（interface） | |
+| 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | |
+| 31 | カレンダー一覧画面 | |
+| 32 | カレンダー作成画面 | |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
+| 34 | メンバー一覧・ロール変更（オーナーのみ） | |
+| 35 | 招待送信（`invites`） | |
+| 36 | 招待受信・承認/拒否 | |
+| 37 | セキュリティルールをロールベースに作り替える | |
+| 38 | 画面のロール出し分け（閲覧者には「＋」も「編集」も出さない） | |
+
+#### Step 27（ドメインモデル）
+
+`Calendar`（部屋）と `CalendarMember`（名簿の 1 行）を**別の型に分けている**。Firestore 側も
+`calendars/{id}` と `calendars/{id}/members/{uid}` に分かれており（要件定義書 §4）、
+名簿をサブコレクションにしておくとルールから `members/$(request.auth.uid)` を一発で引ける（Step 37）。
+
+`CalendarType` は `Calendar.kt` に同居、`MemberRole` は単独ファイル。**単独で意味があり
+あちこちから使うものはファイルを分ける**（grammar §7-(108)）。
+
+⚠️ **Phase 2 のデータは「部屋が無いのに紙だけある」状態。** `events` の `calendarId` には
+ユーザーの uid が入っているが、`calendars/{uid}` のドキュメントは存在しない（2026-08-08 の決定どおり）。
+Phase 3 で `calendars/{uid}`（type=PERSONAL）を後から作れば既存データと矛盾しない。
+
+⚠️ **今のセキュリティルールのままでは共有カレンダーは動かない。** `events` のルールは
+`request.auth.uid == resource.data.calendarId`（＝自分の uid の部屋だけ）なので、
+共有カレンダーを作った瞬間その中の予定は本人ですら読めなくなる。Step 37 で
+「`members/{自分のuid}` があるか、その `role` は何か」で判定する形に置き換える。
+
+#### Step 28（`users` への自己登録）
+
+Firebase Authentication には**他人をメールアドレスで検索する手段が無い**（総当たりで会員名簿を
+作られるのを防ぐため）。Step 35 の招待はメールアドレスで相手を指名する仕様（要件定義書 §3.4）なので、
+**検索できる名簿を自分たちで `users` に作る**。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 28-A | `domain/repository/UserRepository`（`saveUser` / `findUserByEmail`） | ✅ |
+| 28-B | `data/repository/UserRepositoryImpl`（Firestore 実装） | ✅ |
+| 28-C | `RepositoryModule` に `bindUserRepositoryImpl` を追加 | ✅ |
+| 28-D | ログイン / Google ログイン / サインアップの成功時に `saveUser` を呼ぶ | ✅ |
+| 28-E | セキュリティルールに `users` を追加 | ✅ |
+| 28-F | 実機確認（`users` に名刺ができ、再ログインで `createdAt` が変わらない） | ✅ 09-24 |
+
+**`AuthRepository` と `UserRepository` は別物。** 前者は Firebase Authentication で
+「**自分が**誰か」、後者は Firestore で「**他人を含めた**名簿」。同じ `User` 型を扱うが、
+Step 28 は「Auth から来た `User` を Firestore へ写す」作業。
+
+**`findUserByEmail` の戻り値は `Result<User?>`。** 封筒（`Result`）が「通信できたか」、
+中身の `?` が「その人が居たか」。`getItem` が `Result<ScheduleItem>`（`?` 無し）なのと対照的で、
+**「見つからないのは異常か、普通のことか」**で決めている。招待相手が未登録なのは普通に起きる。
+
+**`.set(map, SetOptions.merge())` を使う**（grammar §4-(109)）。`createdAt` は
+`if (snapshot.exists())` で**初回だけ**入れる。毎回入れると登録日がログインのたびに
+今日へ書き換わる。Phase4 の `fcmTokens` を消さないためにも `merge` が要る。
+
+⚠️ **`email` は保存側・検索側の両方で `lowercase()` する。** Firestore の検索は大文字小文字を
+区別するため、片方だけだと「登録したのに招待で見つからない」になる。保存側は `String?` なので `?.`。
+
+⚠️ **`saveUser` は `isLoginSuccess = true` より前に呼ぶ。** 逆にすると画面が HOME へ移って
+ログイン画面が履歴から消え、`LoginViewModel` が捨てられ `viewModelScope` が打ち切られる。
+**画面が消えるより前に通信を終わらせる。**
+
+**`saveUser` の失敗は握り潰している（`onFailure` を書いていない）。** ログイン自体は成功しており、
+実害は「招待で見つけてもらえない」だけ。ログインのたびに呼ぶので次回に自己修復する。
+**毎回呼ぶ・何度呼んでも同じ結果（`merge`）だからこそ、エラー処理を省ける。**
+
+**セキュリティルール（2026-09-24 適用）**
+
+```
+match /users/{userId} {
+  allow read: if request.auth != null;
+  allow create, update: if request.auth != null && request.auth.uid == userId;
+  allow delete: if false;
+}
+```
+
+`read` が「ログインしていれば誰でも」なのは、招待でメールアドレス検索をするため
+（自分以外の名刺を読めないと成立しない）。**代償として全ユーザーのメールアドレスが読める**ので、
+Phase4 で Cloud Functions を入れるときに検索をサーバー側へ寄せる（要件定義書 §7 に記載）。
+`delete` を禁じているのは、名刺が消えるとメンバー一覧が名無しになるため。
+
+💡 **ログアウトの瞬間に `events` の購読が `PERMISSION_DENIED` で失敗する**（2026-09-24 の
+Logcat で確認）。ルールが正しく効いている証拠だが、一瞬エラーが画面に出うる。
+Step 33 で購読の止め方を整理するときに直す。
 
 #### Phase 2 の設計判断（詳細は `docs/requirements.md` §4）
 

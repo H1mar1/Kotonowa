@@ -2076,6 +2076,132 @@ state.selectedDateMillis?.let { onDateSelected(it) }
 
 ---
 
+### (109) `SetOptions.merge()` — 書いた項目だけ差し替える
+
+```kotlin
+document.set(map, SetOptions.merge())
+```
+
+Firestore の `.set()` は**書類を丸ごと差し替える**のが既定の動き。
+Map に入れなかった項目は**消える**。
+
+| 書き方 | 書類に元々あった `fcmTokens` は |
+|---|---|
+| `.set(map)` | **消える**（Map に無いので） |
+| `.set(map, SetOptions.merge())` | **残る**（書いた項目だけ差し替わる） |
+
+`merge`（マージ）＝「混ぜ合わせる」。
+
+**なぜ `users` でこれが要るか。** Phase4 で `fcmTokens`（通知の宛先）を
+別の場所から書き込む予定がある。ログインのたびに `.set(map)` で
+上書きすると、そのたびに通知の宛先が消えてしまう。
+
+⚠️ **`.update()` との違い。**
+
+| 命令 | 書類が無いとき | 書いていない項目 |
+|---|---|---|
+| `.set(map)` | 作る | 消える |
+| `.set(map, SetOptions.merge())` | **作る** | 残る |
+| `.update(map)` | **エラー** | 残る |
+
+「無ければ作る、あれば一部だけ直す」を 1 回で書けるのが `merge` だけ。
+`saveUser` は初回ログインなら作る・2 回目以降は直す、なのでこれが要る。
+
+### (110) `firstOrNull()` / `limit(n)` — 「あれば 1 つ目、無ければ null」
+
+```kotlin
+snapshot.documents.firstOrNull()?.toUser()
+```
+
+| 命令 | 中身が空のとき |
+|---|---|
+| `first()` | **例外を投げて落ちる** |
+| `firstOrNull()` | `null` を返す |
+
+「そのメールアドレスの人は登録していない」は**普通に起きる**ことで、
+異常ではない。だから落ちない方（`firstOrNull`）を使い、`?.`（§4-㊻）で
+「あれば組み立てる」と繋ぐ。答えは `User?` になる。
+
+💡 `Or` で終わる命令は「無かったらこうする」の宣言。
+`getOrNull()`（§4-(56)）、`?:`（§4-⑮）と同じ考え方。
+
+⚠️ `limit(1)` は Firestore 側に付ける「**1 件だけ送って**」という注文。
+`firstOrNull()` は手元に届いた後で 1 つ目を取る作業。**場所が違う**
+（`limit` が無いと一致する全員ぶん通信してから 1 人だけ使うことになり、無駄）。
+
+### (111) enum の `.name` と `valueOf()` — 名前の文字と行き来する
+
+`enum class` は「自分の名前の文字」を最初から持っている。変換表を自分で書く必要はない。
+
+```kotlin
+MemberRole.EDITOR.name            // → "EDITOR"（文字）
+MemberRole.valueOf("EDITOR")      // → MemberRole.EDITOR（型に戻す）
+```
+
+Firestore やセキュリティルールは Kotlin の型を知らないので、保存するときは文字に直す。
+このアプリはルール側を小文字（`role == 'editor'`）で書くので、前後に変換を挟む。
+
+```kotlin
+"role" to role.name.lowercase()                  // 保存：EDITOR → "editor"
+MemberRole.valueOf(text.uppercase())             // 読み込み："editor" → EDITOR
+```
+
+⚠️ **`valueOf` は知らない名前を渡すと例外を投げる**（`IllegalArgumentException`）。
+Firestore に `"admin"` のような 3 つに無い文字が入っていたら落ちる。data 層の
+`try`/`catch`（§6-㉔）で受け止めて `Result.failure` に変えるか、
+`runCatching { }.getOrNull()`（§4-(56)）で「読めない 1 件は捨てる」扱いにする。
+
+💡 `toScheduleItem()` で `when (getString("type"))` の `else -> throw` を書いたのと同じ備え。
+**外から来た文字は、いつでも想定外でありうる。**
+
+### (112) `runBatch { }` — 2 か所以上を「まとめて 1 回で」書く
+
+```kotlin
+firestore.runBatch { batch ->
+    batch.set(calendarDoc, ...)   // ① 部屋の書類
+    batch.set(ownerDoc, ...)      // ② 名簿の行
+}.await()
+```
+
+`batch`（バッチ）＝「ひとまとめ」。**全部成功するか、全部書かれないかのどちらか**になる。
+
+**なぜ要るか。** 部屋を作る処理は「部屋の書類」と「名簿の行」の 2 か所に書く。
+別々に書くと、1 つ目の直後に通信が切れたとき**誰も入っていない部屋**が残る。
+`runBatch` ならそういう中途半端な状態が生まれない。
+
+| 書き方 | 途中で失敗したら |
+|---|---|
+| `set()` を 2 回続けて呼ぶ | 1 つ目だけ書かれた状態が残る |
+| `runBatch { }` | **何も書かれない**（巻き戻る） |
+
+`batch.set` / `batch.update` / `batch.delete` が使える。`batch.` から呼ぶものには
+`.await()` を付けない（「予約」しているだけで、実際に送るのは `runBatch` 全体が終わるとき）。
+
+⚠️ 1 回のバッチに入れられるのは 500 件まで。
+
+### (113) 配列のフィールド（`arrayUnion` / `arrayRemove` / `whereArrayContains`）
+
+Firestore は「文字の一覧」を 1 つのフィールドに持てる。このアプリでは
+`calendars.memberUids`（入っている人の uid の一覧）がそれ（要件定義書 §4）。
+
+```kotlin
+// 足す（既に入っていれば何も起きない）
+batch.update(calendarDoc, "memberUids", FieldValue.arrayUnion(uid))
+
+// 外す
+batch.update(calendarDoc, "memberUids", FieldValue.arrayRemove(uid))
+
+// 「その uid が入っている書類」を探す
+firestore.collection("calendars").whereArrayContains("memberUids", uid)
+```
+
+**`FieldValue.arrayUnion` は「配列に足して」という命令そのものを値として渡す書き方。**
+自分で配列を読み出して、足して、書き戻す必要がない（その間に他の人が書き込むと
+消えてしまう＝競合が起きる。`arrayUnion` ならサーバー側で足すので安全）。
+
+⚠️ `whereArrayContains` は **1 つのクエリに 1 回しか使えない**。また
+別のフィールドでの並べ替え（`orderBy`）と組み合わせると複合インデックスが要る。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

@@ -133,7 +133,7 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | コレクション | 構造 | 主なフィールド |
 |---|---|---|
 | `users` | トップレベル | uid, displayName, email, photoUrl, fcmTokens[], createdAt |
-| `calendars` | トップレベル | calendarId, name, ownerUid, type, color, createdAt |
+| `calendars` | トップレベル | calendarId, name, ownerUid, type, color, createdAt, **memberUids[]** |
 | `calendars/{calendarId}/members` | サブコレクション | uid, role(owner/editor/viewer), joinedAt, invitedBy |
 | `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, sortAt, createdBy, reminderMinutesBefore, updatedAt |
 | `invites` | トップレベル | inviteId, calendarId, invitedEmail, role, status, invitedBy, createdAt |
@@ -147,6 +147,18 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
   Phase2 は個人利用のみなので `calendars` ドキュメントは作らない。ViewModel は `AuthRepository.currentUser?.uid`
   を `calendarId` として `ScheduleRepository` に渡す。
   Phase3 で共有カレンダーを導入する際に `calendars/{uid}`（type=personal）を後から作れば、既存データと矛盾しない
+- **`calendars.memberUids[]` は「自分が入っている部屋の一覧」を引くための検索用フィールド**（2026-09-24 決定）。
+  名簿の本体はあくまで `calendars/{id}/members/{uid}`。`memberUids` はそこに誰が載っているかを
+  写しただけの重複情報で、`whereArrayContains("memberUids", uid)` の 1 クエリで一覧を取るために置く。
+  - 採用理由：`members` はサブコレクションなので「子から親を逆引き」できない。
+    コレクショングループ検索（案A）だと名簿の行しか返らず、部屋の情報を取りに行く通信が部屋の数だけ増える。
+    `users` に `calendarIds[]` を持つ案Bも同じ問題を抱える
+  - セキュリティルールを `allow read: if request.auth.uid in resource.data.memberUids;` と
+    1 行で書けるのも利点（案Aだとルールの中で名簿を `exists()` で読みに行く必要がある）
+  - Kotlin 側の `Calendar` には持たせない。`type` / `sortAt` と同じく data 層の `toMap()` 相当で扱い、
+    メンバーの増減時に `FieldValue.arrayUnion` / `arrayRemove` で名簿と同時に更新する
+  - ⚠️ 代償：入退室のたびに `members` と `memberUids` の 2 か所を更新する必要がある。
+    更新をまとめて書けるよう、`CalendarRepositoryImpl` の外からは配列の存在が見えない設計にする
 - **`sortAt` は期間クエリ・並べ替え専用の共通フィールド**（2026-08-07 決定）。予定は `startAt`、タスクは `dueAt` と同じ値を入れる。
   Firestore の範囲絞り込みは単一フィールドにしか掛けられないため、`type` によって見る場所が変わるのを避ける狙い。
   - Kotlin 側の `ScheduleItem` には持たせない。`startAt` / `dueAt` から導出できる重複情報なので、data 層の `toMap()` で保存直前に付与する（`type` と同じ扱い）
@@ -199,6 +211,9 @@ Cloud Functionsのデプロイ・FCM送受信は初見だと詰まりやすい�
 - Firestoreセキュリティルールの具体的な記述（ロール判定ロジック）
 - テスト方針（Unit Test / UI Testの範囲、対象レイヤー）
 - オフライン対応（Firestoreのオフラインキャッシュ活用方針）
+- `users` の読み取り権限の絞り込み（2026-09-24 追加）。招待のメールアドレス検索のため
+  `allow read: if request.auth != null` にしており、ログイン済みなら全ユーザーのメールを読めてしまう。
+  Phase4 で Cloud Functions を導入する際に、検索をサーバー側の関数へ寄せる
 - イベント単位での公開範囲制御（カレンダー共有中でも一部の予定を非公開にする機能）
 - メンバーごとの個別リマインダー設定
 - ダークモード・多言語対応
