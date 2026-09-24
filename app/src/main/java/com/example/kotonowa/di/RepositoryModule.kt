@@ -2,9 +2,11 @@ package com.example.kotonowa.di
 
 import com.example.kotonowa.data.local.ReminderSchedulerImpl
 import com.example.kotonowa.data.repository.AuthRepositoryImpl
+import com.example.kotonowa.data.repository.CalendarRepositoryImpl
 import com.example.kotonowa.data.repository.ScheduleRepositoryImpl
 import com.example.kotonowa.data.repository.UserRepositoryImpl
 import com.example.kotonowa.domain.repository.AuthRepository
+import com.example.kotonowa.domain.repository.CalendarRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.example.kotonowa.domain.repository.UserRepository
@@ -43,4 +45,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUserRepositoryImpl(impl: UserRepositoryImpl): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCalendarRepository(impl: CalendarRepositoryImpl): CalendarRepository
 }

@@ -2129,6 +2129,79 @@ snapshot.documents.firstOrNull()?.toUser()
 `firstOrNull()` は手元に届いた後で 1 つ目を取る作業。**場所が違う**
 （`limit` が無いと一致する全員ぶん通信してから 1 人だけ使うことになり、無駄）。
 
+### (111) enum の `.name` と `valueOf()` — 名前の文字と行き来する
+
+`enum class` は「自分の名前の文字」を最初から持っている。変換表を自分で書く必要はない。
+
+```kotlin
+MemberRole.EDITOR.name            // → "EDITOR"（文字）
+MemberRole.valueOf("EDITOR")      // → MemberRole.EDITOR（型に戻す）
+```
+
+Firestore やセキュリティルールは Kotlin の型を知らないので、保存するときは文字に直す。
+このアプリはルール側を小文字（`role == 'editor'`）で書くので、前後に変換を挟む。
+
+```kotlin
+"role" to role.name.lowercase()                  // 保存：EDITOR → "editor"
+MemberRole.valueOf(text.uppercase())             // 読み込み："editor" → EDITOR
+```
+
+⚠️ **`valueOf` は知らない名前を渡すと例外を投げる**（`IllegalArgumentException`）。
+Firestore に `"admin"` のような 3 つに無い文字が入っていたら落ちる。data 層の
+`try`/`catch`（§6-㉔）で受け止めて `Result.failure` に変えるか、
+`runCatching { }.getOrNull()`（§4-(56)）で「読めない 1 件は捨てる」扱いにする。
+
+💡 `toScheduleItem()` で `when (getString("type"))` の `else -> throw` を書いたのと同じ備え。
+**外から来た文字は、いつでも想定外でありうる。**
+
+### (112) `runBatch { }` — 2 か所以上を「まとめて 1 回で」書く
+
+```kotlin
+firestore.runBatch { batch ->
+    batch.set(calendarDoc, ...)   // ① 部屋の書類
+    batch.set(ownerDoc, ...)      // ② 名簿の行
+}.await()
+```
+
+`batch`（バッチ）＝「ひとまとめ」。**全部成功するか、全部書かれないかのどちらか**になる。
+
+**なぜ要るか。** 部屋を作る処理は「部屋の書類」と「名簿の行」の 2 か所に書く。
+別々に書くと、1 つ目の直後に通信が切れたとき**誰も入っていない部屋**が残る。
+`runBatch` ならそういう中途半端な状態が生まれない。
+
+| 書き方 | 途中で失敗したら |
+|---|---|
+| `set()` を 2 回続けて呼ぶ | 1 つ目だけ書かれた状態が残る |
+| `runBatch { }` | **何も書かれない**（巻き戻る） |
+
+`batch.set` / `batch.update` / `batch.delete` が使える。`batch.` から呼ぶものには
+`.await()` を付けない（「予約」しているだけで、実際に送るのは `runBatch` 全体が終わるとき）。
+
+⚠️ 1 回のバッチに入れられるのは 500 件まで。
+
+### (113) 配列のフィールド（`arrayUnion` / `arrayRemove` / `whereArrayContains`）
+
+Firestore は「文字の一覧」を 1 つのフィールドに持てる。このアプリでは
+`calendars.memberUids`（入っている人の uid の一覧）がそれ（要件定義書 §4）。
+
+```kotlin
+// 足す（既に入っていれば何も起きない）
+batch.update(calendarDoc, "memberUids", FieldValue.arrayUnion(uid))
+
+// 外す
+batch.update(calendarDoc, "memberUids", FieldValue.arrayRemove(uid))
+
+// 「その uid が入っている書類」を探す
+firestore.collection("calendars").whereArrayContains("memberUids", uid)
+```
+
+**`FieldValue.arrayUnion` は「配列に足して」という命令そのものを値として渡す書き方。**
+自分で配列を読み出して、足して、書き戻す必要がない（その間に他の人が書き込むと
+消えてしまう＝競合が起きる。`arrayUnion` ならサーバー側で足すので安全）。
+
+⚠️ `whereArrayContains` は **1 つのクエリに 1 回しか使えない**。また
+別のフィールドでの並べ替え（`orderBy`）と組み合わせると複合インデックスが要る。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
