@@ -3,6 +3,7 @@ package com.example.kotonowa.presentation.auth.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.repository.AuthRepository
+import com.example.kotonowa.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
 
     // 外からは書き換えられないように、内部用(_uiState)と公開用(uiState)を分けている
@@ -48,7 +50,8 @@ class LoginViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             authRepository.login(current.email.trim(), current.password)
-                .onSuccess {
+                .onSuccess {user ->
+                    userRepository.saveUser(user)
                     _uiState.update { state ->
                         state.copy(isLoading = false, isLoginSuccess = true)
                     }
@@ -73,7 +76,8 @@ class LoginViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             authRepository.loginWithGoogle(idToken)
-                .onSuccess {
+                .onSuccess {user ->
+                    userRepository.saveUser(user)
                     _uiState.update { state ->
                         state.copy(isLoading = false, isLoginSuccess = true)
                     }

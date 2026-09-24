@@ -3,9 +3,11 @@ package com.example.kotonowa.di
 import com.example.kotonowa.data.local.ReminderSchedulerImpl
 import com.example.kotonowa.data.repository.AuthRepositoryImpl
 import com.example.kotonowa.data.repository.ScheduleRepositoryImpl
+import com.example.kotonowa.data.repository.UserRepositoryImpl
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
+import com.example.kotonowa.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -37,4 +39,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindReminderScheduler(impl: ReminderSchedulerImpl): ReminderScheduler
+
+    @Binds
+    @Singleton
+    abstract fun bindUserRepositoryImpl(impl: UserRepositoryImpl): UserRepository
 }
