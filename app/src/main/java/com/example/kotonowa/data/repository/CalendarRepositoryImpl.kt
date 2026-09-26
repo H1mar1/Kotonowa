@@ -1,14 +1,18 @@
 package com.example.kotonowa.data.repository
 
+import android.R
 import com.example.kotonowa.domain.model.Calendar
 import com.example.kotonowa.domain.model.CalendarMember
+import com.example.kotonowa.domain.model.CalendarType
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.sql.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.time.Instant
@@ -60,13 +64,48 @@ class CalendarRepositoryImpl @Inject constructor(
     // ---- 30-C ----------------------------------------------------------
 
     override fun observeMyCalendars(uid: String): Flow<List<Calendar>> = callbackFlow {
-        // TODO(Step 30-C)
-        TODO()
+
+        val registration = firestore.collection(COLLECTION_CALENDARS)
+            // memberUids に自分の uid が入っている書類だけに絞る（§4-(113)）
+            .whereArrayContains(FIELD_MEMBER_UIDS, uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                // 読めない 1 件は捨てる（runCatching + getOrNull。§4-(56)）
+                val calendars = snapshot?.documents
+                    ?.mapNotNull { doc -> runCatching { doc.toCalendar() }.getOrNull() }
+                    ?: emptyList()
+
+                trySend(calendars)
+            }
+
+        awaitClose { registration.remove() }
     }
 
     override fun observeMembers(calendarId: String): Flow<List<CalendarMember>> = callbackFlow {
-        // TODO(Step 30-C)
-        TODO()
+
+        // 名簿は部屋の書類の中のサブコレクション。collection → document → collection と降りる。
+        // 最後に .document(...) は付けない（その部屋の名簿を全部見張るため）
+        val registration = firestore.collection(COLLECTION_CALENDARS)
+            .document(calendarId)
+            .collection(SUBCOLLECTION_MEMBERS)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val members = snapshot?.documents
+                    ?.mapNotNull { doc -> runCatching { doc.toCalendarMember() }.getOrNull() }
+                    ?: emptyList()
+
+                trySend(members)
+            }
+
+        awaitClose { registration.remove() }
     }
 
     // ---- 30-D ----------------------------------------------------------
@@ -99,25 +138,48 @@ class CalendarRepositoryImpl @Inject constructor(
  * `memberUids` は domain の [Calendar] が持っていないので、**引数で受け取って足す**。
  * `type` は enum なので文字に直す（§4-(111)）。
  */
-private fun Calendar.toMap(memberUids: List<String>): Map<String, Any?> {
-    // TODO(Step 30-B)
-    TODO()
-}
+private fun Calendar.toMap(memberUids: List<String>): Map<String, Any?> = mapOf(
+    "id" to id,
+    "name" to name,
+    "ownerUid" to ownerUid,
+    "type" to type.name.lowercase(),        // enum は文字に直す（§4-(111)）
+    "color" to color,
+    "createdAt" to Date.from(createdAt),   // Instant は直接保存できない（お手本: ScheduleItem.toMap の updatedAt）
+    FIELD_MEMBER_UIDS to memberUids,
+)
 
 /** [CalendarMember] を Map に詰め替える。`role` は enum なので文字に直す（§4-(111)）。 */
-private fun CalendarMember.toMap(): Map<String, Any?> {
-    // TODO(Step 30-D)
-    TODO()
-}
+private fun CalendarMember.toMap(): Map<String, Any?> = mapOf(
+    "uid" to uid,
+    "role" to role.name.lowercase(),        // enum は文字に直す。Step 37 のルールが小文字で照合する
+    "joinedAt" to Date.from(joinedAt),    // Instant は直接保存できない
+    "invitedBy" to invitedBy,   // String? なのでそのまま（null はそのまま保存される）
+)
 
 /** Firestore の書類 1 件を [Calendar] に組み立て直す。`toUser()` と同じ形（§4-⑮、§6-㊺）。 */
-private fun DocumentSnapshot.toCalendar(): Calendar {
-    // TODO(Step 30-C)
-    TODO()
-}
+private fun DocumentSnapshot.toCalendar(): Calendar = Calendar(
+    // お手本は UserRepositoryImpl の toUser()。ただしこちらは「無くてよい項目」が無いので、
+    // 6 つとも ?: throw で守る（欠けていたら壊れたデータ）
+    id = getString("id") ?: throw IllegalStateException("idが入っていません"),
+    name = getString("name") ?: throw IllegalStateException("nameが入っていません"),
+    ownerUid = getString("ownerUid") ?: throw IllegalStateException("ownerUidが入っていません"),
+    // 文字から enum に戻す（§4-(111)）。"personal" → "PERSONAL" → CalendarType.PERSONAL
+    type = CalendarType.valueOf(
+        (getString("type") ?: throw IllegalStateException("typeが入っていません")).uppercase()
+    ),
+    color = getString("color") ?: throw IllegalStateException("colorが入っていません"),
+    createdAt = getDate("createdAt")?.toInstant()
+        ?: throw IllegalStateException("createdAtが入っていません"),
+)
 
 /** Firestore の書類 1 件を [CalendarMember] に組み立て直す。 */
-private fun DocumentSnapshot.toCalendarMember(): CalendarMember {
-    // TODO(Step 30-C)
-    TODO()
-}
+private fun DocumentSnapshot.toCalendarMember(): CalendarMember = CalendarMember(
+    uid = getString("uid") ?: throw IllegalStateException("uidが入っていません"),
+    role = MemberRole.valueOf(
+        (getString("role") ?: throw IllegalStateException("roleが入っていません")).uppercase()
+    ),
+    joinedAt = getDate("joinedAt")?.toInstant()
+        ?: throw IllegalStateException("joinedAtが入っていません"),
+    // invitedBy は「無いことがある」ので ?: throw を付けない（toUser の email と同じ）
+    invitedBy = getString("invitedBy"),
+)
