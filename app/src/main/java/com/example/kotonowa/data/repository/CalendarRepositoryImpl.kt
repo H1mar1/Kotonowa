@@ -7,6 +7,7 @@ import com.example.kotonowa.domain.model.CalendarType
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -110,23 +111,67 @@ class CalendarRepositoryImpl @Inject constructor(
 
     // ---- 30-D ----------------------------------------------------------
 
-    override suspend fun addMember(calendarId: String, member: CalendarMember): Result<Unit> {
-        // TODO(Step 30-D)
-        TODO()
+    override suspend fun addMember(calendarId: String, member: CalendarMember): Result<Unit> = try {
+
+        // 部屋の書類の住所（createCalendar の calenderDoc と同じ作り方。ただし id は引数から）
+        val calendarDoc = firestore.collection(COLLECTION_CALENDARS).document(calendarId)
+
+        // 名簿の中の、その人の行の住所
+        val memberDoc = calendarDoc.collection(SUBCOLLECTION_MEMBERS).document(member.uid)
+
+        firestore.runBatch { batch ->
+            // ① 名簿に行を書く。Firestore は Kotlin の型を知らないので toMap() で翻訳してから渡す
+            batch.set(memberDoc, member.toMap())
+
+            // ② 検索用の配列にも足す（§4-(113)）。①と②が片方だけ書かれないよう runBatch でまとめる
+            batch.update(calendarDoc, FIELD_MEMBER_UIDS, FieldValue.arrayUnion(member.uid))
+        }.await()
+
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
+    /**
+     * 肩書きだけを書き換える。人の出入りではないので `memberUids` は触らない。
+     * 1 か所しか書かないので `runBatch` も要らない。
+     */
     override suspend fun updateMemberRole(
         calendarId: String,
         uid: String,
         role: MemberRole,
-    ): Result<Unit> {
-        // TODO(Step 30-D)
-        TODO()
+    ): Result<Unit> = try {
+
+        firestore.collection(COLLECTION_CALENDARS)
+            .document(calendarId)
+            .collection(SUBCOLLECTION_MEMBERS)
+            .document(uid)
+            // 書類が無ければエラーにしたいので set ではなく update（要件定義書 §3.3 の表）。
+            // enum は文字に直す（§4-(111)）
+            .update("role",role.name.lowercase() )
+            .await()
+
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
-    override suspend fun removeMember(calendarId: String, uid: String): Result<Unit> {
-        // TODO(Step 30-D)
-        TODO()
+    override suspend fun removeMember(calendarId: String, uid: String): Result<Unit> = try {
+
+        val calendarDoc = firestore.collection(COLLECTION_CALENDARS).document(calendarId)
+        val memberDoc = calendarDoc.collection(SUBCOLLECTION_MEMBERS).document(uid)
+
+        firestore.runBatch { batch ->
+            // ① 名簿の行を消す
+            batch.delete(memberDoc)
+
+            // ② 検索用の配列からも外す（addMember の逆）
+            batch.update(calendarDoc, FIELD_MEMBER_UIDS, FieldValue.arrayRemove(uid))
+        }.await()
+
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 }
 
