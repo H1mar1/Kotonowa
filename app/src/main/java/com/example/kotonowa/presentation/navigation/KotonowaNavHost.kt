@@ -14,6 +14,7 @@ import com.example.kotonowa.presentation.auth.signup.SignUpScreen
 import com.example.kotonowa.presentation.calendar.CalendarScreen
 import com.example.kotonowa.presentation.calendar.detail.ScheduleDetailScreen
 import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
+import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
@@ -39,6 +40,8 @@ object Routes {
     const val SPLASH = "splash"
 
     const val SETTING = "setting"
+
+    const val CALENDAR_LIST = "calendar_list"
 }
 
 /**
@@ -95,7 +98,7 @@ fun KotonowaNavHost(
             CalendarScreen(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
                 onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },
-                onSetting = {navController.navigate(Routes.SETTING)},
+                onSetting = { navController.navigate(Routes.SETTING) },
             )
         }
 
@@ -164,7 +167,15 @@ fun KotonowaNavHost(
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.HOME) { inclusive = true }
                     }
-                }
+                },
+                onCalendarListClick = { navController.navigate(Routes.CALENDAR_LIST) },
+            )
+        }
+
+        composable(Routes.CALENDAR_LIST) {
+            CalendarListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onAddClick = { /* Step 32 で作成画面へ繋ぐ */ },
             )
         }
     }

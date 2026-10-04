@@ -90,7 +90,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 ## 現在の状態
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
-Step 27（ドメインモデル）と Step 28（`users` への自己登録）まで完了（2026-09-24）。
+Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -733,9 +733,9 @@ grammar §8-(99)。
 |---|---|---|
 | 27 | ドメインモデル（`Calendar` / `CalendarType` / `CalendarMember` / `MemberRole`） | ✅ 09-23 |
 | 28 | `users` コレクションへの自己登録（`UserRepository`） | ✅ 09-24 |
-| 29 | `CalendarRepository`（interface） | |
-| 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | |
-| 31 | カレンダー一覧画面 | |
+| 29 | `CalendarRepository`（interface） | ✅ 09-24 |
+| 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
+| 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
@@ -761,6 +761,69 @@ Phase 3 で `calendars/{uid}`（type=PERSONAL）を後から作れば既存デ�
 `request.auth.uid == resource.data.calendarId`（＝自分の uid の部屋だけ）なので、
 共有カレンダーを作った瞬間その中の予定は本人ですら読めなくなる。Step 37 で
 「`members/{自分のuid}` があるか、その `role` は何か」で判定する形に置き換える。
+
+#### Step 29 / 30（`CalendarRepository` と Firestore 実装）
+
+**「自分が入っているカレンダーの一覧」の取り方に C 案（`memberUids` 配列）を採用**（2026-09-24。
+詳細は `docs/requirements.md` §4）。`members` はサブコレクションなので**子から親を逆引きできない**。
+コレクショングループ検索（案A）だと名簿の行しか返らず部屋の情報を取りに行く通信が部屋の数だけ増える。
+C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の情報ごと返り、
+セキュリティルールも `allow read: if request.auth.uid in resource.data.memberUids;` の 1 行で書ける。
+
+⚠️ **`memberUids` は Kotlin の `Calendar` に持たせない。** 名簿に誰が載っているかを写しただけの
+重複情報なので、`events` の `type` / `sortAt` と同じく data 層だけで面倒を見る。
+両方をモデルに持たせると「名簿には居るのに配列には居ない」矛盾を画面側から作れてしまう。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 30-A | 骨組み・定数・変換係の器 | ✅ |
+| 30-B | `createCalendar` ＋ `Calendar.toMap` / `CalendarMember.toMap` | ✅ 09-24 |
+| 30-C | `observeMyCalendars` / `observeMembers` ＋ `toCalendar` / `toCalendarMember` | ✅ 09-27 |
+| 30-D | `addMember` / `updateMemberRole` / `removeMember` | ✅ 09-28 |
+
+**`runBatch` で「名簿」と「配列」を必ず同時に書く**（grammar §4-(112)）。片方だけ書かれると、
+名簿にだけ居る人は**自分の一覧にそのカレンダーが出ず**、配列にだけ居る人は**肩書きが無くルールに弾かれる**。
+`createCalendar`（部屋＋オーナーの行）、`addMember`、`removeMember` の 3 つが対象。
+`updateMemberRole` は人の出入りではないので配列を触らず、`runBatch` も要らない。
+
+**enum は境界で文字に変換する**（grammar §4-(111)）。保存は `role.name.lowercase()`、
+読み込みは `MemberRole.valueOf(文字.uppercase())`。Step 37 のルールが `role == 'owner'` と
+小文字で照合するため。
+
+**翻訳に失敗した 1 件は `runCatching { }.getOrNull()` で捨てる。** 壊れたデータ 1 件で
+一覧が丸ごと出なくなるのを防ぐ（`observeItems` と同じ方針）。
+
+⚠️ **Firestore の API は `Any` を受け取るので、コンパイラが間違いを素通しする。**
+実際に `batch.set(memberDoc, calendarDoc)`（名簿の行に部屋の住所を書く）と
+`.update("role", "role" to ...)`（値ではなくペアを渡す）の 2 つがビルドを通ってしまった。
+どちらも実行時に壊れ、原因を追いにくい。**Firestore に渡す直前の行は声に出して読む**こと。
+`trySend` が型違いを止めてくれたのは `Flow<List<Calendar>>` と具体的に書いていたから。
+
+⚠️ **`to〇〇()` は 2 方向あり、`this` が誰かで書き方が変わる。**
+`Calendar.toMap()` の中では `name` と名前だけで書けるが（§4-㊲）、
+`DocumentSnapshot.toCalendar()` の中では `getString("name")` になる。
+関数の 1 行目を見て「今どちらの中にいるか」を確かめてから書く。
+
+#### Step 31（カレンダー一覧画面）
+
+設定 →「カレンダー」で `presentation/calendarlist/` の一覧を開く。`CalendarListViewModel` は
+`init` で `observeMyCalendars(uid)` を 1 回 collect するだけ（月の移動が無いので `observeJob` は持たない）。
+`CalendarListUiState.isLoading` は `true` 始まり。一覧の「＋」は Step 32 で作成画面へ繋ぐ（今は空の `{ }`）。
+
+**Firestore ルールに `calendars` の読み取りを追加（2026-10-04）。** ルールの無いパスは拒否されるため。
+
+```
+match /calendars/{calendarId} {
+  allow read: if request.auth != null
+    && request.auth.uid in resource.data.memberUids;
+}
+```
+
+書き込みは Step 32（作成）・Step 37（ロールベース）で足す。`calendars` の書類はまだ 1 件も無いので、
+一覧は「カレンダーがまだありません」と出るのが正しい。
+
+⚠️ **行の名前に `calendar.ownerUid` を渡しても型が `String` 同士なのでビルドが通る。**
+一覧に uid が出るだけで気づきにくい（Step 19-D の取り違えと同じ種類）。Preview で目視確認する。
 
 #### Step 28（`users` への自己登録）
 
