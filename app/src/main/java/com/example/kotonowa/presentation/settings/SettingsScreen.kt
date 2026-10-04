@@ -32,6 +32,7 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onLoggedOut: () -> Unit,
+    onCalendarListClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -42,6 +43,7 @@ fun SettingsScreen(
             viewModel.logout()
             onLoggedOut()
         },
+        onCalendarListClick = onCalendarListClick,
         modifier = modifier,
     )
 }
@@ -55,7 +57,9 @@ private fun SettingsContent(
     user: User?,
     onNavigateBack: () -> Unit,
     onLogoutClick: () -> Unit,
+    onCalendarListClick: () -> Unit,
     modifier: Modifier = Modifier,
+
 ) {
     Scaffold(
         modifier = modifier,
@@ -85,6 +89,11 @@ private fun SettingsContent(
 
             // ★5 メールアドレス。★4 と同じ形で、見る先を email に変えるだけ
             Text(user?.email ?: "メールアドレス不明")
+
+            TextButton(onClick = onCalendarListClick,
+                modifier= Modifier.fillMaxWidth(),) {
+                Text("カレンダー",modifier= Modifier.weight(1f))
+            }
 
             // --- 通知設定（準備中） ---
             // ★6 押せない状態にする。中身が無いので、押して空振りさせない（Step 21 の enabled と同じ）
@@ -119,6 +128,7 @@ private fun SettingsContentPreview() {
             ),
             onNavigateBack = {},
             onLogoutClick = {},
+            onCalendarListClick = {},
         )
     }
 }

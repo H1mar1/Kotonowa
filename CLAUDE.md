@@ -90,7 +90,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 ## 現在の状態
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
-Step 27（ドメインモデル）と Step 28（`users` への自己登録）まで完了（2026-09-24）。
+Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -735,7 +735,7 @@ grammar §8-(99)。
 | 28 | `users` コレクションへの自己登録（`UserRepository`） | ✅ 09-24 |
 | 29 | `CalendarRepository`（interface） | ✅ 09-24 |
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
-| 31 | カレンダー一覧画面 | |
+| 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
@@ -803,6 +803,27 @@ C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の�
 `Calendar.toMap()` の中では `name` と名前だけで書けるが（§4-㊲）、
 `DocumentSnapshot.toCalendar()` の中では `getString("name")` になる。
 関数の 1 行目を見て「今どちらの中にいるか」を確かめてから書く。
+
+#### Step 31（カレンダー一覧画面）
+
+設定 →「カレンダー」で `presentation/calendarlist/` の一覧を開く。`CalendarListViewModel` は
+`init` で `observeMyCalendars(uid)` を 1 回 collect するだけ（月の移動が無いので `observeJob` は持たない）。
+`CalendarListUiState.isLoading` は `true` 始まり。一覧の「＋」は Step 32 で作成画面へ繋ぐ（今は空の `{ }`）。
+
+**Firestore ルールに `calendars` の読み取りを追加（2026-10-04）。** ルールの無いパスは拒否されるため。
+
+```
+match /calendars/{calendarId} {
+  allow read: if request.auth != null
+    && request.auth.uid in resource.data.memberUids;
+}
+```
+
+書き込みは Step 32（作成）・Step 37（ロールベース）で足す。`calendars` の書類はまだ 1 件も無いので、
+一覧は「カレンダーがまだありません」と出るのが正しい。
+
+⚠️ **行の名前に `calendar.ownerUid` を渡しても型が `String` 同士なのでビルドが通る。**
+一覧に uid が出るだけで気づきにくい（Step 19-D の取り違えと同じ種類）。Preview で目視確認する。
 
 #### Step 28（`users` への自己登録）
 
