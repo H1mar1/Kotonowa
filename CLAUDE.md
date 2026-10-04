@@ -736,7 +736,7 @@ grammar §8-(99)。
 | 29 | `CalendarRepository`（interface） | ✅ 09-24 |
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
-| 32 | カレンダー作成画面 | |
+| 32 | カレンダー作成画面 | 🔧 32-C の穴埋め中 |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
@@ -803,6 +803,29 @@ C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の�
 `Calendar.toMap()` の中では `name` と名前だけで書けるが（§4-㊲）、
 `DocumentSnapshot.toCalendar()` の中では `getString("name")` になる。
 関数の 1 行目を見て「今どちらの中にいるか」を確かめてから書く。
+
+#### Step 32 の内訳（カレンダー作成画面）
+
+`presentation/calendarlist/create/`。お手本は Step 17 の予定作成画面（作成モードだけの縮小版）。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 32-A | `CalendarCreateUiState`（name / color / isSaving / isSaved / errorMessage） | ✅ 10-04 |
+| 32-B | `CalendarCreateViewModel`（`onNameChange` / `onColorChange` / `save()`） | ✅ 10-04 |
+| 32-C | `CalendarCreateScreen`（入力欄・色の丸 ×5・保存/戻る・Preview 2 つ） | 🔧 骨組みのみ（`____` 8 か所）。**ビルドは通らない状態でコミット** |
+| 32-D | `Routes` ＋ `NavHost` に登録し、一覧の「＋」から開く | |
+| 32-E | Firestore ルールに `calendars` / `members` の `create` を追加 | |
+| 32-F | 実機確認（保存 → 一覧に 1 行増える） | |
+
+**色は自由入力にせず `CALENDAR_COLORS`（5 色の文字列）から選ばせる。** `color` の既定値は
+`CALENDAR_COLORS.first()` で、「色が無いカレンダー」を最初から作れないようにしている。
+表示の直前だけ `Color(hex.toColorInt())` で変換する（grammar §3-(115)）。
+
+⚠️ **共有カレンダーの `id` は UUID。`uid` を入れてはいけない。** 個人カレンダーの id ＝ uid なので、
+共有カレンダーまで uid にすると Phase 2 の予定が全部その中身として扱われる。`type` は `SHARED`。
+
+💡 `CalendarRepositoryImpl.kt` の先頭に未使用の `import android.R` と `import java.sql.Date` が残っている。
+`createCalendar` が初めて動く 32-E〜F で見直す。
 
 #### Step 31（カレンダー一覧画面）
 
