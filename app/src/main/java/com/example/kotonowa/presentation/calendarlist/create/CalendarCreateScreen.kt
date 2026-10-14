@@ -47,15 +47,15 @@ fun CalendarCreateScreen(
 
     // TODO(32-C-1) 保存が終わった旗を見張り、立ったら呼び鈴を鳴らす（§3-⑬）
     LaunchedEffect(uiState.isSaved) {
-        if (____) onSaved()
+        if (uiState.isSaved) onSaved()
     }
 
     // TODO(32-C-1) ViewModel の関数を、Content の呼び鈴に繋ぐ（§4-⑲）
     CalendarCreateContent(
         uiState = uiState,
-        onNameChange = ____,
-        onColorChange = ____,
-        onSaveClick = ____,
+        onNameChange = viewModel::onNameChange,
+        onColorChange = viewModel::onColorChange,
+        onSaveClick = viewModel::save,
         onNavigateBack = onNavigateBack,
         modifier = modifier,
     )
@@ -83,8 +83,8 @@ private fun CalendarCreateContent(
 
         // TODO(32-C-2) 名前の入力欄。部品は状態を持たない（§3-(76)）
         OutlinedTextField(
-            value = ____,
-            onValueChange = ____,
+            value = uiState.name,
+            onValueChange = onNameChange,
             label = { Text("名前") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -95,10 +95,10 @@ private fun CalendarCreateContent(
         // TODO(32-C-3) 色の候補を 1 つずつ丸にして横に並べる（§4-(114)）
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CALENDAR_COLORS.forEach { hex ->
-                val isSelected = ____
+                val isSelected = hex==uiState.color
 
                 Surface(
-                    onClick = { ____ },                    // §3-(116)
+                    onClick = {onColorChange(hex) },                    // §3-(116)
                     shape = CircleShape,
                     color = Color(hex.toColorInt()),       // §3-(115)
                     border = if (isSelected) {
@@ -119,7 +119,7 @@ private fun CalendarCreateContent(
         // TODO(32-C-4) 通信中は押せなくする
         Button(
             onClick = onSaveClick,
-            enabled = ____,
+            enabled = !uiState.isSaving,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("保存")
