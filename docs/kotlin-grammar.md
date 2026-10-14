@@ -1182,6 +1182,45 @@ Step 18-A で `Card` を押せる版に替えたのと同じ仕組み。
 
 最後の `{ }` は板の**中身**。色の丸は中に何も置かないので空にする（省略はできない）。
 
+### (117) 画面遷移の 3 点セット（`Routes` の `const val` ／ `composable(…) { }` ／ `navigate` ・ `popBackStack`）
+
+```kotlin
+object Routes {
+    const val CALENDAR_CREATE = "calendar_create"
+}
+
+composable(Routes.CALENDAR_CREATE) {                 // ① この住所に来たら
+    CalendarCreateScreen(                            //    この画面を出す
+        onSaved = { navController.popBackStack() },  // ③ 1 枚前に戻る
+    )
+}
+
+onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) }  // ② この住所へ行く
+```
+
+Phase 1 から使っていたが、まとめて説明していなかったのでここに記録する（2026-10-14、Step 32-D）。
+
+| 部品 | たとえ | 何をしているか |
+|---|---|---|
+| `object Routes` | 住所録 | `object`（オブジェクト）は「アプリ全体で 1 つしか作られない入れ物」。`class` と違って `Routes()` と作る必要がなく、いきなり `Routes.〇〇` と読める。画面の住所（ルート）を書き並べる |
+| `const val 名前 = "文字"` | 住所録の 1 行 | `const`（コンスト＝constant・定数）は「アプリを作る時点で中身が決まっていて、二度と変わらない」印。`val` よりさらに固い |
+| `composable(住所) { 画面 }` | 地図に「この住所にはこの建物」と書く | `NavHost { }` の中に並べる。`{ }` の中身は、その住所に来たときに描く画面（§1-⑥ のラムダ） |
+| `navController.navigate(住所)` | その住所へ行く | 新しい画面を履歴の**上に積む**。`.` は「〜の」なので「案内係の、行く」 |
+| `navController.popBackStack()` | 1 枚前に戻る | 履歴のいちばん上を**捨てる**。下にあった画面が見える。端末の「戻る」ボタンと同じ |
+
+**なぜ文字を直接書かず `Routes.〇〇` を使うのか。** `navigate("calender_create")` のように
+綴りを間違えても、文字はただの文字なのでコンパイラは気づかず、**実行して押した瞬間に落ちる**。
+`Routes.CALENDAR_CREATE` なら、綴りを間違えた時点で「そんな名前は無い」とコンパイルエラーになる。
+住所を 1 か所に書いておけば、行く側（`navigate`）と受ける側（`composable`）で食い違うこともない。
+
+**大文字の名前**（`CALENDAR_CREATE`）は「変わらない値」の慣習（§1-⑧ とは別の、定数のための書き方）。
+単語の区切りは `_`（アンダースコア）。
+
+**履歴は積み木。** `navigate` で積み、`popBackStack` で 1 つ下ろす。
+`[HOME] → [SETTING] → [CALENDAR_LIST] → [CALENDAR_CREATE]` の状態で `popBackStack()` すると
+一覧（`CALENDAR_LIST`）に戻る。ログアウトで使う `popUpTo(…) { inclusive = true }` は
+「そこまでまとめて下ろす」版（Step 22）。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子

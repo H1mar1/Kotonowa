@@ -15,6 +15,7 @@ import com.example.kotonowa.presentation.calendar.CalendarScreen
 import com.example.kotonowa.presentation.calendar.detail.ScheduleDetailScreen
 import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
+import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
@@ -42,6 +43,9 @@ object Routes {
     const val SETTING = "setting"
 
     const val CALENDAR_LIST = "calendar_list"
+
+    // TODO(32-D-1) カレンダー作成画面の住所（grammar §3-(117)）
+    const val CALENDAR_CREATE = "calendar_create"
 }
 
 /**
@@ -175,7 +179,16 @@ fun KotonowaNavHost(
         composable(Routes.CALENDAR_LIST) {
             CalendarListScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onAddClick = { /* Step 32 で作成画面へ繋ぐ */ },
+                // TODO(32-D-2) 「＋」が押されたら作成画面の住所へ行く（§3-(117)）
+                onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
+            )
+        }
+
+        // TODO(32-D-3) 作成画面を地図に登録する。保存しても戻っても一覧へ 1 枚戻す（§3-(117)）
+        composable(Routes.CALENDAR_CREATE) {
+            CalendarCreateScreen(
+                onSaved = { navController.popBackStack() },
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }
