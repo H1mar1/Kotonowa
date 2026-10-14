@@ -740,7 +740,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-B から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -862,6 +862,34 @@ match /calendars/{calendarId} {
 💡 `CalendarRepositoryImpl.kt` の `import java.sql.Date`（データベース接続用の別物）を `java.util.Date` に直し、
 未使用の `import android.R` を削除した（2026-10-14）。`Date.from` は親の `java.util.Date` から受け継いでいるので、
 `java.sql` のままでも動いてしまっていた。
+
+#### Step 33 の内訳（表示するカレンダーの切り替え）
+
+**設計（2026-10-14 にユーザーが選択）。**
+- 「今どのカレンダーを表示しているか」は**掲示板**（`SelectedCalendarRepository`。`@Singleton` でアプリに 1 枚）に貼る。
+  ホームは見張って購読を張り直し、作成画面は保存時に 1 回読む。画面の住所（`home/{calendarId}`）に載せる案は、
+  全部の住所に `calendarId` を通す配管が増えるため不採用。アプリを閉じると個人に戻る（保存はしない）。
+- 掲示板が**白紙（`null`）＝個人カレンダー**。個人カレンダーは `calendars` の書類を持たないため。
+- 一覧の先頭に「マイカレンダー」を**画面側で固定の行**として出す。`calendars/{uid}` の書類は作らない
+  （「無ければ作る」の確認が今のルールでは拒否される／Phase 2 のデータとルールをそのまま使える）。
+- ⚠️ **ログアウト時に掲示板を白紙に戻す。** `@Singleton` はログアウトしても生き残るので、戻さないと
+  次にログインした人のホームが前の人の共有カレンダーを開こうとする。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
+| 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | |
+| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | |
+| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
+| 33-E | ログアウトで掲示板を白紙に戻す | |
+| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
+| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
+
+**33-A で踏んだところ（2026-10-14）。** 約束側の型に `CalendarUiState`（ホーム画面の状態の箱）を書き、
+domain から presentation を `import` してしまった。`Calendar`（カレンダー 1 つ）と名前が似ているので注意。
+**domain のファイルに `presentation` の import が入っていたら、依存の向きが逆になっている印。**
+`clear()` に `MutableStateFlow<Calendar?>(null)` を丸ごと書いたのも同じ回。`.value =` の右は**中身（`null`）**で、
+掲示板そのものではない。
 
 #### Step 31（カレンダー一覧画面）
 

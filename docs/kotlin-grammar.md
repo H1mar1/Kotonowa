@@ -2333,6 +2333,42 @@ Kotlin 側のチェックを迂回されても止められる（Step 18 直後�
 **`resource` と `request.resource` の取り違えが一番起きやすい。** 作成（`create`）では「今ある書類」が無いので、
 `resource.data` を使うと必ず拒否される（エラーは `PERMISSION_DENIED` しか出ず、理由は教えてくれない）。
 
+### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
+
+```kotlin
+@Singleton
+class SelectedCalendarRepositoryImpl @Inject constructor() : SelectedCalendarRepository {
+    private val _selected = MutableStateFlow<Calendar?>(null)
+    override val selected: StateFlow<Calendar?> = _selected.asStateFlow()
+
+    override fun select(calendar: Calendar?) {
+        _selected.value = calendar
+    }
+}
+```
+
+2026-10-14、Step 33-A で記録。
+
+**`@Singleton`（シングルトン＝ただ 1 つ）。** Hilt に「このクラスは**アプリ全体で 1 つだけ**作り、
+欲しがる人みんなに**同じもの**を配って」と頼む印。付けないと、頼まれるたびに新しく作って渡す。
+掲示板の場合、ホームと作成画面に**別々の**掲示板が配られると、ホームで貼った紙が作成画面から見えない。
+`RepositoryModule` の `@Binds` の上にも付いているのは同じ理由（窓口の人を 1 人に決める）。
+`@Inject constructor()` の `()` が空なのは、材料（他の Repository など）が何も要らないから。
+
+**`MutableStateFlow<Calendar?>(null)` の `< >`。** 普段は `MutableStateFlow(LoginUiState())` のように
+初期値から型を推測してもらえる（§4-(58)）。ところが初期値が `null` だと、Kotlin は
+「何の型の空っぽなのか」が分からない。そこで `<Calendar?>` と**型を明示**する。
+`< >` は「中に入れるものの型」の指定で、`List<String>` の `< >` と同じ読み方。
+
+**`.value = 新しい値` と `.update { }` の使い分け。**
+
+| 書き方 | 使う場面 |
+|---|---|
+| `_uiState.update { it.copy(name = …) }` | 今の値の**一部だけ**変える（`copy` で残りを引き継ぐ） |
+| `_selected.value = calendar` | 今の値を**丸ごと**取り替える。前の値を見る必要が無い |
+
+掲示板は「貼ってある紙を新しい紙に替える」だけで、前の紙の一部を残す必要が無いので `.value =` で足りる。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
