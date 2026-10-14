@@ -17,6 +17,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
   新しい画面や層を足すとき、フォルダを切ってファイルを置くところまでは Claude の担当。
   ただし**中身は骨組みと穴埋め（`____`）まで**で、埋めるのはユーザー。
 - 勝手に中身まで書いて完成させない。ユーザーが「書いて」と明示したときだけ実装する。
+- **Firestore のセキュリティルールは例外で、Claude が完成形を書く**（2026-10-14 にユーザーが指示）。
+  ユーザーは 1 行ずつの解説（grammar §4-(118)）で理解する。Kotlin のコードは引き続き穴埋め。
 - 出すのは**空の骨組みと `TODO` コメント、穴埋めの `____`**まで。中身のロジックはユーザーが書く。
 - ユーザーが書いたコードのレビュー、エラーの原因説明、詰まったときのヒント出しは積極的に行う。答えを即出しせず、まずヒントから。
 
@@ -91,7 +93,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
-Step 32-C（作成画面の見た目）・32-D（一覧の「＋」から開く）完了（2026-10-14）。
+Step 32（カレンダー作成画面）完了（2026-10-14）。次は Step 33（表示するカレンダーの切り替え）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -737,8 +739,8 @@ grammar §8-(99)。
 | 29 | `CalendarRepository`（interface） | ✅ 09-24 |
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
-| 32 | カレンダー作成画面 | 🔧 32-E（ルール）から |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
+| 32 | カレンダー作成画面 | ✅ 10-14 |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-B から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -815,8 +817,8 @@ C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の�
 | 32-B | `CalendarCreateViewModel`（`onNameChange` / `onColorChange` / `save()`） | ✅ 10-04 |
 | 32-C | `CalendarCreateScreen`（入力欄・色の丸 ×5・保存/戻る・Preview 2 つ） | ✅ 10-14 |
 | 32-D | `Routes` ＋ `NavHost` に登録し、一覧の「＋」から開く | ✅ 10-14 |
-| 32-E | Firestore ルールに `calendars` / `members` の `create` を追加 | |
-| 32-F | 実機確認（保存 → 一覧に 1 行増える） | |
+| 32-E | Firestore ルールに `calendars` / `members` の `create` を追加 | ✅ 10-14 |
+| 32-F | 実機確認（保存 → 一覧に 1 行増える） | ✅ 10-14 |
 
 **色は自由入力にせず `CALENDAR_COLORS`（5 色の文字列）から選ばせる。** `color` の既定値は
 `CALENDAR_COLORS.first()` で、「色が無いカレンダー」を最初から作れないようにしている。
@@ -829,8 +831,65 @@ C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の�
 ⚠️ **共有カレンダーの `id` は UUID。`uid` を入れてはいけない。** 個人カレンダーの id ＝ uid なので、
 共有カレンダーまで uid にすると Phase 2 の予定が全部その中身として扱われる。`type` は `SHARED`。
 
-💡 `CalendarRepositoryImpl.kt` の先頭に未使用の `import android.R` と `import java.sql.Date` が残っている。
-`createCalendar` が初めて動く 32-E〜F で見直す。
+**Firestore ルールに `calendars` の `create` と `members` の `create` を追加（2026-10-14 適用）。**
+
+```
+match /calendars/{calendarId} {
+  allow read: if request.auth != null
+    && request.auth.uid in resource.data.memberUids;
+
+  allow create: if request.auth != null
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.memberUids == [request.auth.uid]
+    && request.resource.data.id == calendarId;
+
+  match /members/{memberUid} {
+    allow create: if request.auth != null
+      && memberUid == request.auth.uid
+      && request.resource.data.role == 'owner'
+      && getAfter(/databases/$(database)/documents/calendars/$(calendarId)).data.ownerUid
+           == request.auth.uid;
+  }
+}
+```
+
+作成時は「オーナーは自分・`memberUids` は自分だけ・住所と中身の id が一致」。名簿の行は
+「自分の行・`'owner'`・部屋の `ownerUid` が自分」。最後の条件が無いと、**他人のカレンダーに
+自分をオーナーとして書き足せてしまう**（乗っ取り）。部屋と名簿は `runBatch` で同時に書かれるので、
+部屋の確認は `get` ではなく **`getAfter`**（書き込み後の状態を読む）でないと必ず拒否される（grammar §4-(118)）。
+部屋の `update` / `delete`、名簿の `read`、招待による他人の追加は**まだ拒否される**（Step 34 / 37 で開ける）。
+
+💡 `CalendarRepositoryImpl.kt` の `import java.sql.Date`（データベース接続用の別物）を `java.util.Date` に直し、
+未使用の `import android.R` を削除した（2026-10-14）。`Date.from` は親の `java.util.Date` から受け継いでいるので、
+`java.sql` のままでも動いてしまっていた。
+
+#### Step 33 の内訳（表示するカレンダーの切り替え）
+
+**設計（2026-10-14 にユーザーが選択）。**
+- 「今どのカレンダーを表示しているか」は**掲示板**（`SelectedCalendarRepository`。`@Singleton` でアプリに 1 枚）に貼る。
+  ホームは見張って購読を張り直し、作成画面は保存時に 1 回読む。画面の住所（`home/{calendarId}`）に載せる案は、
+  全部の住所に `calendarId` を通す配管が増えるため不採用。アプリを閉じると個人に戻る（保存はしない）。
+- 掲示板が**白紙（`null`）＝個人カレンダー**。個人カレンダーは `calendars` の書類を持たないため。
+- 一覧の先頭に「マイカレンダー」を**画面側で固定の行**として出す。`calendars/{uid}` の書類は作らない
+  （「無ければ作る」の確認が今のルールでは拒否される／Phase 2 のデータとルールをそのまま使える）。
+- ⚠️ **ログアウト時に掲示板を白紙に戻す。** `@Singleton` はログアウトしても生き残るので、戻さないと
+  次にログインした人のホームが前の人の共有カレンダーを開こうとする。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
+| 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | |
+| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | |
+| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
+| 33-E | ログアウトで掲示板を白紙に戻す | |
+| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
+| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
+
+**33-A で踏んだところ（2026-10-14）。** 約束側の型に `CalendarUiState`（ホーム画面の状態の箱）を書き、
+domain から presentation を `import` してしまった。`Calendar`（カレンダー 1 つ）と名前が似ているので注意。
+**domain のファイルに `presentation` の import が入っていたら、依存の向きが逆になっている印。**
+`clear()` に `MutableStateFlow<Calendar?>(null)` を丸ごと書いたのも同じ回。`.value =` の右は**中身（`null`）**で、
+掲示板そのものではない。
 
 #### Step 31（カレンダー一覧画面）
 

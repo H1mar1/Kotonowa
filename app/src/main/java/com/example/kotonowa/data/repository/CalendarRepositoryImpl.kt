@@ -1,6 +1,5 @@
 package com.example.kotonowa.data.repository
 
-import android.R
 import com.example.kotonowa.domain.model.Calendar
 import com.example.kotonowa.domain.model.CalendarMember
 import com.example.kotonowa.domain.model.CalendarType
@@ -13,7 +12,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.sql.Date
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.time.Instant

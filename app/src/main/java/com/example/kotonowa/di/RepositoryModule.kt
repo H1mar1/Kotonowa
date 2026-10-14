@@ -1,6 +1,7 @@
 package com.example.kotonowa.di
 
 import com.example.kotonowa.data.local.ReminderSchedulerImpl
+import com.example.kotonowa.data.local.SelectedCalendarRepositoryImpl
 import com.example.kotonowa.data.repository.AuthRepositoryImpl
 import com.example.kotonowa.data.repository.CalendarRepositoryImpl
 import com.example.kotonowa.data.repository.ScheduleRepositoryImpl
@@ -9,6 +10,7 @@ import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
+import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import com.example.kotonowa.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -49,4 +51,9 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCalendarRepository(impl: CalendarRepositoryImpl): CalendarRepository
+
+    // TODO(33-A-3) 掲示板の約束を頼まれたら、実装を渡す（上の 5 つと同じ形）
+    @Binds
+    @Singleton
+    abstract fun bindSelectedCalendarRepository(impl: SelectedCalendarRepositoryImpl): SelectedCalendarRepository
 }
