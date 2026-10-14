@@ -2299,6 +2299,40 @@ Compose では `Row { }` / `Column { }` の中で `forEach` すると、**リス
 `{ hex -> … }` の `hex ->` は、1 つずつ渡される値に付けた名前（§1-㊿）。
 省略すると `it` になるが、入れ子で `it` が隠れる（§1-(73)）ので名前を付ける方が安全。
 
+### (118) Firestore セキュリティルールの読み方（Kotlin ではない、サーバー側の門番の言葉）
+
+```
+match /calendars/{calendarId} {
+  allow create: if request.auth != null
+    && request.resource.data.ownerUid == request.auth.uid;
+
+  match /members/{memberUid} {
+    allow create: if getAfter(/databases/$(database)/documents/calendars/$(calendarId)).data.ownerUid
+      == request.auth.uid;
+  }
+}
+```
+
+Firebase コンソールの「ルール」タブに書く。アプリの中ではなく **Firestore のサーバー側で動く門番**なので、
+Kotlin 側のチェックを迂回されても止められる（Step 18 直後の記述）。2026-10-14、Step 32-E で記録。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `match /calendars/{calendarId}` | 「この住所の書類について」 | `{ }` の部分は**何でもよい**の印で、来た id が `calendarId` という名前で使える（Kotlin の `{itemId}` ルートと同じ考え方） |
+| `match` の中の `match` | 「その下の住所について」 | サブコレクション `calendars/{id}/members/{uid}` を表す。外の `calendarId` も中から使える |
+| `allow 動作: if 条件;` | 「条件を満たせば許す」 | 動作は `read` / `create` / `update` / `delete`。**どの `allow` にも当たらなければ拒否** |
+| `request.auth.uid` | 「頼んできた人の uid」 | ログインしていなければ `request.auth` 自体が `null` |
+| `resource.data.〇〇` | 「**今ある**書類の〇〇」 | 読む・書き換える・消すときに使う。作成時は書類がまだ無いので使えない |
+| `request.resource.data.〇〇` | 「**これから書こうとしている**中身の〇〇」 | 作成・書き換えのときに使う |
+| `&&` / `==` / `in` | 「かつ」/「同じ」/「〜の中に入っている」 | Kotlin と同じ読み方 |
+| `[a]` | 「a だけが入ったリスト」 | Kotlin の `listOf(a)` |
+| `get(住所)` | 「別の書類を読みに行く」 | 書き込み**前**の状態を読む |
+| `getAfter(住所)` | 「この書き込みが**終わった後**の書類を読む」 | `runBatch`（§4-(112)）で一緒に書く書類はまだ存在しないので、`get` では見つからない。`getAfter` なら「一緒に書かれる予定の中身」が見える |
+| `$(変数)` | 「ここに変数の中身を差し込む」 | Kotlin の文字列の `$id` と同じ役目 |
+
+**`resource` と `request.resource` の取り違えが一番起きやすい。** 作成（`create`）では「今ある書類」が無いので、
+`resource.data` を使うと必ず拒否される（エラーは `PERMISSION_DENIED` しか出ず、理由は教えてくれない）。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
