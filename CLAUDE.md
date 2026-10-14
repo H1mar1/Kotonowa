@@ -91,7 +91,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
-Step 32-C（作成画面の見た目）完了（2026-10-14）。
+Step 32-C（作成画面の見た目）・32-D（一覧の「＋」から開く）完了（2026-10-14）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -737,7 +737,7 @@ grammar §8-(99)。
 | 29 | `CalendarRepository`（interface） | ✅ 09-24 |
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
-| 32 | カレンダー作成画面 | 🔧 32-D の穴埋め中 |
+| 32 | カレンダー作成画面 | 🔧 32-E（ルール）から |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
@@ -814,7 +814,7 @@ C 案なら `whereArrayContains("memberUids", uid)` の 1 クエリで部屋の�
 | 32-A | `CalendarCreateUiState`（name / color / isSaving / isSaved / errorMessage） | ✅ 10-04 |
 | 32-B | `CalendarCreateViewModel`（`onNameChange` / `onColorChange` / `save()`） | ✅ 10-04 |
 | 32-C | `CalendarCreateScreen`（入力欄・色の丸 ×5・保存/戻る・Preview 2 つ） | ✅ 10-14 |
-| 32-D | `Routes` ＋ `NavHost` に登録し、一覧の「＋」から開く | 🔧 骨組みのみ（`____` 5 か所） |
+| 32-D | `Routes` ＋ `NavHost` に登録し、一覧の「＋」から開く | ✅ 10-14 |
 | 32-E | Firestore ルールに `calendars` / `members` の `create` を追加 | |
 | 32-F | 実機確認（保存 → 一覧に 1 行増える） | |
 

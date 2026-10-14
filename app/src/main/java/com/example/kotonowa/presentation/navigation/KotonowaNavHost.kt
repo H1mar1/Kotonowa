@@ -45,7 +45,7 @@ object Routes {
     const val CALENDAR_LIST = "calendar_list"
 
     // TODO(32-D-1) カレンダー作成画面の住所（grammar §3-(117)）
-    const val CALENDAR_CREATE = ____
+    const val CALENDAR_CREATE = "calendar_create"
 }
 
 /**
@@ -180,15 +180,15 @@ fun KotonowaNavHost(
             CalendarListScreen(
                 onNavigateBack = { navController.popBackStack() },
                 // TODO(32-D-2) 「＋」が押されたら作成画面の住所へ行く（§3-(117)）
-                onAddClick = { ____ },
+                onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
             )
         }
 
         // TODO(32-D-3) 作成画面を地図に登録する。保存しても戻っても一覧へ 1 枚戻す（§3-(117)）
-        composable(____) {
+        composable(Routes.CALENDAR_CREATE) {
             CalendarCreateScreen(
-                onSaved = { ____ },
-                onNavigateBack = { ____ },
+                onSaved = { navController.popBackStack() },
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }
