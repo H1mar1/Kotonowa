@@ -2,8 +2,11 @@ package com.example.kotonowa.presentation.calendarlist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.kotonowa.domain.model.Calendar
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,7 @@ import javax.inject.Inject
 class CalendarListViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val calendarRepository: CalendarRepository,
+    private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarListUiState())
@@ -68,5 +72,14 @@ class CalendarListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * 行がタップされたカレンダーを掲示板に貼る。`null` は「マイカレンダー（個人）」。
+     * 画面遷移は知らない（呼び鈴を鳴らすのは画面の仕事。Step 22 / 25 の logout と同じ分担）。
+     */
+    fun selectCalendar(calendar: Calendar?) {
+        // TODO(33-B-1) 掲示板に貼る（33-A で作った select を呼ぶ
+        selectedCalendarRepository.select(calendar)
     }
 }

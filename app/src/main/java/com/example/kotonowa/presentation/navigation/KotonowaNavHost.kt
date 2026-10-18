@@ -181,6 +181,8 @@ fun KotonowaNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 // TODO(32-D-2) 「＋」が押されたら作成画面の住所へ行く（§3-(117)）
                 onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
+                // TODO(33-B-4) 選び終わったら、設定画面も飛ばしてホームまで一気に戻る（§3-(120)）
+                onCalendarSelected = { navController.popBackStack(Routes.HOME, inclusive = false) },
             )
         }
 
