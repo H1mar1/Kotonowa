@@ -740,7 +740,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-B から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-C から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -878,7 +878,7 @@ match /calendars/{calendarId} {
 | | 内容 | 状態 |
 |---|---|---|
 | 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
-| 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | |
+| 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | ✅ 10-18 |
 | 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | |
 | 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
 | 33-E | ログアウトで掲示板を白紙に戻す | |
@@ -890,6 +890,21 @@ domain から presentation を `import` してしまった。`Calendar`（カレ
 **domain のファイルに `presentation` の import が入っていたら、依存の向きが逆になっている印。**
 `clear()` に `MutableStateFlow<Calendar?>(null)` を丸ごと書いたのも同じ回。`.value =` の右は**中身（`null`）**で、
 掲示板そのものではない。
+
+**33-B。** 一覧の先頭に `PersonalCalendarRow`（固定の行。押すと `null`）、その下に共有カレンダー。
+空っぽの案内は `when` の枝から `LazyColumn` の中へ移した（マイカレンダーの行は 0 件でも出すため）。
+画面は `viewModel.selectCalendar(calendar)` → `onCalendarSelected()` の 2 行（Step 25 の logout と同じ形）。
+NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛ばしてホームへ戻す（grammar §3-(120)）。
+
+⚠️ **33-B で 3 回踏んだ「ビルドは通るのに何も起きない」書き方（2026-10-18）。** コンパイラは止めてくれない。
+
+| 書いたもの | 何が起きるか | 正しくは |
+|---|---|---|
+| `onCalendarSelected`（`()` 無し） | 呼び鈴を指さすだけで鳴らない | `onCalendarSelected()` |
+| `{ null }` / `{ calendar.id }` / `{ Routes.HOME }` | 値を思い浮かべただけで、誰にも渡していない | `{ onCalendarClick(null) }` など |
+| `navigate(Routes.HOME)` | ホームが**もう 1 枚積まれ**、「戻る」で一覧が出てくる | `popBackStack(Routes.HOME, inclusive = false)` |
+
+**`{ }` の中は「誰の・何をする」と声に出して読めるか**で確かめる。
 
 #### Step 31（カレンダー一覧画面）
 

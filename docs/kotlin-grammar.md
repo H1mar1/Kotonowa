@@ -1221,6 +1221,45 @@ Phase 1 から使っていたが、まとめて説明していなかったので
 一覧（`CALENDAR_LIST`）に戻る。ログアウトで使う `popUpTo(…) { inclusive = true }` は
 「そこまでまとめて下ろす」版（Step 22）。
 
+### (120) `LazyColumn` の `item { }` と、`popBackStack(住所, inclusive = false)`
+
+```kotlin
+LazyColumn {
+    item {                                   // 1 行だけ足す
+        PersonalCalendarRow(onClick = { onCalendarClick(null) })
+    }
+    if (uiState.calendars.isEmpty()) {       // 中で if も使える
+        item { Text("共有カレンダーはまだありません。") }
+    } else {
+        items(uiState.calendars, key = { calendar -> calendar.id }) { calendar ->
+            CalendarRow(calendar = calendar, onClick = { onCalendarClick(calendar) })
+        }
+    }
+}
+
+onCalendarSelected = { navController.popBackStack(Routes.HOME, inclusive = false) }
+```
+
+2026-10-14、Step 33-B で記録。
+
+**`item { }`（s が無い）と `items(リスト) { }`（s がある）。** `LazyColumn` の `{ }` の中では、
+行の足し方が 2 つある。`items` はリストの 1 件ごとに行を作る（§3-(66)）。`item` は**決まった 1 行**を足す。
+並べた順に上から描かれるので、`item` を先に書けば先頭に固定の行が出る。
+`{ }` の中では `if` も使える。普通の Kotlin なので、条件によって足す行を変えられる。
+
+**`popBackStack(住所, inclusive = false)`。** 引数なしの `popBackStack()` は 1 枚だけ下ろす（§3-(117)）。
+住所を渡すと「**その画面が一番上に来るまで**まとめて下ろす」。
+
+```
+[HOME] → [SETTING] → [CALENDAR_LIST]
+popBackStack()                              → [HOME] → [SETTING]          （設定画面に戻る）
+popBackStack(Routes.HOME, inclusive = false) → [HOME]                     （ホームまで一気に戻る）
+```
+
+`inclusive`（インクルーシブ＝含める）は「指定した住所の画面**自身も**下ろすか」。
+`false` なら HOME は残す（そこへ戻りたいので）。ログアウトの `popUpTo(HOME) { inclusive = true }`（Step 22）は
+HOME **ごと**消して LOGIN を積む、という逆の使い方。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
