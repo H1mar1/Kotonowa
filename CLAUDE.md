@@ -740,7 +740,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-C から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-D から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -879,7 +879,7 @@ match /calendars/{calendarId} {
 |---|---|---|
 | 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
 | 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | ✅ 10-18 |
-| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | |
+| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | ✅ 10-20 |
 | 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
 | 33-E | ログアウトで掲示板を白紙に戻す | |
 | 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
@@ -905,6 +905,18 @@ NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛
 | `navigate(Routes.HOME)` | ホームが**もう 1 枚積まれ**、「戻る」で一覧が出てくる | `popBackStack(Routes.HOME, inclusive = false)` |
 
 **`{ }` の中は「誰の・何をする」と声に出して読めるか**で確かめる。
+
+**33-C。** `CalendarViewModel` に `uid`（自分＝マイカレンダーの id。`val`）と `calendarId`（今表示中。`var`）を分けた。
+`init` で掲示板を `collect` し、流れてくるたびに `calendarId = calendar?.id ?: uid`・
+`calendarName = calendar?.name ?: "マイカレンダー"`・`observeMonth(今の月)`。
+**張り直しは Step 23 の `observeMonth`（先頭で `observeJob?.cancel()`）をそのまま使う。**
+`init` の `observeMonth` 直呼びは消した（StateFlow は collect した瞬間に今の値を 1 回流すので二重になる。grammar §2-(121)）。
+`observeMonth` の先頭で `val id = calendarId` に写す（`var` はスマートキャストできない。§4-(65)）。
+上のバーは「ことのわ」固定から `uiState.calendarName` に。
+
+⚠️ **33-C で踏んだところ。** `calendarId = calendarId ?: uid`（右も箱から始めてしまい、掲示板を見ていない）、
+`calendarName = calendarId ?: …`（バーに uid が出る）、`Text(uiState,id)`（`.` と `,` の取り違え）。
+①②は「掲示板から箱へ」、④の `val id = calendarId` は「箱から手元へ」で**向きが逆**。
 
 #### Step 31（カレンダー一覧画面）
 

@@ -2,9 +2,11 @@ package com.example.kotonowa.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.impl.utils.forName
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
+import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -33,17 +35,40 @@ class CalendarViewModel @Inject constructor(
 
     private val scheduleRepository: ScheduleRepository, //予定/タスクを出し入れする窓口
     private val authRepository: AuthRepository, //ログイン中のユーザーを知る窓口
+    private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
 
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
-    val calendarId = authRepository.currentUser?.uid
+    /** ログイン中のユーザーの uid。マイカレンダー（個人）の id でもある（要件定義書 §4）。 */
+    private val uid = authRepository.currentUser?.uid
+
+    /**
+     * 今表示しているカレンダーの id。掲示板が貼り替わるたびに入れ直すので `var`。
+     * Step 33 までは `val calendarId = uid` の決め打ちだった。
+     */
+    private var calendarId: String? = uid
 
     private var observeJob: Job? = null
 
     init {
-        observeMonth(_uiState.value.currentMonth)
+        // 掲示板を見張る。StateFlow は collect した瞬間に「今貼ってある紙」を 1 回流してくれるので、
+        // 最初の observeMonth もここから始まる（grammar §2-(121)）。
+        viewModelScope.launch {
+            selectedCalendarRepository.selected.collect { calendar ->
+                // TODO(33-C-2) 誰の：この頭脳の calendarId に ／ 何をする：貼られたカレンダーの id を入れる。
+                //              白紙（null）なら自分の uid（§4-⑮ の ?:）
+                calendarId = calendar?.id?:uid
+
+                // TODO(33-C-2) 誰の：_uiState の ／ 何をする：calendarName を、貼られたカレンダーの名前に書き換える。
+                //              白紙なら "マイカレンダー"（§4-⑮、§2-(58) の update）
+                _uiState.update { it.copy(calendarName = calendar?.name ?: "マイカレンダー") }
+
+                // TODO(33-C-2) 誰の：この頭脳の observeMonth を ／ 何をする：今表示している月で呼び直す（＝購読の張り直し）
+                observeMonth(_uiState.value.currentMonth)
+            }
+        }
     }
     /** 前の月へ。升目の表示を変え、その月を購読し直す。 */
     fun showPreviousMonth(){
@@ -69,8 +94,11 @@ class CalendarViewModel @Inject constructor(
      * 今月の予定/タスクを監視し始める。
      */
     private fun observeMonth(month: YearMonth) {
-        // ログインしていなければ calendarId が無く、読み込みようがない
-        if (calendarId == null) {
+        // TODO(33-C-3) calendarId は var になったので、一度 val に写してから使う（§4-(65) の var の項）
+        val id = calendarId
+
+        // ログインしていなければ id が無く、読み込みようがない
+        if (id == null) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -91,7 +119,7 @@ class CalendarViewModel @Inject constructor(
 
         observeJob =  viewModelScope.launch {
             try {
-                scheduleRepository.observeItems(calendarId, from, to)
+                scheduleRepository.observeItems(id, from, to)
                     .collect { list ->
                         val dates = list.map { item ->
                             when (item) {

@@ -21,6 +21,9 @@ data class CalendarUiState(
 
     val selectedDate: LocalDate= LocalDate.now(),
 
+    /** 今表示しているカレンダーの名前。上のバーに出す。掲示板が白紙のときは個人（Step 33-C）。 */
+    val calendarName: String = "マイカレンダー",
+
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )

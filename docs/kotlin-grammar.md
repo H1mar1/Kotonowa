@@ -599,6 +599,37 @@ fun observe(): Flow<T> = callbackFlow {
 
 ---
 
+### (121) `StateFlow` を `collect` すると、まず「今の値」が 1 回流れてくる
+
+```kotlin
+init {
+    viewModelScope.launch {
+        selectedCalendarRepository.selected.collect { calendar ->
+            calendarId = calendar?.id ?: uid
+            observeMonth(_uiState.value.currentMonth)
+        }
+    }
+}
+```
+
+2026-10-18、Step 33-C で記録。
+
+普通の `Flow`（§2-㉝）は、**次に何かが流れてくるまで**黙って待つ。
+`StateFlow`（§2-(58)）は「今の値」を必ず持っているので、`collect` を始めた**その瞬間に今の値を 1 回**流し、
+そのあとは**値が変わるたびに**流してくる。
+
+```
+画面を開く → collect 開始 → 今の紙（白紙）が流れる → マイカレンダーを購読
+           …
+一覧で「家族」を選ぶ → 掲示板が貼り替わる → 家族が流れる → 家族を購読し直す
+```
+
+だから `init` で `observeMonth(...)` を直接呼ばなくても、最初の購読は `collect` の 1 回目から始まる。
+直接呼ぶと、**同じ購読が 2 回**始まってしまう（すぐ `observeJob?.cancel()` で片方は止まるが、無駄な通信が 1 回増える）。
+
+**`collect` は終わらない**（§2-㉝）。なので `init` の中でも、必ず `viewModelScope.launch { }` で包んで別の作業として走らせる。
+包まないと `init` が `collect` で止まったままになる（そもそも `suspend` なのでビルドが通らない）。
+
 ## §3 Compose 特有
 
 ### ⑪ `remember` 系 — 作り直しを防ぐ
@@ -2395,7 +2426,7 @@ class SelectedCalendarRepositoryImpl @Inject constructor() : SelectedCalendarRep
 `@Inject constructor()` の `()` が空なのは、材料（他の Repository など）が何も要らないから。
 
 **`MutableStateFlow<Calendar?>(null)` の `< >`。** 普段は `MutableStateFlow(LoginUiState())` のように
-初期値から型を推測してもらえる（§4-(58)）。ところが初期値が `null` だと、Kotlin は
+初期値から型を推測してもらえる（§2-(58)）。ところが初期値が `null` だと、Kotlin は
 「何の型の空っぽなのか」が分からない。そこで `<Calendar?>` と**型を明示**する。
 `< >` は「中に入れるものの型」の指定で、`List<String>` の `< >` と同じ読み方。
 

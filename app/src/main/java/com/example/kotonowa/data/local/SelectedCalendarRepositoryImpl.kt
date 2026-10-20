@@ -18,10 +18,10 @@ import javax.inject.Singleton
 @Singleton
 class SelectedCalendarRepositoryImpl @Inject constructor() : SelectedCalendarRepository {
 
-    // TODO(33-A-2) 書き換えられる版。最初は白紙（grammar §4-(58)、§4-(119) の <型> の明示）
+    // TODO(33-A-2) 書き換えられる版。最初は白紙（grammar §2-(58)、§4-(119) の <型> の明示）
     private val _selected = MutableStateFlow<Calendar?>(null)
 
-    // TODO(33-A-2) 外へは「読むだけ」の姿で見せる（§4-(58)）
+    // TODO(33-A-2) 外へは「読むだけ」の姿で見せる（§2-(58)）
     override val selected: StateFlow<Calendar?> = _selected.asStateFlow()
 
     override fun select(calendar: Calendar?) {

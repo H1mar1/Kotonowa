@@ -71,7 +71,8 @@ fun CalendarScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("ことのわ") },
+                // TODO(33-C-4) 誰の：uiState の ／ 何をする：calendarName を表示する（"ことのわ" の決め打ちをやめる）
+                title = { Text(uiState.calendarName) },
                 actions = {
                     TextButton(onClick = onSetting) {
                         Text("設定⚙️")

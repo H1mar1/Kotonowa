@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface SelectedCalendarRepository {
 
-    // TODO(33-A-1) 今選ばれているカレンダー。白紙（個人）もありうる（grammar §4-(58)）
+    // TODO(33-A-1) 今選ばれているカレンダー。白紙（個人）もありうる（grammar §2-(58)）
     val selected: StateFlow<Calendar?>
 
     // TODO(33-A-1) カレンダーを選ぶ。個人に戻すときは null を渡せるようにする
