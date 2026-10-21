@@ -2403,6 +2403,33 @@ Kotlin 側のチェックを迂回されても止められる（Step 18 直後�
 **`resource` と `request.resource` の取り違えが一番起きやすい。** 作成（`create`）では「今ある書類」が無いので、
 `resource.data` を使うと必ず拒否される（エラーは `PERMISSION_DENIED` しか出ず、理由は教えてくれない）。
 
+### (122) セキュリティルールの `function` と `||`
+
+```
+function isMember(calendarId) {
+  return request.auth.uid == calendarId
+    || request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+}
+
+allow read: if request.auth != null && isMember(resource.data.calendarId);
+```
+
+2026-10-22、Step 33-F で記録。(118) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `function 名前(材料) { return 条件; }` | 「この名前で、この判定をまとめておく」 | Kotlin の `fun` と同じ。同じ判定を `read` / `create` / `update` で何度も書かずに済む |
+| `return 条件;` | 「この条件の結果（はい／いいえ）を返す」 | ルールの関数は**必ず `return` 1 つ**で書く |
+| `||` | 「または」 | `&&`（かつ）の仲間。左か右のどちらかが「はい」なら「はい」 |
+
+**`||` は左から順に見て、左が「はい」なら右を見ない。** これを利用している。
+個人カレンダー（id ＝ 自分の uid）は `calendars` の書類が無いので、右の `get(…)` を実行すると
+「書類が無い」で失敗する。左の `request.auth.uid == calendarId` が先に「はい」になるので、右は実行されない。
+他人の個人カレンダーなら左が「いいえ」→右の `get` が書類を見つけられず失敗→**拒否**になる（それで正しい）。
+
+**関数は `match /databases/{database}/documents { }` の中に書く。** 中の `$(database)` を使うため。
+`match /events/…` の外（同じ階層）に置けば、どの `match` からも呼べる。
+
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 
 ```kotlin

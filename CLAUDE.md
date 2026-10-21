@@ -93,7 +93,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
-Step 32（カレンダー作成画面）完了（2026-10-14）。次は Step 33（表示するカレンダーの切り替え）。
+Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
+次は Step 34（メンバー一覧・ロール変更）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -740,7 +741,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-F（ルール）から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | ✅ 10-22 |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -882,8 +883,8 @@ match /calendars/{calendarId} {
 | 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | ✅ 10-20 |
 | 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | ✅ 10-22 |
 | 33-E | ログアウトで掲示板を白紙に戻す | ✅ 10-22 |
-| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
-| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
+| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | ✅ 10-22 |
+| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | ✅ 10-22 |
 
 **33-A で踏んだところ（2026-10-14）。** 約束側の型に `CalendarUiState`（ホーム画面の状態の箱）を書き、
 domain から presentation を `import` してしまった。`Calendar`（カレンダー 1 つ）と名前が似ているので注意。
@@ -927,6 +928,35 @@ NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛
 
 **33-E。** `SettingsViewModel.logout()` の先頭で `selectedCalendarRepository.clear()`。画面と NavHost は変更なし。
 共有カレンダーを表示したままログアウト→再ログインで、ホームが「マイカレンダー」から始まることを実機で確認。
+
+**33-F：`events` のルールをメンバーベースに作り替えた（2026-10-22 適用）。** 2026-09-04 の
+「`calendarId` が自分の uid なら OK」を置き換え。コンソールのルール全文は以下（`users` / `calendars` は従来どおり）。
+
+```
+function isMember(calendarId) {
+  return request.auth.uid == calendarId
+    || request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+}
+
+match /events/{eventId} {
+  allow read, delete: if request.auth != null
+    && isMember(resource.data.calendarId);
+
+  allow create: if request.auth != null
+    && isMember(request.resource.data.calendarId)
+    && request.resource.data.createdBy == request.auth.uid;
+
+  allow update: if request.auth != null
+    && isMember(resource.data.calendarId)
+    && request.resource.data.calendarId == resource.data.calendarId
+    && request.resource.data.createdBy == resource.data.createdBy;
+}
+```
+
+- `isMember` の左はマイカレンダー（id ＝ uid）、右は共有カレンダー（部屋の `memberUids`）。
+  **`||` は左が「はい」なら右を見ない**ので、`calendars` の書類が無いマイカレンダーでも `get` が失敗しない（grammar §4-(122)）。
+- `update` は置き場所（`calendarId`）と作った人（`createdBy`）の**書き換えを禁止**（別カレンダーへの引っ越し・作者の詐称を防ぐ）。
+- ⚠️ **ロールはまだ見ていない。** 閲覧者でもメンバーなら作成・編集・削除できる。Step 37 で `members/{uid}` の `role` を見る形にする。
 
 #### Step 31（カレンダー一覧画面）
 
