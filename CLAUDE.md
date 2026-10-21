@@ -740,7 +740,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-E から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-F（ルール）から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -881,7 +881,7 @@ match /calendars/{calendarId} {
 | 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | ✅ 10-18 |
 | 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | ✅ 10-20 |
 | 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | ✅ 10-22 |
-| 33-E | ログアウトで掲示板を白紙に戻す | |
+| 33-E | ログアウトで掲示板を白紙に戻す | ✅ 10-22 |
 | 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
 | 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
 
@@ -924,6 +924,9 @@ NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛
 作成画面は掲示板を **`.value` で保存の瞬間に 1 回読むだけ**（ホームは `collect` で見張る。Step 20 の「1 回きり／購読」と同じ使い分け）。
 ⚠️ `.value` の代わりに 33-C の `calendar`（`collect { calendar -> }` で**自分で付けた**名前）を書きかけた。
 `.value` は Kotlin が決めた取り出し口、`calendar` は受け取るときに付けた名前で、`collect` の外には存在しない。
+
+**33-E。** `SettingsViewModel.logout()` の先頭で `selectedCalendarRepository.clear()`。画面と NavHost は変更なし。
+共有カレンダーを表示したままログアウト→再ログインで、ホームが「マイカレンダー」から始まることを実機で確認。
 
 #### Step 31（カレンダー一覧画面）
 
@@ -1076,6 +1079,11 @@ cd ~/Library/Android/sdk/emulator
 また `identitytoolkit.googleapis.com` は **ICMP を返さない**ので、ping が無応答でも異常ではない。
 
 💡 コールドブート（`-no-snapshot-load`）するとエミュレータ内のログイン状態は消える。
+
+**2026-10-22 に再発。** 33-E の確認中、ログアウト→再ログインで「ネットワークに接続できません」。
+`netsimd --host-dns=202.13.160.201,…`（前のネットワーク）に対し Mac は `192.168.1.253` で、上の手順どおり確定。
+`adb emu kill` → `-dns-server 192.168.1.253 -no-snapshot-load` で起動し直して解消した。
+**ログアウトの直後に起きると「33-E の変更で壊した」と誤解しやすい**が、アプリとは無関係。
 
 ### 検証環境のハマりどころ（2026-08-12 追記）
 

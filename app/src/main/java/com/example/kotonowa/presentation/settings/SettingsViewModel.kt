@@ -3,6 +3,7 @@ package com.example.kotonowa.presentation.settings
 import androidx.lifecycle.ViewModel
 import com.example.kotonowa.domain.model.User
 import com.example.kotonowa.domain.repository.AuthRepository
+import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -16,14 +17,22 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
 ) : ViewModel() {
 
     /** ログイン中のユーザー。ログインしていなければ null。 */
 
     val user: User? = authRepository.currentUser
 
-    /** ログアウトする。画面遷移は知らない（Step 22 と同じ分担）。 */
+    /**
+     * ログアウトする。画面遷移は知らない（Step 22 と同じ分担）。
+     *
+     * 掲示板は @Singleton なのでログアウトしても生き残る。白紙に戻さないと、
+     * 次に同じ端末でログインした人のホームが、前の人の共有カレンダーを開こうとする（Step 33-E）。
+     */
     fun logout() {
+        // TODO(33-E) 誰の：掲示板の ／ 何をする：白紙に戻す（33-A で作った窓口。部屋を出る前に片付ける）
+        selectedCalendarRepository.clear()
         authRepository.logout()
     }
 }
