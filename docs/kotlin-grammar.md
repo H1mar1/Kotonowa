@@ -1291,6 +1291,39 @@ popBackStack(Routes.HOME, inclusive = false) → [HOME]                     （�
 `false` なら HOME は残す（そこへ戻りたいので）。ログアウトの `popUpTo(HOME) { inclusive = true }`（Step 22）は
 HOME **ごと**消して LOGIN を積む、という逆の使い方。
 
+### (123) `DropdownMenuItem` の `leadingIcon` と `HorizontalDivider`
+
+```kotlin
+DropdownMenuItem(
+    text = { Text("マイカレンダー") },
+    leadingIcon = { CheckMark(visible = uiState.selectedCalendarId == null) },
+    onClick = { viewModel.selectCalendar(null) },
+)
+HorizontalDivider()
+
+@Composable
+private fun CheckMark(visible: Boolean) {
+    Text(if (visible) "✓" else "")
+}
+```
+
+2026-10-22、Step 33-H で記録。§3-(107) の続き。
+
+| 部分 | 意味 |
+|---|---|
+| `leadingIcon = { … }` | 項目の**左端**に置く小さな部品のスロット（§3-(83)）。`leading`（リーディング）＝「先頭の」。右端用の `trailingIcon` もある |
+| `HorizontalDivider()` | **横の区切り線**を 1 本引く。`Horizontal`（ホリゾンタル）＝「横の」、`Divider`（ディバイダー）＝「仕切り」。メニューの中で「カレンダーを選ぶ」と「別の画面へ行く」の 2 種類を分けるのに使う |
+
+**✓ が付かない行でも `leadingIcon` を渡す理由。** スロットを渡さない（`null`）と、その行は左端の場所ごと無くなり、
+文字が左へ詰まる。✓ のある行とない行で文字の位置がずれてガタつく。
+そこで**全部の行に `CheckMark` を置き、中身だけ `"✓"` と `""`（空の文字）で出し分ける**。
+Step 24 で、選択中でない日にも `Color.Transparent` の `Surface` を置いて升目の大きさを揃えたのと同じ考え方。
+
+`if (visible) "✓" else ""` は「値を返す `if`」（§5-(68)）。`else` を省略できないのはこのため。
+
+**`== null` で判定してよい理由。** `selectedCalendarId` は「マイカレンダーなら `null`」と決めてあるので（33-H-1）、
+`uiState.selectedCalendarId == null` がそのまま「マイカレンダーを表示中」の意味になる。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
