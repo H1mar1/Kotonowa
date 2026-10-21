@@ -599,6 +599,37 @@ fun observe(): Flow<T> = callbackFlow {
 
 ---
 
+### (121) `StateFlow` を `collect` すると、まず「今の値」が 1 回流れてくる
+
+```kotlin
+init {
+    viewModelScope.launch {
+        selectedCalendarRepository.selected.collect { calendar ->
+            calendarId = calendar?.id ?: uid
+            observeMonth(_uiState.value.currentMonth)
+        }
+    }
+}
+```
+
+2026-10-18、Step 33-C で記録。
+
+普通の `Flow`（§2-㉝）は、**次に何かが流れてくるまで**黙って待つ。
+`StateFlow`（§2-(58)）は「今の値」を必ず持っているので、`collect` を始めた**その瞬間に今の値を 1 回**流し、
+そのあとは**値が変わるたびに**流してくる。
+
+```
+画面を開く → collect 開始 → 今の紙（白紙）が流れる → マイカレンダーを購読
+           …
+一覧で「家族」を選ぶ → 掲示板が貼り替わる → 家族が流れる → 家族を購読し直す
+```
+
+だから `init` で `observeMonth(...)` を直接呼ばなくても、最初の購読は `collect` の 1 回目から始まる。
+直接呼ぶと、**同じ購読が 2 回**始まってしまう（すぐ `observeJob?.cancel()` で片方は止まるが、無駄な通信が 1 回増える）。
+
+**`collect` は終わらない**（§2-㉝）。なので `init` の中でも、必ず `viewModelScope.launch { }` で包んで別の作業として走らせる。
+包まないと `init` が `collect` で止まったままになる（そもそも `suspend` なのでビルドが通らない）。
+
 ## §3 Compose 特有
 
 ### ⑪ `remember` 系 — 作り直しを防ぐ
@@ -1259,6 +1290,39 @@ popBackStack(Routes.HOME, inclusive = false) → [HOME]                     （�
 `inclusive`（インクルーシブ＝含める）は「指定した住所の画面**自身も**下ろすか」。
 `false` なら HOME は残す（そこへ戻りたいので）。ログアウトの `popUpTo(HOME) { inclusive = true }`（Step 22）は
 HOME **ごと**消して LOGIN を積む、という逆の使い方。
+
+### (123) `DropdownMenuItem` の `leadingIcon` と `HorizontalDivider`
+
+```kotlin
+DropdownMenuItem(
+    text = { Text("マイカレンダー") },
+    leadingIcon = { CheckMark(visible = uiState.selectedCalendarId == null) },
+    onClick = { viewModel.selectCalendar(null) },
+)
+HorizontalDivider()
+
+@Composable
+private fun CheckMark(visible: Boolean) {
+    Text(if (visible) "✓" else "")
+}
+```
+
+2026-10-22、Step 33-H で記録。§3-(107) の続き。
+
+| 部分 | 意味 |
+|---|---|
+| `leadingIcon = { … }` | 項目の**左端**に置く小さな部品のスロット（§3-(83)）。`leading`（リーディング）＝「先頭の」。右端用の `trailingIcon` もある |
+| `HorizontalDivider()` | **横の区切り線**を 1 本引く。`Horizontal`（ホリゾンタル）＝「横の」、`Divider`（ディバイダー）＝「仕切り」。メニューの中で「カレンダーを選ぶ」と「別の画面へ行く」の 2 種類を分けるのに使う |
+
+**✓ が付かない行でも `leadingIcon` を渡す理由。** スロットを渡さない（`null`）と、その行は左端の場所ごと無くなり、
+文字が左へ詰まる。✓ のある行とない行で文字の位置がずれてガタつく。
+そこで**全部の行に `CheckMark` を置き、中身だけ `"✓"` と `""`（空の文字）で出し分ける**。
+Step 24 で、選択中でない日にも `Color.Transparent` の `Surface` を置いて升目の大きさを揃えたのと同じ考え方。
+
+`if (visible) "✓" else ""` は「値を返す `if`」（§5-(68)）。`else` を省略できないのはこのため。
+
+**`== null` で判定してよい理由。** `selectedCalendarId` は「マイカレンダーなら `null`」と決めてあるので（33-H-1）、
+`uiState.selectedCalendarId == null` がそのまま「マイカレンダーを表示中」の意味になる。
 
 ## §4 その他
 
@@ -2372,6 +2436,33 @@ Kotlin 側のチェックを迂回されても止められる（Step 18 直後�
 **`resource` と `request.resource` の取り違えが一番起きやすい。** 作成（`create`）では「今ある書類」が無いので、
 `resource.data` を使うと必ず拒否される（エラーは `PERMISSION_DENIED` しか出ず、理由は教えてくれない）。
 
+### (122) セキュリティルールの `function` と `||`
+
+```
+function isMember(calendarId) {
+  return request.auth.uid == calendarId
+    || request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+}
+
+allow read: if request.auth != null && isMember(resource.data.calendarId);
+```
+
+2026-10-22、Step 33-F で記録。(118) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `function 名前(材料) { return 条件; }` | 「この名前で、この判定をまとめておく」 | Kotlin の `fun` と同じ。同じ判定を `read` / `create` / `update` で何度も書かずに済む |
+| `return 条件;` | 「この条件の結果（はい／いいえ）を返す」 | ルールの関数は**必ず `return` 1 つ**で書く |
+| `||` | 「または」 | `&&`（かつ）の仲間。左か右のどちらかが「はい」なら「はい」 |
+
+**`||` は左から順に見て、左が「はい」なら右を見ない。** これを利用している。
+個人カレンダー（id ＝ 自分の uid）は `calendars` の書類が無いので、右の `get(…)` を実行すると
+「書類が無い」で失敗する。左の `request.auth.uid == calendarId` が先に「はい」になるので、右は実行されない。
+他人の個人カレンダーなら左が「いいえ」→右の `get` が書類を見つけられず失敗→**拒否**になる（それで正しい）。
+
+**関数は `match /databases/{database}/documents { }` の中に書く。** 中の `$(database)` を使うため。
+`match /events/…` の外（同じ階層）に置けば、どの `match` からも呼べる。
+
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 
 ```kotlin
@@ -2395,7 +2486,7 @@ class SelectedCalendarRepositoryImpl @Inject constructor() : SelectedCalendarRep
 `@Inject constructor()` の `()` が空なのは、材料（他の Repository など）が何も要らないから。
 
 **`MutableStateFlow<Calendar?>(null)` の `< >`。** 普段は `MutableStateFlow(LoginUiState())` のように
-初期値から型を推測してもらえる（§4-(58)）。ところが初期値が `null` だと、Kotlin は
+初期値から型を推測してもらえる（§2-(58)）。ところが初期値が `null` だと、Kotlin は
 「何の型の空っぽなのか」が分からない。そこで `<Calendar?>` と**型を明示**する。
 `< >` は「中に入れるものの型」の指定で、`List<String>` の `< >` と同じ読み方。
 

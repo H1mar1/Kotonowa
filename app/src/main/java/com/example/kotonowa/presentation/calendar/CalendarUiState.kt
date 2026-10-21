@@ -1,5 +1,6 @@
 package com.example.kotonowa.presentation.calendar
 
+import com.example.kotonowa.domain.model.Calendar
 import com.example.kotonowa.domain.model.ScheduleItem
 import java.time.LocalDate
 import java.time.YearMonth
@@ -20,6 +21,21 @@ data class CalendarUiState(
     val currentMonth: YearMonth=YearMonth.now(),
 
     val selectedDate: LocalDate= LocalDate.now(),
+
+    /** 今表示しているカレンダーの名前。上のバーに出す。掲示板が白紙のときは個人（Step 33-C）。 */
+    val calendarName: String = "マイカレンダー",
+
+    /**
+     * 今表示しているカレンダーの id。マイカレンダー（掲示板が白紙）なら null。
+     * ▼ のメニューで、どの行に ✓ を付けるかの判定に使う（Step 33-H）。
+     */
+    val selectedCalendarId: String? = null,
+
+    /** 自分が入っている共有カレンダー。▼ のメニューに並べる（Step 33-H）。 */
+    val calendars: List<Calendar> = emptyList(),
+
+    /** ▼ のメニューが開いているか。部品は自分で開かないので、ここに持つ（grammar §3-(107)）。 */
+    val isCalendarMenuOpen: Boolean = false,
 
     val isLoading: Boolean = true,
     val errorMessage: String? = null,

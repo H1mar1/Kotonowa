@@ -7,6 +7,7 @@ import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
+import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,12 +39,19 @@ class ScheduleEditViewModel @Inject constructor(
     private val authRepository: AuthRepository, // ログイン中のユーザーを知る窓口
     private val savedStateHandle: SavedStateHandle,
     private val reminderScheduler: ReminderScheduler,
+    private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
 ) : ViewModel() {
 
 
     private val _uiState = MutableStateFlow(ScheduleEditUiState())
     val uiState: StateFlow<ScheduleEditUiState> = _uiState.asStateFlow()
-    private val calendarId = authRepository.currentUser?.uid
+
+    /**
+     * ログイン中のユーザーの uid。予定の `createdBy`（誰が作ったか）に使う。
+     * Step 33-D で `calendarId` から改名した。Phase 3 では「置き場所（calendarId）」と
+     * 「作った人（createdBy）」が別の値になるので、この名前のままだと取り違える（Step 19-D の ⚠️）。
+     */
+    private val uid = authRepository.currentUser?.uid
 
     private val itemId: String? = savedStateHandle["itemId"]
 
@@ -198,7 +206,12 @@ class ScheduleEditViewModel @Inject constructor(
      */
     fun save() {
 
-        val id = calendarId ?: return
+        val myUid = uid ?: return
+
+        // TODO(33-D-1) 誰の：掲示板の、今貼ってある紙の ／ 何をする：その id を取り出す。白紙なら自分の uid（＝マイカレンダー）
+        //   掲示板は selectedCalendarRepository.selected。保存の瞬間に 1 回読むだけなので collect ではなく .value（§2-(58)）
+        //   形は 33-C の calendarId = calendar?.id ?: uid と同じ
+        val targetCalendarId = selectedCalendarRepository.selected.value?.id ?: myUid
         val state = _uiState.value
         val original = originalItem
         if (state.isSaving) return
@@ -223,8 +236,10 @@ class ScheduleEditViewModel @Inject constructor(
             val item = when (state.itemType) {
                 ScheduleItemType.EVENT -> ScheduleItem.Event(
                     id = original?.id ?: UUID.randomUUID().toString(),
-                    calendarId = original?.calendarId ?: id,
-                    createdBy = original?.createdBy ?: id,
+                    // TODO(33-D-2) 新規なら「どのカレンダーに置くか」＝ 掲示板のカレンダー
+                    calendarId = original?.calendarId ?: targetCalendarId,
+                    // TODO(33-D-2) 新規なら「誰が作ったか」＝ 自分
+                    createdBy = original?.createdBy ?: myUid,
                     title = state.title,
                     description = state.description.ifBlank { null },
                     reminderMinutesBefore = state.reminderMinutesBefore,
@@ -236,10 +251,12 @@ class ScheduleEditViewModel @Inject constructor(
 
                 ScheduleItemType.TASK -> ScheduleItem.Task(
                     id = original?.id ?: UUID.randomUUID().toString(),
-                    calendarId = original?.calendarId ?: id,
+                    // TODO(33-D-2) 新規なら「どのカレンダーに置くか」＝ 掲示板のカレンダー
+                    calendarId = original?.calendarId ?: targetCalendarId,
                     title = state.title,
                     description = state.description.ifBlank { null },
-                    createdBy = original?.createdBy ?: id,
+                    // TODO(33-D-2) 新規なら「誰が作ったか」＝ 自分
+                    createdBy = original?.createdBy ?: myUid,
                     reminderMinutesBefore = state.reminderMinutesBefore,
                     updatedAt = now,
                     dueAt = state.dueDate.toInstant(state.dueTime),

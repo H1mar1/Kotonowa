@@ -93,7 +93,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
-Step 32（カレンダー作成画面）完了（2026-10-14）。次は Step 33（表示するカレンダーの切り替え）。
+Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
+次は Step 34（メンバー一覧・ロール変更）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -740,7 +741,8 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-C から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | ✅ 10-22 |
+| 33-H | 切り替えを設定からホームの「名前 ▼」のメニューへ移す | ✅ 10-22 |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -879,11 +881,11 @@ match /calendars/{calendarId} {
 |---|---|---|
 | 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
 | 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | ✅ 10-18 |
-| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | |
-| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
-| 33-E | ログアウトで掲示板を白紙に戻す | |
-| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
-| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
+| 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | ✅ 10-20 |
+| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | ✅ 10-22 |
+| 33-E | ログアウトで掲示板を白紙に戻す | ✅ 10-22 |
+| 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | ✅ 10-22 |
+| 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | ✅ 10-22 |
 
 **33-A で踏んだところ（2026-10-14）。** 約束側の型に `CalendarUiState`（ホーム画面の状態の箱）を書き、
 domain から presentation を `import` してしまった。`Calendar`（カレンダー 1 つ）と名前が似ているので注意。
@@ -905,6 +907,81 @@ NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛
 | `navigate(Routes.HOME)` | ホームが**もう 1 枚積まれ**、「戻る」で一覧が出てくる | `popBackStack(Routes.HOME, inclusive = false)` |
 
 **`{ }` の中は「誰の・何をする」と声に出して読めるか**で確かめる。
+
+**33-C。** `CalendarViewModel` に `uid`（自分＝マイカレンダーの id。`val`）と `calendarId`（今表示中。`var`）を分けた。
+`init` で掲示板を `collect` し、流れてくるたびに `calendarId = calendar?.id ?: uid`・
+`calendarName = calendar?.name ?: "マイカレンダー"`・`observeMonth(今の月)`。
+**張り直しは Step 23 の `observeMonth`（先頭で `observeJob?.cancel()`）をそのまま使う。**
+`init` の `observeMonth` 直呼びは消した（StateFlow は collect した瞬間に今の値を 1 回流すので二重になる。grammar §2-(121)）。
+`observeMonth` の先頭で `val id = calendarId` に写す（`var` はスマートキャストできない。§4-(65)）。
+上のバーは「ことのわ」固定から `uiState.calendarName` に。
+
+⚠️ **33-C で踏んだところ。** `calendarId = calendarId ?: uid`（右も箱から始めてしまい、掲示板を見ていない）、
+`calendarName = calendarId ?: …`（バーに uid が出る）、`Text(uiState,id)`（`.` と `,` の取り違え）。
+①②は「掲示板から箱へ」、④の `val id = calendarId` は「箱から手元へ」で**向きが逆**。
+
+**33-D。** `ScheduleEditViewModel` の `calendarId`（中身は自分の uid）を **`uid` に改名**（Step 19-D の 💡 を回収）。
+`save()` で `myUid = uid ?: return`、`targetCalendarId = selectedCalendarRepository.selected.value?.id ?: myUid`。
+新規なら `calendarId = targetCalendarId`（置き場所）、`createdBy = myUid`（作った人）。編集なら `original?.〇〇` を引き継ぐ。
+作成画面は掲示板を **`.value` で保存の瞬間に 1 回読むだけ**（ホームは `collect` で見張る。Step 20 の「1 回きり／購読」と同じ使い分け）。
+⚠️ `.value` の代わりに 33-C の `calendar`（`collect { calendar -> }` で**自分で付けた**名前）を書きかけた。
+`.value` は Kotlin が決めた取り出し口、`calendar` は受け取るときに付けた名前で、`collect` の外には存在しない。
+
+**33-E。** `SettingsViewModel.logout()` の先頭で `selectedCalendarRepository.clear()`。画面と NavHost は変更なし。
+共有カレンダーを表示したままログアウト→再ログインで、ホームが「マイカレンダー」から始まることを実機で確認。
+
+**33-F：`events` のルールをメンバーベースに作り替えた（2026-10-22 適用）。** 2026-09-04 の
+「`calendarId` が自分の uid なら OK」を置き換え。コンソールのルール全文は以下（`users` / `calendars` は従来どおり）。
+
+```
+function isMember(calendarId) {
+  return request.auth.uid == calendarId
+    || request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+}
+
+match /events/{eventId} {
+  allow read, delete: if request.auth != null
+    && isMember(resource.data.calendarId);
+
+  allow create: if request.auth != null
+    && isMember(request.resource.data.calendarId)
+    && request.resource.data.createdBy == request.auth.uid;
+
+  allow update: if request.auth != null
+    && isMember(resource.data.calendarId)
+    && request.resource.data.calendarId == resource.data.calendarId
+    && request.resource.data.createdBy == resource.data.createdBy;
+}
+```
+
+- `isMember` の左はマイカレンダー（id ＝ uid）、右は共有カレンダー（部屋の `memberUids`）。
+  **`||` は左が「はい」なら右を見ない**ので、`calendars` の書類が無いマイカレンダーでも `get` が失敗しない（grammar §4-(122)）。
+- `update` は置き場所（`calendarId`）と作った人（`createdBy`）の**書き換えを禁止**（別カレンダーへの引っ越し・作者の詐称を防ぐ）。
+- ⚠️ **ロールはまだ見ていない。** 閲覧者でもメンバーなら作成・編集・削除できる。Step 37 で `members/{uid}` の `role` を見る形にする。
+
+#### Step 33-H（切り替えをホームの ▼ へ移す。2026-10-22 にユーザーが要望）
+
+「毎日使う切り替えが設定の奥にあるのは遠い」ため。**設計（ユーザーが選択）**：ホームの上のバーを
+「家族 ▼」にし、押すとその場に `DropdownMenu`（Step 26 と同じ部品）を開く。並びは
+マイカレンダー → 共有カレンダー → 区切り線 →「＋ 新しいカレンダー」「カレンダーの管理」。選択中に ✓。
+**設定画面の「カレンダー」の行は消す**（入口を 2 つ持たない）。一覧画面（Step 31）は「カレンダーの管理」として残し、
+Step 34 のメンバー管理の入口にする。
+
+| | 内容 | 状態 |
+|---|---|---|
+| H-1 | `CalendarUiState` に `selectedCalendarId` / `calendars` / `isCalendarMenuOpen` | ✅（Claude） |
+| H-2 | `CalendarViewModel`：`observeCalendars`・メニューの開閉・`selectCalendar` | ✅（Claude） |
+| H-3 | `CalendarScreen`：「名前 ▼」＋ `DropdownMenu` ＋ 呼び鈴 2 つ | ✅（Claude） |
+| H-4 | `NavHost` の配線＋設定画面の「カレンダー」の行を削除 | ✅（Claude） |
+| H-5 | 実機確認（Claude が adb で操作し、8 項目すべて確認） | ✅ 10-22 |
+
+**H-2〜H-4 はユーザーの依頼で Claude が実装した（2026-10-22。「このボタンのお引越し部分の実装はそっちで頼みたい」）。**
+- 選んだあとの切り替えは**新しく書いていない**。`selectCalendar` は掲示板に貼ってメニューを閉じるだけで、
+  33-C の `collect` が気づいてバーの名前と予定を張り直す。一覧画面（33-B）からの選択と入口が同じ。
+- `observeCalendars` の失敗は `errorMessage` に入れない（メニューに共有が出ないだけで予定は読める。
+  入れると下の一覧がエラー表示に置き換わる。ログアウトの瞬間の `PERMISSION_DENIED` もここに来る）。
+- 別画面へ行く 2 項目は、`closeCalendarMenu()` → 呼び鈴 の順。閉じずに行くと戻ってきたとき開いたまま。
+- ✓ は全行に `CheckMark` を置いて中身だけ出し分ける（行の文字位置を揃えるため。grammar §3-(123)）。
 
 #### Step 31（カレンダー一覧画面）
 
@@ -1057,6 +1134,11 @@ cd ~/Library/Android/sdk/emulator
 また `identitytoolkit.googleapis.com` は **ICMP を返さない**ので、ping が無応答でも異常ではない。
 
 💡 コールドブート（`-no-snapshot-load`）するとエミュレータ内のログイン状態は消える。
+
+**2026-10-22 に再発。** 33-E の確認中、ログアウト→再ログインで「ネットワークに接続できません」。
+`netsimd --host-dns=202.13.160.201,…`（前のネットワーク）に対し Mac は `192.168.1.253` で、上の手順どおり確定。
+`adb emu kill` → `-dns-server 192.168.1.253 -no-snapshot-load` で起動し直して解消した。
+**ログアウトの直後に起きると「33-E の変更で壊した」と誤解しやすい**が、アプリとは無関係。
 
 ### 検証環境のハマりどころ（2026-08-12 追記）
 

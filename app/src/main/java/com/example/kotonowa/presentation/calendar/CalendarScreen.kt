@@ -18,9 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -62,6 +65,8 @@ fun CalendarScreen(
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
     onSetting: () -> Unit,
+    onCreateCalendarClick: () -> Unit,     // ▼ のメニューの「＋ 新しいカレンダー」（Step 33-H）
+    onManageCalendarsClick: () -> Unit,    // ▼ のメニューの「カレンダーの管理」（Step 33-H）
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -71,7 +76,58 @@ fun CalendarScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("ことのわ") },
+                // 「家族 ▼」を押すと、その場にカレンダーのメニューを開く（Step 33-H。grammar §3-(107)）
+                title = {
+                    // ボタンとメニューを同じ Box に入れる。メニューは「どのボタンから出たか」を Box で知る
+                    Box {
+                        TextButton(onClick = viewModel::openCalendarMenu) {
+                            Text(
+                                text = "${uiState.calendarName} ▼",           // §4-㉖
+                                style = MaterialTheme.typography.titleLarge,   // バーの見出しと同じ大きさ
+                                color = MaterialTheme.colorScheme.onSurface,   // ボタンの色（primary）ではなく見出しの色
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = uiState.isCalendarMenuOpen,
+                            onDismissRequest = viewModel::closeCalendarMenu,
+                        ) {
+                            // 先頭はマイカレンダー（掲示板の白紙＝null）
+                            DropdownMenuItem(
+                                text = { Text("マイカレンダー") },
+                                leadingIcon = { CheckMark(visible = uiState.selectedCalendarId == null) },
+                                onClick = { viewModel.selectCalendar(null) },
+                            )
+
+                            // 共有カレンダーを 1 つずつ（§4-(114)）
+                            uiState.calendars.forEach { calendar ->
+                                DropdownMenuItem(
+                                    text = { Text(calendar.name) },
+                                    leadingIcon = { CheckMark(visible = calendar.id == uiState.selectedCalendarId) },
+                                    onClick = { viewModel.selectCalendar(calendar) },
+                                )
+                            }
+
+                            HorizontalDivider()   // 区切り線（§3-(123)）
+
+                            // 別の画面へ行く 2 つ。先にメニューを閉じておかないと、戻ってきたとき開いたままになる
+                            DropdownMenuItem(
+                                text = { Text("＋ 新しいカレンダー") },
+                                onClick = {
+                                    viewModel.closeCalendarMenu()
+                                    onCreateCalendarClick()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("カレンダーの管理") },
+                                onClick = {
+                                    viewModel.closeCalendarMenu()
+                                    onManageCalendarsClick()
+                                },
+                            )
+                        }
+                    }
+                },
                 actions = {
                     TextButton(onClick = onSetting) {
                         Text("設定⚙️")
@@ -510,3 +566,11 @@ private fun MonthGridPreview() {
     }
 }
 
+/**
+ * ▼ のメニューの ✓。選ばれていない行でも**場所だけは取る**（中身を空にする）ので、
+ * ✓ の有無で行の文字の位置がずれない（Step 24 で選択中でない日にも透明な Surface を置いたのと同じ考え方）。
+ */
+@Composable
+private fun CheckMark(visible: Boolean) {
+    Text(if (visible) "✓" else "")
+}

@@ -103,6 +103,8 @@ fun KotonowaNavHost(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
                 onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },
                 onSetting = { navController.navigate(Routes.SETTING) },
+                onCreateCalendarClick = { navController.navigate(Routes.CALENDAR_CREATE) },
+                onManageCalendarsClick = { navController.navigate(Routes.CALENDAR_LIST) },
             )
         }
 
@@ -172,7 +174,6 @@ fun KotonowaNavHost(
                         popUpTo(Routes.HOME) { inclusive = true }
                     }
                 },
-                onCalendarListClick = { navController.navigate(Routes.CALENDAR_LIST) },
             )
         }
 
