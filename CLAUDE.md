@@ -740,7 +740,7 @@ grammar §8-(99)。
 | 30 | `CalendarRepositoryImpl`（作成時に members も一緒に書く） | ✅ 09-28 |
 | 31 | カレンダー一覧画面 | ✅ 10-04 |
 | 32 | カレンダー作成画面 | ✅ 10-14 |
-| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-D から |
+| 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | 🔧 33-E から |
 | 34 | メンバー一覧・ロール変更（オーナーのみ） | |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
@@ -880,7 +880,7 @@ match /calendars/{calendarId} {
 | 33-A | 掲示板（`domain/repository/SelectedCalendarRepository` ＋ `data/local/…Impl` ＋ `RepositoryModule`） | ✅ 10-14 |
 | 33-B | 一覧の先頭に「マイカレンダー」＋行タップで掲示板に貼ってホームへ戻る | ✅ 10-18 |
 | 33-C | `CalendarViewModel` が掲示板を見張り、貼り替わったら購読を張り直す＋上のバーに名前 | ✅ 10-20 |
-| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | |
+| 33-D | `ScheduleEditViewModel` の新規作成で、掲示板のカレンダーの id を使う | ✅ 10-22 |
 | 33-E | ログアウトで掲示板を白紙に戻す | |
 | 33-F | `events` のルールを「そのカレンダーのメンバーなら読み書きできる」に広げる（Claude が書く） | |
 | 33-G | 実機確認（家族に切り替え→予定作成→個人に戻ると出ない） | |
@@ -917,6 +917,13 @@ NavHost は `popBackStack(Routes.HOME, inclusive = false)` で設定画面も飛
 ⚠️ **33-C で踏んだところ。** `calendarId = calendarId ?: uid`（右も箱から始めてしまい、掲示板を見ていない）、
 `calendarName = calendarId ?: …`（バーに uid が出る）、`Text(uiState,id)`（`.` と `,` の取り違え）。
 ①②は「掲示板から箱へ」、④の `val id = calendarId` は「箱から手元へ」で**向きが逆**。
+
+**33-D。** `ScheduleEditViewModel` の `calendarId`（中身は自分の uid）を **`uid` に改名**（Step 19-D の 💡 を回収）。
+`save()` で `myUid = uid ?: return`、`targetCalendarId = selectedCalendarRepository.selected.value?.id ?: myUid`。
+新規なら `calendarId = targetCalendarId`（置き場所）、`createdBy = myUid`（作った人）。編集なら `original?.〇〇` を引き継ぐ。
+作成画面は掲示板を **`.value` で保存の瞬間に 1 回読むだけ**（ホームは `collect` で見張る。Step 20 の「1 回きり／購読」と同じ使い分け）。
+⚠️ `.value` の代わりに 33-C の `calendar`（`collect { calendar -> }` で**自分で付けた**名前）を書きかけた。
+`.value` は Kotlin が決めた取り出し口、`calendar` は受け取るときに付けた名前で、`collect` の外には存在しない。
 
 #### Step 31（カレンダー一覧画面）
 
