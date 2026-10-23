@@ -2521,6 +2521,34 @@ class SelectedCalendarRepositoryImpl @Inject constructor() : SelectedCalendarRep
 
 掲示板は「貼ってある紙を新しい紙に替える」だけで、前の紙の一部を残す必要が無いので `.value =` で足りる。
 
+### (125) `any { }` ／ `sortedBy { }` ／ `?:` を繋げる
+
+```kotlin
+val isOwner = members.any { member -> member.uid == myUid && member.role == MemberRole.OWNER }
+val sorted  = items.sortedBy { item -> item.role }
+val name    = user?.displayName ?: user?.email ?: "（名前未登録）"
+```
+
+2026-10-23、Step 34-C で記録。
+
+| 書き方 | 読み方 | 答え |
+|---|---|---|
+| `リスト.any { 条件 }` | 「リストの中に、条件に合うものが**1 つでも**あるか」 | `Boolean`。1 件見つかった時点で残りは見ない |
+| `リスト.sortedBy { 並べる基準 }` | 「基準の小さい順に並べ替えた**新しい**リスト」 | 元のリストは変わらない（`filter` / `map` と同じ。§4-(55)(95)） |
+| `a ?: b ?: c` | 「a、無ければ b、それも無ければ c」 | 左から順に見て、`null` でない最初のもの（§4-⑮ を繋げただけ） |
+
+**`any` の `{ }` の中は「はい／いいえ」の式。** `filter`（§4-(95)）と同じ形の条件を書く。
+違いは答えで、`filter` は合うものを集めたリスト、`any` は「あったか」の `Boolean` 1 つ。
+💡 仲間に `all { }`（全部が合うか）と `none { }`（1 つも合わないか）がある。
+
+**enum は書いた順に並ぶ。** `MemberRole` は `OWNER, EDITOR, VIEWER` の順に書いてあるので、
+`sortedBy { it.role }` でオーナー → 編集者 → 閲覧者になる。enum の並び替えは
+**名前の五十音順ではなく、定義に書いた順**。順番を変えたいなら enum の書き順を変える。
+
+💡 **`map { }` の中で `suspend` の関数（`getUser`）を呼べる。** `map` の `{ }` は
+呼んだ場所にそのまま貼り付けられる作りなので、外側の `collect { }`（コルーチンの中）の続きとして動く。
+ただし 1 人ずつ**順番に**通信するので、メンバーが多いと遅くなる（数人なら問題ない）。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
