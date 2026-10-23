@@ -46,6 +46,13 @@ object Routes {
 
     // TODO(32-D-1) カレンダー作成画面の住所（grammar §3-(117)）
     const val CALENDAR_CREATE = "calendar_create"
+
+    // Step 34-B: メンバー画面の住所。SCHEDULE_DETAIL / scheduleDetail と同じ形（grammar §3-(124)）
+    // TODO(34-B-1) { } の中は「ここに id が入る」という穴の名前。34-C の頭脳がこの名前で受け取る
+    const val CALENDAR_MEMBERS = "calendar_members/{calendarId}"
+
+    // TODO(34-B-1) 誰の：この関数の ／ 何をする：受け取った id を住所の文字に差し込む（§6-㉖）
+    fun calendarMembers(calendarId: String) = "calendar_members/$calendarId"
 }
 
 /**
@@ -182,8 +189,9 @@ fun KotonowaNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 // TODO(32-D-2) 「＋」が押されたら作成画面の住所へ行く（§3-(117)）
                 onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
-                // TODO(33-B-4) 選び終わったら、設定画面も飛ばしてホームまで一気に戻る（§3-(120)）
-                onCalendarSelected = { navController.popBackStack(Routes.HOME, inclusive = false) },
+                // Step 34-B: 着地先（メンバー画面）は 34-D で作る。まだ地図に無い住所へ navigate すると
+                // 落ちるので、今は呼び鈴を受け取るだけ。34-D で navigate(Routes.calendarMembers(calendarId)) に変える
+                onCalendarClick = { calendarId -> },
             )
         }
 

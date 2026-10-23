@@ -1324,6 +1324,28 @@ Step 24 で、選択中でない日にも `Color.Transparent` の `Surface` を�
 **`== null` で判定してよい理由。** `selectedCalendarId` は「マイカレンダーなら `null`」と決めてあるので（33-H-1）、
 `uiState.selectedCalendarId == null` がそのまま「マイカレンダーを表示中」の意味になる。
 
+### (124) 住所に id を載せる — `"〇〇/{名前}"` と `"〇〇/$名前"`
+
+```kotlin
+const val CALENDAR_MEMBERS = "calendar_members/{calendarId}"          // ① 地図に書く「型」
+fun calendarMembers(calendarId: String) = "calendar_members/$calendarId" // ② 実際に行く住所を作る
+```
+
+2026-10-23、Step 34-B で記録（Step 18-A の `SCHEDULE_DETAIL` / `scheduleDetail` から使っていた形）。
+
+| 書き方 | 誰が使う | 意味 |
+|---|---|---|
+| `"calendar_members/{calendarId}"` | `composable(…)`（地図） | `{ }` は**穴**。「ここには何かの id が入る。その値を `calendarId` という名前で取っておいて」という型。中括弧はただの文字で、Kotlin の文法ではない |
+| `"calendar_members/$calendarId"` | `navigate(…)`（行く側） | `$` は §6-㉖ の `${ }` の短縮形。変数の名前 1 つだけなら `{ }` を省ける。`calendarId` が `"abc"` なら `"calendar_members/abc"` になる |
+
+**2 つの名前は揃える。** ① の `{ }` の中の名前は、受け取る頭脳が
+`savedStateHandle["calendarId"]` と**同じ綴り**で取り出すときの名札（Step 18-B）。
+② の `$` の後ろは**関数の引数の名前**。両方 `calendarId` にしておくと読みやすいが、
+食い違って困るのは ① と `savedStateHandle[…]` の方。こちらは文字なのでコンパイラは見つけてくれない。
+
+**載せられるのは文字だけ。** 住所は文字列なので、`Calendar` そのものは載せられない。
+**id だけ載せ、行った先の画面が自分で読み直す**（詳細画面が `itemId` から予定を読んだのと同じ）。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
