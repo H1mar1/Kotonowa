@@ -75,6 +75,21 @@ class UserRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    override suspend fun getUser(uid: String): Result<User?> = try {
+        // TODO(34-A-2) 誰の：users の棚の ／ 何をする：この uid の住所の名刺を 1 回読む
+        //   名刺の住所は uid そのもの（saveUser の document(user.uid) と同じ）。お手本は ScheduleRepositoryImpl.getItem
+        val snapshot = firestore.collection(COLLECTION_USERS)
+            .document(uid)
+            .get()
+            .await()
+
+        // TODO(34-A-2) 名刺があれば User に組み立て、無ければ「無し」を返す（値を返す if。§5-(68)）
+        //   getItem と違って、無いのは異常ではないので throw しない
+        Result.success(if (snapshot.exists()) snapshot.toUser() else null)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }
 
 /**
