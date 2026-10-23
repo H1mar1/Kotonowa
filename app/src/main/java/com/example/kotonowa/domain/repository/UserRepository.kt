@@ -26,4 +26,14 @@ interface UserRepository {
      *
      */
     suspend fun findUserByEmail(email: String): Result<User?>
+
+    /**
+     * uid で名刺を 1 枚読む（Step 34。メンバー一覧に名前を出すため）。
+     *
+     * 名簿（members）には uid と肩書きしか無いので、名前はここから引く。
+     * 名刺が無い人もありうる（Step 28 より前に作られた・保存に失敗した等）ので、
+     * 「通信できたか」は Result、「名刺があったか」は中身の ? で表す（findUserByEmail と同じ考え方）。
+     */
+    // TODO(34-A-1) 戻り値の型。封筒（Result）の中に「名刺、または無し」を入れる。すぐ上の findUserByEmail と同じ
+    suspend fun getUser(uid: String): Result<User?>
 }
