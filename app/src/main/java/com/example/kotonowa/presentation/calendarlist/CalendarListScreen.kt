@@ -32,13 +32,14 @@ import java.time.Instant
  * お手本は `presentation/settings/SettingsScreen`（Screen ＋ Content の 2 段構え）。
  * 画面は `navController` を受け取らず、呼び鈴（`() -> Unit`）だけを持つ。
  *
- * @param onCalendarSelected カレンダーを選び終わったときに鳴らす呼び鈴。NavHost がホームへ戻す。
+ * @param onCalendarClick 行が押されたときに鳴らす呼び鈴。押されたカレンダーの id を添える。
+ *   NavHost がその id を住所に載せてメンバー画面へ行く（Step 34-B）。
  */
 @Composable
 fun CalendarListScreen(
     onNavigateBack: () -> Unit,
     onAddClick: () -> Unit,
-    onCalendarSelected: () -> Unit,
+    onCalendarClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarListViewModel = hiltViewModel(),
 ) {
@@ -48,12 +49,9 @@ fun CalendarListScreen(
         uiState = uiState,
         onNavigateBack = onNavigateBack,
         onAddClick = onAddClick,
-        // TODO(33-B-2) 行がタップされたら、①頭脳に「掲示板に貼って」と頼み、②呼び鈴を鳴らす
-        //   お手本は SettingsScreen の「viewModel.logout() → onLoggedOut()」の 2 行（Step 25）
-        onCalendarClick = { calendar ->
-            viewModel.selectCalendar(calendar)
-            onCalendarSelected()
-        },
+        // TODO(34-B-2) 誰の：この画面の呼び鈴を ／ 何をする：見た目係にそのまま手渡す
+        //   型が同じ (String) -> Unit なので { } で包まなくてよい（§1-(78) の①。onAddClick と同じ）
+        onCalendarClick = onCalendarClick,
         modifier = modifier,
     )
 }
@@ -67,7 +65,8 @@ private fun CalendarListContent(
     uiState: CalendarListUiState,
     onNavigateBack: () -> Unit,
     onAddClick: () -> Unit,
-    onCalendarClick: (Calendar?) -> Unit,   // null ＝ マイカレンダー（個人）
+    // TODO(34-B-3) 呼び鈴の型。添えるのはカレンダーの id（文字）。Calendar そのものではない
+    onCalendarClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -86,8 +85,7 @@ private fun CalendarListContent(
     ) { innerPadding ->
 
         // 条件だけの when（§5-(64)）。上から順に試して、最初に当たった枝だけ描く。
-        // Step 33-B で「空っぽ」の枝を無くした。マイカレンダーの行は共有が 0 件でも必ず出すため、
-        // 空っぽの案内は LazyColumn の中に移した。
+        // 空っぽの案内は LazyColumn の中にある（Step 33-B）。
         // ⚠️ 枝の順番が命。errorMessage の枝を先に置くと、読み込み中に何も出なくなる
         when {
             uiState.isLoading -> {
@@ -114,12 +112,6 @@ private fun CalendarListContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    // 先頭に 1 行だけ、マイカレンダー（個人）を固定で出す（§3-(120)）
-                    item {
-                        // TODO(33-B-3) 押されたら「個人」を選んだと伝える。個人は null で表す（33-A）
-                        PersonalCalendarRow(onClick = { onCalendarClick(null) })
-                    }
-
                     if (uiState.calendars.isEmpty()) {
                         item {
                             Text(
@@ -130,8 +122,8 @@ private fun CalendarListContent(
                     } else {
                         // 一覧の 1 件ずつを CalendarRow で描く（§3-(66)）
                         items(uiState.calendars, key = { calendar -> calendar.id }) { calendar ->
-                            // TODO(33-B-3) 押されたら「このカレンダー」を選んだと伝える
-                            CalendarRow(calendar = calendar, onClick = { onCalendarClick(calendar) })
+                            // TODO(34-B-4) 誰の：この行の ／ 何をする：呼び鈴を「このカレンダーの id」を添えて鳴らす
+                            CalendarRow(calendar = calendar, onClick = { onCalendarClick(calendar.id) })
                         }
                     }
                 }
@@ -168,35 +160,6 @@ private fun CalendarRow(
 
             Text(
                 text = calendar.name,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-    }
-}
-
-/**
- * 先頭に固定で出す「マイカレンダー」の行。個人カレンダーは `calendars` の書類を持たないので
- * [Calendar] を受け取らず、文字を直接書く。見た目は [CalendarRow] と揃えている。
- */
-@Composable
-private fun PersonalCalendarRow(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "個人",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-            )
-            Text(
-                text = "マイカレンダー",
                 style = MaterialTheme.typography.titleMedium,
             )
         }
