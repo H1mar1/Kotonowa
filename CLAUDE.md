@@ -743,7 +743,7 @@ grammar §8-(99)。
 | 32 | カレンダー作成画面 | ✅ 10-14 |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | ✅ 10-22 |
 | 33-H | 切り替えを設定からホームの「名前 ▼」のメニューへ移す | ✅ 10-22 |
-| 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | 🔧 34-D 完了、次は 34-E（ルール） |
+| 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | 🔧 34-E 完了、次は 34-F（実機確認） |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
 | 37 | セキュリティルールをロールベースに作り替える | |
@@ -998,8 +998,42 @@ Step 34 のメンバー管理の入口にする。
 | 34-B | 管理一覧：個人の行を消し、行タップでメンバー画面へ（`Routes` に `calendar_members/{calendarId}`） | ✅ 10-23 |
 | 34-C | `MemberListUiState` ＋ `MemberListViewModel`（名簿の購読・名前の引き当て・ロール変更・外す） | ✅ 10-23 |
 | 34-D | `MemberListScreen`（名前・肩書き。オーナーだけ変更・外すを出す） | ✅ 10-23 |
-| 34-E | ルール：名簿の `read`（メンバー）・`update` / `delete`（オーナーのみ。オーナー自身の行は不可）（Claude が書く） | |
+| 34-E | ルール：名簿の `read`（メンバー）・`update` / `delete`（オーナーのみ。オーナー自身の行は不可）＋部屋の `memberUids` の `update`（オーナーのみ）（Claude が書く） | ✅ 11-02 |
 | 34-F | コンソールで仮メンバーを足して実機確認 | |
+
+**34-E のルールで足す分（`users` / `events` / `calendars` の既存分はそのまま）。**
+
+```
+function isCalendarOwner(calendarId) {
+  return get(/databases/$(database)/documents/calendars/$(calendarId)).data.ownerUid == request.auth.uid;
+}
+
+match /calendars/{calendarId} {
+  allow update: if request.auth != null
+    && resource.data.ownerUid == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+    && request.auth.uid in request.resource.data.memberUids;
+
+  match /members/{memberUid} {
+    allow read: if request.auth != null && isMember(calendarId);
+
+    allow update: if request.auth != null
+      && isCalendarOwner(calendarId)
+      && memberUid != request.auth.uid
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+      && request.resource.data.role in ['editor', 'viewer'];
+
+    allow delete: if request.auth != null
+      && isCalendarOwner(calendarId)
+      && memberUid != request.auth.uid;
+  }
+}
+```
+
+⚠️ **「外す」は名簿だけ開けても動かない。** `removeMember` は `runBatch` で「名簿の行を消す」と「部屋の `memberUids` から抜く」を
+同時に行い、**片方でも拒否されると両方失敗する**。だから部屋の `update` も要る。ただし名前や `ownerUid` まで書き換えられないよう、
+変えてよい項目を `memberUids` だけに絞っている（grammar §4-(127)）。自分を配列から抜けないようにもしてある。
+肩書きは `editor` / `viewer` だけ許す。`owner` を許すと、オーナーが 2 人いる状態を作れてしまう。
 
 #### Step 31（カレンダー一覧画面）
 
