@@ -59,4 +59,13 @@ interface CalendarRepository {
      * 消すものの中身は受け取らず、id だけで足りる。
      */
     suspend fun removeMember(calendarId: String, uid: String): Result<Unit>
+
+    /**
+     * カレンダーの書類を 1 回読む（Step 35。招待状にカレンダー名を写すため）。
+     *
+     * 「通信できたか」は Result、「書類があったか」は中身の ? で表す（UserRepository の getUser と同じ）。
+     */
+    // TODO(35-D-1-1) 関数名は getCalendar。引数は calendarId（文字）。
+    //   戻り値は封筒の中に「カレンダー、または無し」。お手本は UserRepository の getUser
+    suspend fun getCalendar(calendarId: String): Result<Calendar?>
 }

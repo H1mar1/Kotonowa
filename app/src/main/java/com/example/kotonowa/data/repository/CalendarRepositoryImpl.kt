@@ -172,6 +172,23 @@ class CalendarRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    // ---- 35-D-1 --------------------------------------------------------
+
+    override suspend fun getCalendar(calendarId: String): Result<Calendar?> = try {
+        // TODO(35-D-1-2) 誰の：calendars の棚の ／ 何をする：この calendarId の書類を 1 回読む
+        //   お手本は UserRepositoryImpl の getUser
+        val snapshot = firestore.collection(COLLECTION_CALENDARS)
+            .document(calendarId)
+            .get()
+            .await()
+
+        // TODO(35-D-1-3) 書類があれば Calendar に組み立て、無ければ「無し」を返す（値を返す if。§5-(68)）
+        //   組み立て係はこのファイルの下の toCalendar
+        Result.success(if (snapshot.exists()) snapshot.toCalendar() else null)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }
 
 // ---- 変換係（このファイルの中だけで使う。§4-㊱） --------------------------
