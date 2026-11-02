@@ -4,10 +4,12 @@ import com.example.kotonowa.data.local.ReminderSchedulerImpl
 import com.example.kotonowa.data.local.SelectedCalendarRepositoryImpl
 import com.example.kotonowa.data.repository.AuthRepositoryImpl
 import com.example.kotonowa.data.repository.CalendarRepositoryImpl
+import com.example.kotonowa.data.repository.InviteRepositoryImpl
 import com.example.kotonowa.data.repository.ScheduleRepositoryImpl
 import com.example.kotonowa.data.repository.UserRepositoryImpl
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.InviteRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.example.kotonowa.domain.repository.SelectedCalendarRepository
@@ -56,4 +58,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSelectedCalendarRepository(impl: SelectedCalendarRepositoryImpl): SelectedCalendarRepository
+
+    // TODO(35-C-5) 招待の約束を頼まれたら、実装を渡す（上と同じ形。@Binds と @Singleton も付ける）
+    //   ファイルの上の import も 2 行足す（InviteRepositoryImpl と InviteRepository）
+    @Binds
+    @Singleton
+    abstract fun bindInviteRepository(impl: InviteRepositoryImpl):InviteRepository
 }

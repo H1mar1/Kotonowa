@@ -136,7 +136,7 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | `calendars` | トップレベル | calendarId, name, ownerUid, type, color, createdAt, **memberUids[]** |
 | `calendars/{calendarId}/members` | サブコレクション | uid, role(owner/editor/viewer), joinedAt, invitedBy |
 | `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, sortAt, createdBy, reminderMinutesBefore, updatedAt |
-| `invites` | トップレベル | inviteId, calendarId, invitedEmail, role, status, invitedBy, createdAt |
+| `invites` | トップレベル | inviteId, calendarId, **calendarName**, invitedEmail, role, status, invitedBy, createdAt |
 
 **設計メモ**
 - `events`はフラット構造にすることで、「自分が所属する全カレンダーの予定/タスクを横断表示」するクエリを1回で書けるようにしている

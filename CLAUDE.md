@@ -1041,6 +1041,22 @@ match /calendars/{calendarId} {
 変えてよい項目を `memberUids` だけに絞っている（grammar §4-(127)）。自分を配列から抜けないようにもしてある。
 肩書きは `editor` / `viewer` だけ許す。`owner` を許すと、オーナーが 2 人いる状態を作れてしまう。
 
+#### Step 35 の内訳（招待送信）
+
+**設計（2026-11-02）。** 入口はメンバー画面のオーナーだけに見える「招待」。未登録のメールアドレスには招待状を作らない。
+招待状に `calendarName` を写す。招待された人はまだメンバーではなく部屋の書類を読めないので、Step 36 で名前を出すために要る。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 35-A | `domain/model/Invite` ＋ `InviteStatus` | ✅ 11-02 |
+| 35-B | `domain/repository/InviteRepository`（interface） | ✅ 11-02 |
+| 35-C | `data/repository/InviteRepositoryImpl` ＋ `RepositoryModule` | ✅ 11-02 |
+| 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | |
+| 35-D-2 | 招待の処理（`MemberListViewModel`：相手を探す→招待状を書く） | |
+| 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | |
+| 35-F | ルール：`invites` の `create`（Claude が書く） | |
+| 35-G | 実機確認（`invites` に招待状が 1 枚できる） | |
+
 #### Step 31（カレンダー一覧画面）
 
 設定 →「カレンダー」で `presentation/calendarlist/` の一覧を開く。`CalendarListViewModel` は
