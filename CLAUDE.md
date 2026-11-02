@@ -1051,7 +1051,7 @@ match /calendars/{calendarId} {
 | 35-A | `domain/model/Invite` ＋ `InviteStatus` | ✅ 11-02 |
 | 35-B | `domain/repository/InviteRepository`（interface） | ✅ 11-02 |
 | 35-C | `data/repository/InviteRepositoryImpl` ＋ `RepositoryModule` | ✅ 11-02 |
-| 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | |
+| 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | ✅ 11-02 |
 | 35-D-2 | 招待の処理（`MemberListViewModel`：相手を探す→招待状を書く） | |
 | 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | |
 | 35-F | ルール：`invites` の `create`（Claude が書く） | |
