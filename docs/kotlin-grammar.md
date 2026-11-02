@@ -322,6 +322,20 @@ Firestore は Kotlin の変数名を知らない。**名札は文字列で伝え
 
 ---
 
+### (126) `{ _, _ -> }` — 使わない引数は `_` で受け流す
+
+```kotlin
+onChangeRole = { _, _ -> },   // (String, MemberRole) -> Unit の「何もしない」版
+onRemove = {},                // (String) -> Unit は it があるので {} だけで書ける
+```
+
+2026-10-23、Step 34-D（Preview）で記録。
+
+呼び鈴の型が `(String, MemberRole) -> Unit` のように**引数 2 つ以上**だと、`{}` だけでは書けない
+（`it` が使えるのは引数が 1 つのときだけ。§1-⑥）。受け取る名前を書く必要があるが、
+使わないなら名前の代わりに `_`（アンダースコア）を置くと「受け取るけど使わない」の印になる。
+Preview で呼び鈴を空にしておくときによく出てくる。
+
 ## §2 コルーチン（時間のかかる処理）
 
 ### ⑨ `suspend` — 待てる関数
@@ -2484,6 +2498,28 @@ allow read: if request.auth != null && isMember(resource.data.calendarId);
 
 **関数は `match /databases/{database}/documents { }` の中に書く。** 中の `$(database)` を使うため。
 `match /events/…` の外（同じ階層）に置けば、どの `match` からも呼べる。
+
+### (127) セキュリティルールの `diff` ／ `hasOnly` ／ `!=` ／ `in [ ]`
+
+```
+allow update: if isCalendarOwner(calendarId)
+  && memberUid != request.auth.uid
+  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+  && request.resource.data.role in ['editor', 'viewer'];
+```
+
+2026-11-02、Step 34-E で記録。(118)(122) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `!=` | 「同じではない」 | `==` の逆。Kotlin と同じ |
+| `A.diff(B)` | 「A と B を見比べる」 | diff（ディフ）は「違い」。ここでは「これから書く中身」と「今ある書類」を比べる |
+| `.affectedKeys()` | 「変わった項目の名前の一覧」 | affected（アフェクテッド）は「影響を受けた」、keys は「項目名」。追加・変更・削除された項目がすべて入る |
+| `.hasOnly(['role'])` | 「`role` のほかは入っていないか」 | 一覧に**他の項目が 1 つでも**あれば「いいえ」。「変えてよいのは `role` だけ」という意味になる |
+| `値 in ['editor', 'viewer']` | 「この 2 つのどちらかか」 | (118) の `in` と同じ。リストをその場で書いている |
+
+**`diff` が要る理由。** `update` は書類の 1 項目だけを許す命令ではなく、「書き換え」全体を許す。
+`diff` で絞らないと、肩書きの変更を許したつもりで `uid` や `joinedAt` まで書き換えられてしまう。
 
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 

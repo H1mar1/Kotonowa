@@ -92,5 +92,37 @@ class MemberListViewModel @Inject constructor(
         }
     }
 
-    // 34-C-3 で、ここに「肩書きを変える（changeRole）」と「外す（removeMember）」を足す
+    /**
+     * その人の肩書きを [role] に変える。画面ではオーナーにだけボタンを出す（34-D）。
+     *
+     * 成功したときに書くことは無い。名簿の見張り（[observeMembers]）が変化を拾い、
+     * 一覧を作り直して流してくれる（Step 21 の toggleCompleted と同じ）。失敗したときだけ知らせる。
+     */
+    fun changeRole(uid: String, role: MemberRole) {
+        viewModelScope.launch {
+            // TODO(34-C-3-1) 誰の：カレンダーの窓口の ／ 何をする：このカレンダーの、この uid の人の肩書きを role に書き換える
+            //   Step 30-D で作った関数。引数は「どのカレンダー・誰の・何に」の 3 つ（CalendarRepository.kt で順番を確かめる）
+            calendarRepository.updateMemberRole(calendarId, uid, role)
+                .onFailure {
+                    // TODO(34-C-3-2) 誰の：状態の箱の ／ 何をする：errorMessage に「肩書きを変更できませんでした」を入れる
+                    //   下の removeMember の onFailure と同じ形
+                    _uiState.update { it.copy(errorMessage = "肩書きを変更できませんでした") }
+                }
+        }
+    }
+
+    /**
+     * その人を名簿から外す。画面ではオーナーにだけボタンを出す（34-D）。
+     * 成功したら、見張りが「1 人減った名簿」を流してくれる。
+     */
+    fun removeMember(uid: String) {
+        viewModelScope.launch {
+            // TODO(34-C-3-3) 誰の：カレンダーの窓口の ／ 何をする：このカレンダーの名簿から、この uid の人を外す
+            //   Step 30-D で作った関数。引数は「どのカレンダー・誰を」の 2 つ
+            calendarRepository.removeMember(calendarId, uid)
+                .onFailure {
+                    _uiState.update { it.copy(errorMessage = "メンバーを外せませんでした") }
+                }
+        }
+    }
 }

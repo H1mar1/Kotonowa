@@ -94,7 +94,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
-次は Step 34（メンバー一覧・ロール変更）。
+Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。次は Step 35（招待送信）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -743,7 +743,7 @@ grammar §8-(99)。
 | 32 | カレンダー作成画面 | ✅ 10-14 |
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | ✅ 10-22 |
 | 33-H | 切り替えを設定からホームの「名前 ▼」のメニューへ移す | ✅ 10-22 |
-| 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | 🔧 34-C の穴埋め中 |
+| 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | ✅ 11-02 |
 | 35 | 招待送信（`invites`） | |
 | 36 | 招待受信・承認/拒否 | |
 | 37 | セキュリティルールをロールベースに作り替える | |
@@ -996,10 +996,66 @@ Step 34 のメンバー管理の入口にする。
 |---|---|---|
 | 34-A | `UserRepository.getUser(uid): Result<User?>` ＋ 実装 | ✅ 10-23 |
 | 34-B | 管理一覧：個人の行を消し、行タップでメンバー画面へ（`Routes` に `calendar_members/{calendarId}`） | ✅ 10-23 |
-| 34-C | `MemberListUiState` ＋ `MemberListViewModel`（名簿の購読・名前の引き当て・ロール変更・外す） | 🔧 |
-| 34-D | `MemberListScreen`（名前・肩書き。オーナーだけ変更・外すを出す） | |
-| 34-E | ルール：名簿の `read`（メンバー）・`update` / `delete`（オーナーのみ。オーナー自身の行は不可）（Claude が書く） | |
-| 34-F | コンソールで仮メンバーを足して実機確認 | |
+| 34-C | `MemberListUiState` ＋ `MemberListViewModel`（名簿の購読・名前の引き当て・ロール変更・外す） | ✅ 10-23 |
+| 34-D | `MemberListScreen`（名前・肩書き。オーナーだけ変更・外すを出す） | ✅ 10-23 |
+| 34-E | ルール：名簿の `read`（メンバー）・`update` / `delete`（オーナーのみ。オーナー自身の行は不可）＋部屋の `memberUids` の `update`（オーナーのみ）（Claude が書く） | ✅ 11-02 |
+| 34-F | コンソールで仮メンバーを足して実機確認 | ✅ 11-02 |
+
+**34-F の確認（2026-11-02）。** 閲覧者の表示、オーナーでない人にボタンが出ないこと、肩書きの変更、外す（名簿の行と `memberUids` の両方が消える）まで通した。
+
+⚠️ **コンソールで手で足すときの落とし穴（34-F で踏んだ）。** `members` の棚を開かずに「コレクションを開始」すると別の棚ができ、アプリから見えない。
+`memberUids` の編集は上書きになりやすく、オーナーが抜けると本人がカレンダーを読めなくなる。読めない行は `runCatching` で黙って捨てられるので（Step 30）、
+**行が出ないのにエラーも出ないときは、まずコンソールで住所と項目を確認する。**
+
+**34-E のルールで足す分（`users` / `events` / `calendars` の既存分はそのまま）。**
+
+```
+function isCalendarOwner(calendarId) {
+  return get(/databases/$(database)/documents/calendars/$(calendarId)).data.ownerUid == request.auth.uid;
+}
+
+match /calendars/{calendarId} {
+  allow update: if request.auth != null
+    && resource.data.ownerUid == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+    && request.auth.uid in request.resource.data.memberUids;
+
+  match /members/{memberUid} {
+    allow read: if request.auth != null && isMember(calendarId);
+
+    allow update: if request.auth != null
+      && isCalendarOwner(calendarId)
+      && memberUid != request.auth.uid
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+      && request.resource.data.role in ['editor', 'viewer'];
+
+    allow delete: if request.auth != null
+      && isCalendarOwner(calendarId)
+      && memberUid != request.auth.uid;
+  }
+}
+```
+
+⚠️ **「外す」は名簿だけ開けても動かない。** `removeMember` は `runBatch` で「名簿の行を消す」と「部屋の `memberUids` から抜く」を
+同時に行い、**片方でも拒否されると両方失敗する**。だから部屋の `update` も要る。ただし名前や `ownerUid` まで書き換えられないよう、
+変えてよい項目を `memberUids` だけに絞っている（grammar §4-(127)）。自分を配列から抜けないようにもしてある。
+肩書きは `editor` / `viewer` だけ許す。`owner` を許すと、オーナーが 2 人いる状態を作れてしまう。
+
+#### Step 35 の内訳（招待送信）
+
+**設計（2026-11-02）。** 入口はメンバー画面のオーナーだけに見える「招待」。未登録のメールアドレスには招待状を作らない。
+招待状に `calendarName` を写す。招待された人はまだメンバーではなく部屋の書類を読めないので、Step 36 で名前を出すために要る。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 35-A | `domain/model/Invite` ＋ `InviteStatus` | ✅ 11-02 |
+| 35-B | `domain/repository/InviteRepository`（interface） | ✅ 11-02 |
+| 35-C | `data/repository/InviteRepositoryImpl` ＋ `RepositoryModule` | ✅ 11-02 |
+| 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | |
+| 35-D-2 | 招待の処理（`MemberListViewModel`：相手を探す→招待状を書く） | |
+| 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | |
+| 35-F | ルール：`invites` の `create`（Claude が書く） | |
+| 35-G | 実機確認（`invites` に招待状が 1 枚できる） | |
 
 #### Step 31（カレンダー一覧画面）
 

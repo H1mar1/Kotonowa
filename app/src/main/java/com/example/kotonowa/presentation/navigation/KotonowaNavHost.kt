@@ -16,6 +16,7 @@ import com.example.kotonowa.presentation.calendar.detail.ScheduleDetailScreen
 import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
 import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScreen
+import com.example.kotonowa.presentation.calendarlist.members.MemberListScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
@@ -189,9 +190,9 @@ fun KotonowaNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 // TODO(32-D-2) 「＋」が押されたら作成画面の住所へ行く（§3-(117)）
                 onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
-                // Step 34-B: 着地先（メンバー画面）は 34-D で作る。まだ地図に無い住所へ navigate すると
-                // 落ちるので、今は呼び鈴を受け取るだけ。34-D で navigate(Routes.calendarMembers(calendarId)) に変える
-                onCalendarClick = { calendarId -> },
+                // TODO(34-D-6) 誰の：案内係の ／ 何をする：押されたカレンダーの id を載せた住所へ行く
+                //   住所は Routes の「id を差し込む関数」で作る（34-B-1）。お手本は HOME の onItemClick
+                onCalendarClick = { calendarId -> navController.navigate(Routes.calendarMembers(calendarId)) },
             )
         }
 
@@ -199,6 +200,20 @@ fun KotonowaNavHost(
         composable(Routes.CALENDAR_CREATE) {
             CalendarCreateScreen(
                 onSaved = { navController.popBackStack() },
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        // Step 34-D: メンバー画面を地図に登録する。お手本は SCHEDULE_DETAIL
+        composable(
+            // TODO(34-D-7) 受ける住所は「型」の方（{calendarId} の穴が開いている const val）
+            route = Routes.CALENDAR_MEMBERS,
+            arguments = listOf(
+                // TODO(34-D-7) 穴の名前と、中身が文字であること。名前は 34-B-1 の { } の中と同じ綴り
+                navArgument("calendarId") { type = NavType.StringType },
+            ),
+        ) {
+            MemberListScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
