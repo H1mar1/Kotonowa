@@ -2585,6 +2585,34 @@ val name    = user?.displayName ?: user?.email ?: "（名前未登録）"
 呼んだ場所にそのまま貼り付けられる作りなので、外側の `collect { }`（コルーチンの中）の続きとして動く。
 ただし 1 人ずつ**順番に**通信するので、メンバーが多いと遅くなる（数人なら問題ない）。
 
+### (128) `trim()` ／ `lowercase()` を繋ぐ、`Result` の `isFailure`
+
+```kotlin
+val email = state.inviteEmail.trim().lowercase()
+
+val userResult = userRepository.findUserByEmail(email)
+if (userResult.isFailure) { ...; return@launch }
+val user = userResult.getOrNull()
+if (user == null) { ...; return@launch }
+```
+
+2026-11-08、Step 35-D-3 で記録。
+
+| 書き方 | 読み方 | 答え |
+|---|---|---|
+| `文字.trim()`（トリム） | 「文字の**前後の**空白を切り落としたもの」 | 新しい文字。真ん中の空白は残る |
+| `文字.lowercase()` | 「全部小文字にしたもの」（§4-(111) で既出） | 新しい文字 |
+| `a.trim().lowercase()` | 「a の空白を取って、**その答えを**小文字に」 | `.` で繋ぐと左から順に作業する |
+| `結果.isFailure`（イズ フェイリャー） | 「封筒の中身は失敗か」 | `Boolean`。仲間に `isSuccess` |
+
+**なぜ `trim()` が要るか。** スマホのキーボードは、候補を選ぶと末尾に空白を足すことがある。
+`"taro@example.com "` のままだと名刺の `"taro@example.com"` と一致せず、「登録されていません」になる。
+
+**`isFailure` と `getOrNull()` を 2 段に分ける理由。** `findUserByEmail` の答えは `Result<User?>`（Step 28）。
+`getOrNull()` だけだと「通信に失敗した」と「通信できたが居なかった」が**どちらも `null`** になり区別できない。
+先に `isFailure` で封筒を確かめ、そのあと中身の `null` を見る。
+💡 `getCalendar` では区別していない。どちらでも「先へ進めない」で同じ対応になるため。**区別するかは、利用者に違う一言を見せたいかで決める。**
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

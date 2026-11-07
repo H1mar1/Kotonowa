@@ -3,6 +3,8 @@ package com.example.kotonowa.presentation.calendarlist.members
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.kotonowa.domain.model.Invite
+import com.example.kotonowa.domain.model.InviteStatus
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
@@ -13,8 +15,11 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -142,5 +147,104 @@ class MemberListViewModel @Inject constructor(
     fun onInviteRoleChange(role: MemberRole) {
         // TODO(35-D-2-3) 誰の：状態の箱の ／ 何をする：inviteRole を、選ばれた role に差し替える
         _uiState.update { it.copy(inviteRole = role) }
+    }
+
+    // ---- 35-D-3：招待状を出す ----------------------------------------------
+
+    /**
+     * 入力欄のメールアドレスの人に、このカレンダーへの招待状を出す。
+     *
+     * ① 名刺（users）から相手を探す → ② カレンダーの名前を読む → ③ 招待状を書く、の順。
+     * 前の答えを見て「先へ進むか」を決めるので、ダメなら finishInvite で一言出して return@launch で打ち切る（§(54) ガード節）。
+     * お手本は CalendarCreateViewModel の save()（門番 → 旗を立てる → launch → onSuccess / onFailure）。
+     */
+    fun sendInvite() {
+        val uid = myUid ?: return
+        val state = _uiState.value
+
+        // 門番①：オーナーでなければ何もしない（ボタンはオーナーにしか出さないが、念のため）
+        if (!state.isOwner) return
+
+        // 門番②：送っている途中なら何もしない（二度押しで招待状が 2 枚できるのを防ぐ）
+        if (state.isInviting) return
+
+        // TODO(35-D-3-1) 打った文字の、前後の空白を取り除いてから、小文字に揃える（§4-(128)）
+        //   誰の：状態の inviteEmail の ／ 何をする：空白を取る → 小文字にする（2 つを . で繋ぐ）
+        val email = state.inviteEmail.trim().lowercase()
+
+        // 門番③：空なら弾く。isInviting を立てる前に弾くので、あとで戻さなくてよい
+        if (email.isBlank()) {
+            _uiState.update { it.copy(inviteMessage = "メールアドレスを入れてください") }
+            return
+        }
+
+        // TODO(35-D-3-2) 誰の：状態の箱の ／ 何をする：isInviting を「はい」に、inviteMessage を null に（前回の一言を消す）
+        //   save() の isSaving = true, errorMessage = null と同じ形
+        _uiState.update { it.copy(isInviting = true, inviteMessage = null) }
+
+        viewModelScope.launch {
+            // ---- ① 相手を探す ----
+            // TODO(35-D-3-3) 誰の：名刺の窓口の ／ 何をする：email で人を探す（Step 28 の関数）。答えは封筒（Result）のまま受け取る
+            val userResult = userRepository.findUserByEmail(email)
+
+            // 封筒が「失敗」＝通信できなかった（§4-(128) isFailure）
+            if (userResult.isFailure) {
+                finishInvite("通信に失敗しました。もう一度お試しください")
+                return@launch
+            }
+            val user = userResult.getOrNull()
+
+            // TODO(35-D-3-4) 通信はできたが、その人が居なかったとき（user が空っぽ）の条件
+            if (user == null) {
+                finishInvite("このメールアドレスの人は登録されていません")
+                return@launch
+            }
+
+            // TODO(35-D-3-5) 誰の：今の名簿の行の並び（state.members）の ／ 何をする：uid が見つかった人（user.uid）と同じ行が 1 つでもあるか（§4-(125) any）
+            //   自分のメールアドレスを打った場合も、自分は名簿に居るのでここで止まる
+            if (state.members.any { member -> member.uid == user.uid }) {
+                finishInvite("この人はすでにメンバーです")
+                return@launch
+            }
+
+            // ---- ② カレンダーの名前を読む ----
+            // 招待された人はまだ部屋の書類を読めないので、名前を招待状に写す（35 の設計）。
+            // 失敗でも「書類が無い」でも先へ進めないので、getOrNull で 1 つにまとめて null を見る（§4-(56)）
+            val calendar = calendarRepository.getCalendar(calendarId).getOrNull()
+            if (calendar == null) {
+                finishInvite("カレンダーを読み込めませんでした")
+                return@launch
+            }
+
+            // ---- ③ 招待状を組み立てて、書く ----
+            // TODO(35-D-3-6) 6 つの欄を埋める。左の名前と右の値の「綴り」と「意味」を 1 行ずつ声に出して照合する
+            //   （全部 String なので、取り違えてもコンパイラは見つけられない。Step 19-D と同じ注意）
+            val invite = Invite(
+                id = UUID.randomUUID().toString(),  // 招待状そのものの新しい ID（§4-(63)）
+                calendarId = calendarId,            // どのカレンダーへ：この画面のカレンダー
+                calendarName = calendar.name,       // ② で読んだカレンダーの名前
+                invitedEmail = email,               // 誰宛て：小文字に揃えたほうのメールアドレス
+                role = state.inviteRole,            // 承認後の肩書き：入力欄で選ばれたもの
+                status = InviteStatus.PENDING,      // 今の状態：返事待ち（InviteStatus の 1 つ）
+                invitedBy = uid,                    // 招待した人：自分の uid
+                createdAt = Instant.now(),
+            )
+
+            inviteRepository.sendInvite(invite)
+                .onSuccess {
+                    // TODO(35-D-3-7) 誰の：状態の箱の ／ 何をする：isInviting を「いいえ」、inviteEmail を空の文字、
+                    //   inviteMessage を「招待を送りました」に（入力欄を空にして、次の人を打てるようにする）
+                    _uiState.update { it.copy(isInviting = false, inviteEmail = "", inviteMessage = "招待を送りました") }
+                }
+                .onFailure {
+                    finishInvite("招待を送れませんでした")
+                }
+        }
+    }
+
+    /** 招待を途中で終えるときの後片付け。「送信中」の旗を下ろし、一言を出す。打った文字は残す（打ち直せるように）。 */
+    private fun finishInvite(message: String) {
+        // TODO(35-D-3-8) 誰の：状態の箱の ／ 何をする：isInviting を「いいえ」に、inviteMessage を message に
+        _uiState.update { it.copy(isInviting = false, inviteMessage = message) }
     }
 }

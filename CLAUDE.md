@@ -1053,10 +1053,18 @@ match /calendars/{calendarId} {
 | 35-C | `data/repository/InviteRepositoryImpl` ＋ `RepositoryModule` | ✅ 11-02 |
 | 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | ✅ 11-02 |
 | 35-D-2 | 招待の入力欄の箱（`MemberListUiState` に 4 項目＋ `onInviteEmailChange` / `onInviteRoleChange`） | ✅ 11-08 |
-| 35-D-3 | `sendInvite()`（相手を探す→カレンダー名を読む→招待状を書く） | |
+| 35-D-3 | `sendInvite()`（相手を探す→カレンダー名を読む→招待状を書く） | ✅ 11-08（残りは Claude が補完） |
 | 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | |
 | 35-F | ルール：`invites` の `create`（Claude が書く） | |
 | 35-G | 実機確認（`invites` に招待状が 1 枚できる） | |
+
+**35-D-3（2026-11-08）。** ユーザーが書いたあと、残りを依頼により Claude が補完した。踏んだところ：
+`findUserByEmail(email).toString()`（封筒が文字になり `isFailure` が無い）、「すでにメンバーか」を
+`member.uid == uid`（自分）で比べていた（オーナーは必ず名簿に居るので**誰も招待できなくなる**）、
+招待状の欄の取り違え（`calendarName` に肩書きの名前、`role` に `OWNER`、`status` に `ACCEPTED`）。
+⚠️ `role = OWNER` のまま承認されると**招待された人がオーナーになる**。35-F のルールで `role in ['editor', 'viewer']` と
+`status == 'pending'` を必ず確かめる（コード側の間違いをルールで止める）。
+`invitedBy` は `calendar.ownerUid` ではなく自分の `uid`（今はたまたま同じ値だが、意味は「招待した人」）。
 
 #### Step 31（カレンダー一覧画面）
 
