@@ -29,4 +29,19 @@ data class MemberListUiState(
     val isLoading: Boolean = true,
 
     val errorMessage: String? = null,
+
+    // ---- 35-D-2：招待の入力欄 ----------------------------------------------
+
+    // TODO(35-D-2-1) 招待するメールアドレスの入力欄。型は文字、最初は空の文字（ScheduleEditUiState の title と同じ）
+    val inviteEmail: String = "",
+
+    // TODO(35-D-2-1) 承認したあとの肩書き。型は MemberRole、最初は閲覧者（いちばん弱い肩書きから始める）
+    val inviteRole: MemberRole = MemberRole.VIEWER,
+
+    // TODO(35-D-2-1) 送っている途中か。最初は「いいえ」（二度押し防止。ScheduleEditUiState の isSaving と同じ）
+    val isInviting: Boolean = false,
+
+    // 招待の結果を入力欄の下に出す一言（「招待を送りました」「見つかりません」など）。無ければ null。
+    // errorMessage と分けるのは、成功の知らせも出すため（赤い文字のエラー欄に「送りました」は出したくない）
+    val inviteMessage: String? = null,
 )
