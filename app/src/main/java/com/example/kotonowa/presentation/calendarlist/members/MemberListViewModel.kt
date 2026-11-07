@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.InviteRepository
 import com.example.kotonowa.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.coroutines.cancellation.CancellationException
@@ -30,6 +31,8 @@ class MemberListViewModel @Inject constructor(
     authRepository: AuthRepository,                     // 自分の uid を 1 回読むだけなので private val にしない（§7-(88)）
     private val calendarRepository: CalendarRepository, // 名簿の窓口（Step 30）
     private val userRepository: UserRepository,         // 名刺の窓口（Step 28 / 34-A）
+    // TODO(35-D-2-2) 招待状の窓口（35-B / 35-C）。上の 2 行と同じ形。名前は inviteRepository
+    private val inviteRepository: InviteRepository,
     savedStateHandle: SavedStateHandle,                 // NavHost が渡してくる「宛名付きメモ」
 ) : ViewModel() {
 
@@ -124,5 +127,20 @@ class MemberListViewModel @Inject constructor(
                     _uiState.update { it.copy(errorMessage = "メンバーを外せませんでした") }
                 }
         }
+    }
+
+    // ---- 35-D-2：招待 -----------------------------------------------------
+
+    /** 招待のメールアドレス欄に文字が打たれたら呼ばれる。打った文字を箱に入れるだけ。 */
+    fun onInviteEmailChange(email: String) {
+        // TODO(35-D-2-3) 誰の：状態の箱の ／ 何をする：inviteEmail を、打たれた email に差し替える
+        //   お手本は ScheduleEditViewModel の onTitleChange
+        _uiState.update { it.copy(inviteEmail = email) }
+    }
+
+    /** 招待の肩書きが選ばれたら呼ばれる。 */
+    fun onInviteRoleChange(role: MemberRole) {
+        // TODO(35-D-2-3) 誰の：状態の箱の ／ 何をする：inviteRole を、選ばれた role に差し替える
+        _uiState.update { it.copy(inviteRole = role) }
     }
 }
