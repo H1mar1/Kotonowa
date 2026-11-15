@@ -1360,6 +1360,28 @@ fun calendarMembers(calendarId: String) = "calendar_members/$calendarId" // ② 
 **載せられるのは文字だけ。** 住所は文字列なので、`Calendar` そのものは載せられない。
 **id だけ載せ、行った先の画面が自分で読み直す**（詳細画面が `itemId` から予定を読んだのと同じ）。
 
+### (129) `KeyboardOptions` と `enabled` — 入力欄に「どんなキーボードか」「今打てるか」を伝える
+
+```kotlin
+OutlinedTextField(
+    ...,
+    enabled = !isInviting,
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+)
+```
+
+2026-11-08、Step 35-E で記録（Phase 1 のサインアップ画面でも使っていたが、文法メモには未記載だった）。
+
+| 書き方 | 読み方 | 何が起きるか |
+|---|---|---|
+| `enabled = 条件` | 「条件が『はい』のときだけ使える」 | 「いいえ」だと灰色になり、打てない／押せない。`Button` にも同じ名前の口がある |
+| `!isInviting` | 「送っている途中**ではない**」（`!` は「〜ではない」。§5） | — |
+| `KeyboardOptions(keyboardType = KeyboardType.Email)` | 「キーボードの設定。種類はメールアドレス用」 | `@` や `.com` が打ちやすいキーボードが出る |
+
+💡 `keyboardType` は**キーボードの見た目を変えるだけ**で、打てる文字は制限しない。メールアドレスとして正しいかは確かめてくれないので、
+中身の確認は ViewModel（または Firestore の検索結果）でする。
+💡 仲間に `KeyboardType.Password`（サインアップ画面）、`KeyboardType.Number`（数字だけのキーボード）がある。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
@@ -2521,6 +2543,23 @@ allow update: if isCalendarOwner(calendarId)
 **`diff` が要る理由。** `update` は書類の 1 項目だけを許す命令ではなく、「書き換え」全体を許す。
 `diff` で絞らないと、肩書きの変更を許したつもりで `uid` や `joinedAt` まで書き換えられてしまう。
 
+### (130) セキュリティルールの `.lower()` — 「小文字にしたものと同じか」で小文字だけを許す
+
+```
+&& request.resource.data.invitedEmail == request.resource.data.invitedEmail.lower()
+```
+
+2026-11-16、Step 35-F で記録。(118)(122)(127) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `文字.lower()` | 「文字を小文字にしたもの」 | lower（ロウワー）は「下の・小さい」。Kotlin の `lowercase()`（§4-(128)）と同じ働き |
+| `A == A.lower()` | 「A は、A を小文字にしたものと同じか」 | 大文字が 1 つでも混ざっていると、小文字にした版と食い違うので「いいえ」になる |
+
+**ルールは値を書き換えられない。確かめるだけ。** Kotlin なら `lowercase()` で直してから保存できるが、
+ルールにできるのは「この書き込みを通すか、断るか」だけ。だから「小文字に直す」ではなく
+「**小文字にしても変わらない（＝最初から小文字だった）ときだけ通す**」と書く。
+
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 
 ```kotlin
@@ -2584,6 +2623,34 @@ val name    = user?.displayName ?: user?.email ?: "（名前未登録）"
 💡 **`map { }` の中で `suspend` の関数（`getUser`）を呼べる。** `map` の `{ }` は
 呼んだ場所にそのまま貼り付けられる作りなので、外側の `collect { }`（コルーチンの中）の続きとして動く。
 ただし 1 人ずつ**順番に**通信するので、メンバーが多いと遅くなる（数人なら問題ない）。
+
+### (128) `trim()` ／ `lowercase()` を繋ぐ、`Result` の `isFailure`
+
+```kotlin
+val email = state.inviteEmail.trim().lowercase()
+
+val userResult = userRepository.findUserByEmail(email)
+if (userResult.isFailure) { ...; return@launch }
+val user = userResult.getOrNull()
+if (user == null) { ...; return@launch }
+```
+
+2026-11-08、Step 35-D-3 で記録。
+
+| 書き方 | 読み方 | 答え |
+|---|---|---|
+| `文字.trim()`（トリム） | 「文字の**前後の**空白を切り落としたもの」 | 新しい文字。真ん中の空白は残る |
+| `文字.lowercase()` | 「全部小文字にしたもの」（§4-(111) で既出） | 新しい文字 |
+| `a.trim().lowercase()` | 「a の空白を取って、**その答えを**小文字に」 | `.` で繋ぐと左から順に作業する |
+| `結果.isFailure`（イズ フェイリャー） | 「封筒の中身は失敗か」 | `Boolean`。仲間に `isSuccess` |
+
+**なぜ `trim()` が要るか。** スマホのキーボードは、候補を選ぶと末尾に空白を足すことがある。
+`"taro@example.com "` のままだと名刺の `"taro@example.com"` と一致せず、「登録されていません」になる。
+
+**`isFailure` と `getOrNull()` を 2 段に分ける理由。** `findUserByEmail` の答えは `Result<User?>`（Step 28）。
+`getOrNull()` だけだと「通信に失敗した」と「通信できたが居なかった」が**どちらも `null`** になり区別できない。
+先に `isFailure` で封筒を確かめ、そのあと中身の `null` を見る。
+💡 `getCalendar` では区別していない。どちらでも「先へ進めない」で同じ対応になるため。**区別するかは、利用者に違う一言を見せたいかで決める。**
 
 ## §5 判定（条件分岐）
 
