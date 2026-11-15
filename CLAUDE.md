@@ -94,7 +94,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
-Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。次は Step 35（招待送信）。
+Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。Step 35（招待送信）完了（2026-11-16）。次は Step 36（招待受信・承認/拒否）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -744,7 +744,7 @@ grammar §8-(99)。
 | 33 | 表示するカレンダーの切り替え（`CalendarViewModel` の `calendarId` を可変に） | ✅ 10-22 |
 | 33-H | 切り替えを設定からホームの「名前 ▼」のメニューへ移す | ✅ 10-22 |
 | 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | ✅ 11-02 |
-| 35 | 招待送信（`invites`） | |
+| 35 | 招待送信（`invites`） | ✅ 11-16 |
 | 36 | 招待受信・承認/拒否 | |
 | 37 | セキュリティルールをロールベースに作り替える | |
 | 38 | 画面のロール出し分け（閲覧者には「＋」も「編集」も出さない） | |
@@ -1054,9 +1054,9 @@ match /calendars/{calendarId} {
 | 35-D-1 | `CalendarRepository.getCalendar`（招待状に写すカレンダー名を読む） | ✅ 11-02 |
 | 35-D-2 | 招待の入力欄の箱（`MemberListUiState` に 4 項目＋ `onInviteEmailChange` / `onInviteRoleChange`） | ✅ 11-08 |
 | 35-D-3 | `sendInvite()`（相手を探す→カレンダー名を読む→招待状を書く） | ✅ 11-08（残りは Claude が補完） |
-| 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | |
-| 35-F | ルール：`invites` の `create`（Claude が書く） | |
-| 35-G | 実機確認（`invites` に招待状が 1 枚できる） | |
+| 35-E | 招待の入力欄（`MemberListScreen`。オーナーだけ） | ✅ 11-16 |
+| 35-F | ルール：`invites` の `create`（Claude が書く） | ✅ 11-16 |
+| 35-G | 実機確認（`invites` に招待状が 1 枚できる） | ✅ 11-16 |
 
 **35-D-3（2026-11-08）。** ユーザーが書いたあと、残りを依頼により Claude が補完した。踏んだところ：
 `findUserByEmail(email).toString()`（封筒が文字になり `isFailure` が無い）、「すでにメンバーか」を
@@ -1065,6 +1065,38 @@ match /calendars/{calendarId} {
 ⚠️ `role = OWNER` のまま承認されると**招待された人がオーナーになる**。35-F のルールで `role in ['editor', 'viewer']` と
 `status == 'pending'` を必ず確かめる（コード側の間違いをルールで止める）。
 `invitedBy` は `calendar.ownerUid` ではなく自分の `uid`（今はたまたま同じ値だが、意味は「招待した人」）。
+
+**35-E（2026-11-16）。** 名簿の上に `item { InviteSection(…) }` をオーナーのときだけ出す。`InviteSection` は UiState を丸ごと受けず、
+招待の 4 項目と呼び鈴 3 つだけを受け取る。踏んだところ：「招待」ボタンに `onClick = onInvite()` と書いた
+（`()` で**描いた瞬間に鳴らしてしまい**、ボタンには結果の `Unit` が渡る。`Argument type mismatch: actual type is 'Unit'`）。
+**呼び鈴を「渡す」ときは `()` を付けない、「鳴らす」ときは付ける。** 33-B の `onCalendarSelected`（`()` 無しで鳴らない）の逆。
+
+**35-F：`invites` の `create` を追加（2026-11-16 適用）。** 既存分はそのまま、`calendars` の外に足した。
+
+```
+match /invites/{inviteId} {
+  allow create: if request.auth != null
+    && isCalendarOwner(request.resource.data.calendarId)
+    && request.resource.data.invitedBy == request.auth.uid
+    && request.resource.data.id == inviteId
+    && request.resource.data.role in ['editor', 'viewer']
+    && request.resource.data.status == 'pending'
+    && request.resource.data.calendarName == get(/databases/$(database)/documents/calendars/$(request.resource.data.calendarId)).data.name
+    && request.resource.data.invitedEmail == request.resource.data.invitedEmail.lower();
+}
+```
+
+- 招待できるのはオーナーだけ。`role` は `editor` / `viewer` だけ、`status` は `pending` だけ（35-D-3 の `OWNER` / `ACCEPTED` の取り違えをルールでも止める）
+- `calendarName` は本物の部屋の名前と照合する。招待された人は部屋を読めず、この写しを信じて承認するしかないため
+- `invitedEmail` は小文字だけ（grammar §4-(130)）。Step 36 で「自分のメール宛て」を探すとき、大文字まじりだと見つからない
+- `invites` の `read` / `update` / `delete` はまだ拒否される（Step 36 で開ける）
+
+⚠️ **ルール全文をターミナルからコピーすると、長い行が折り返し位置で改行され `Unexpected '=='` などが連発する**（35-F で踏んだ）。
+ファイルに書いて `pbcopy < ファイル` でクリップボードに入れ、コンソールで ⌘A → ⌘V する。
+
+**35-G（2026-11-16）。** 招待状が 1 枚でき、`role` / `status` / 小文字の `invitedEmail` / `calendarName` を確認。
+未登録のアドレス・すでにメンバーの人では招待状ができないこと、オーナー以外にカードが出ないことも確認した。
+途中で 2 回 DNS が切れた（検証環境のハマりどころ 2026-11-16 を参照）。**これで Step 35 は完了。**
 
 #### Step 31（カレンダー一覧画面）
 
@@ -1222,6 +1254,21 @@ cd ~/Library/Android/sdk/emulator
 `netsimd --host-dns=202.13.160.201,…`（前のネットワーク）に対し Mac は `192.168.1.253` で、上の手順どおり確定。
 `adb emu kill` → `-dns-server 192.168.1.253 -no-snapshot-load` で起動し直して解消した。
 **ログアウトの直後に起きると「33-E の変更で壊した」と誤解しやすい**が、アプリとは無関係。
+
+**2026-11-16 に再々発。** 35-G で「招待」を押しても `invites` ができず、Logcat に
+`Unable to resolve host "firestore.googleapis.com"`。`--host-dns=202.13.160.200,…` に対し Mac は `192.168.1.253`。同じ手順で解消。
+**ルールを変えた直後だと「ルールのせい」と疑いやすい**が、ルールに断られたなら `PERMISSION_DENIED` が出る。
+`UnknownHostException` ／ `Unable to resolve host` なら DNS を疑う。
+さらに同日、`192.168.1.253` で起動し直した 20 分後に **Mac が `202.13.160.200` 側へ戻り**、また引けなくなった
+（2 つのネットワークを行き来している）。**今後は公開 DNS で起動する**（どちらのネットワークからでも届く）。
+
+```bash
+./emulator -avd Pixel_7 -dns-server 8.8.8.8,1.1.1.1 -no-snapshot-load &
+```
+
+💡 オフライン中に「招待」を押すと**「送信中…」のまま止まる**。`.set().await()` はサーバーの受け取り確認を待ち続け、
+エラーにならないため（「Firestore が繋がっていなくてもエラーにならない」と同じ性質）。書き込みは端末内に溜まり、
+繋がったときに送られるので、**送り直す前にコンソールで届いていないか確かめる**（二重に招待状ができる）。
 
 ### 検証環境のハマりどころ（2026-08-12 追記）
 

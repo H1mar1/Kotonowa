@@ -1360,6 +1360,28 @@ fun calendarMembers(calendarId: String) = "calendar_members/$calendarId" // ② 
 **載せられるのは文字だけ。** 住所は文字列なので、`Calendar` そのものは載せられない。
 **id だけ載せ、行った先の画面が自分で読み直す**（詳細画面が `itemId` から予定を読んだのと同じ）。
 
+### (129) `KeyboardOptions` と `enabled` — 入力欄に「どんなキーボードか」「今打てるか」を伝える
+
+```kotlin
+OutlinedTextField(
+    ...,
+    enabled = !isInviting,
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+)
+```
+
+2026-11-08、Step 35-E で記録（Phase 1 のサインアップ画面でも使っていたが、文法メモには未記載だった）。
+
+| 書き方 | 読み方 | 何が起きるか |
+|---|---|---|
+| `enabled = 条件` | 「条件が『はい』のときだけ使える」 | 「いいえ」だと灰色になり、打てない／押せない。`Button` にも同じ名前の口がある |
+| `!isInviting` | 「送っている途中**ではない**」（`!` は「〜ではない」。§5） | — |
+| `KeyboardOptions(keyboardType = KeyboardType.Email)` | 「キーボードの設定。種類はメールアドレス用」 | `@` や `.com` が打ちやすいキーボードが出る |
+
+💡 `keyboardType` は**キーボードの見た目を変えるだけ**で、打てる文字は制限しない。メールアドレスとして正しいかは確かめてくれないので、
+中身の確認は ViewModel（または Firestore の検索結果）でする。
+💡 仲間に `KeyboardType.Password`（サインアップ画面）、`KeyboardType.Number`（数字だけのキーボード）がある。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
@@ -2520,6 +2542,23 @@ allow update: if isCalendarOwner(calendarId)
 
 **`diff` が要る理由。** `update` は書類の 1 項目だけを許す命令ではなく、「書き換え」全体を許す。
 `diff` で絞らないと、肩書きの変更を許したつもりで `uid` や `joinedAt` まで書き換えられてしまう。
+
+### (130) セキュリティルールの `.lower()` — 「小文字にしたものと同じか」で小文字だけを許す
+
+```
+&& request.resource.data.invitedEmail == request.resource.data.invitedEmail.lower()
+```
+
+2026-11-16、Step 35-F で記録。(118)(122)(127) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `文字.lower()` | 「文字を小文字にしたもの」 | lower（ロウワー）は「下の・小さい」。Kotlin の `lowercase()`（§4-(128)）と同じ働き |
+| `A == A.lower()` | 「A は、A を小文字にしたものと同じか」 | 大文字が 1 つでも混ざっていると、小文字にした版と食い違うので「いいえ」になる |
+
+**ルールは値を書き換えられない。確かめるだけ。** Kotlin なら `lowercase()` で直してから保存できるが、
+ルールにできるのは「この書き込みを通すか、断るか」だけ。だから「小文字に直す」ではなく
+「**小文字にしても変わらない（＝最初から小文字だった）ときだけ通す**」と書く。
 
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 
