@@ -2560,6 +2560,29 @@ allow update: if isCalendarOwner(calendarId)
 ルールにできるのは「この書き込みを通すか、断るか」だけ。だから「小文字に直す」ではなく
 「**小文字にしても変わらない（＝最初から小文字だった）ときだけ通す**」と書く。
 
+### (131) `private` と `internal` — どこまで見せるか
+
+```kotlin
+internal const val COLLECTION_CALENDARS = "calendars"
+internal fun CalendarMember.toMap(): Map<String, Any?> = …
+```
+
+2026-11-17、Step 36-C で記録。
+
+| 書き方 | 読み方 | 使える範囲 |
+|---|---|---|
+| `private`（ファイルの一番外に書いたとき） | 「このファイルの中だけ」 | 同じ `.kt` ファイルの中だけ。別のファイルからは見えない（名前を書くと `Unresolved reference` か `Cannot access`） |
+| `internal`（インターナル） | 「このアプリの中だけ」 | 同じモジュール（このアプリ `app` の中）なら、どのファイルからでも使える |
+| 何も書かない（`public`） | 「どこからでも」 | 外のライブラリからも見える。Kotlin の既定 |
+
+**なぜ変えたか。** 招待の承認（`InviteRepositoryImpl`）では名簿の行を書くので、`calendars` / `members` の名前と
+「名簿の行の詰め替え係」（`CalendarMember.toMap`）が要る。`private` のままだと別のファイルから使えない。
+同じものをもう 1 つ書き写すと、片方だけ直し忘れたとき**名簿の行の形が 2 種類できてしまう**。
+そこで書き方は 1 か所のまま、見える範囲だけを「このアプリの中」まで広げた。
+
+💡 広げすぎない。`public` にしなかったのは、data 層の Firestore 用の部品を外に見せる理由が無いから。
+「必要なところまでだけ見せる」が基本。
+
 ### (119) `@Singleton` と `MutableStateFlow<型?>(null)` — アプリに 1 枚だけの掲示板
 
 ```kotlin
@@ -2938,6 +2961,16 @@ try {
 
 `"..."` の中で `${ }` と書くと、その中身が計算されて文字列に埋め込まれる（文字列テンプレート）。
 `"..." + e.type + "..."` と繋ぐより読みやすい。
+
+⚠️ **`$名前` の直後に `_` や英数字が続くときは `{ }` を省けない**（2026-11-16、Step 36-A で追記）。
+
+| 書き方 | Kotlin の読み方 | 結果 |
+|---|---|---|
+| `"$calendarId_$email"` | 「`calendarId_` という名前の変数」＋「`email`」 | `_` は名前に使える文字なので、名前の続きだと思われる。`calendarId_` は無いので**エラー**（`Unresolved reference`） |
+| `"${calendarId}_$email"` | 「`calendarId`」＋「`_`」＋「`email`」 | `{ }` で名前の終わりを示しているので正しく区切れる |
+
+`/` や `（` のように**名前に使えない文字**が続くなら省いてよい（§4-(124) の `"calendar_members/$calendarId"` は `$` が最後なので問題ない）。
+迷ったら `{ }` を付けておけば必ず正しく読まれる。
 
 ---
 
