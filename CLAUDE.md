@@ -1245,6 +1245,32 @@ function canEdit(calendarId) {
 ⚠️ 閲覧者にも「＋」「編集」「削除」「完了チェック」が出たままで、押すと保存時に断られる（**Step 38 で隠す**）。
 エラーの文言が「保存できていません」なのも、閲覧者向けには分かりにくい。
 
+#### Step 38 の内訳（画面のロール出し分け）— Phase 3 の最後
+
+**設計（2026-11-17 にユーザーが選択）。**
+- ホームと詳細の頭脳が、それぞれ「このカレンダーでの自分の肩書き」を調べて **`canEdit: Boolean`** を UiState に持つ。
+  調べ方は `observeMembers`（Step 30）から自分の行を探すだけ。窓口に関数は足さない。マイカレンダーはいつも `true`。
+- 閲覧者には「＋」と詳細の［編集］［削除］を**出さない**。上のバーのカレンダー名の下に小さく **「閲覧のみ」**。
+- タスクの完了チェックは**出したまま灰色で押せなくする**（`enabled = canEdit`）。行の形を変えないため。
+- 作成・編集画面は入口（＋・編集）を消せば届かないので変更しない。ルール（Step 37）が最後の砦なのは変わらない。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 38-A | ホームの頭脳：`canEdit` ＋ カレンダーを切り替えるたびに肩書きを見張り直す | ✅ 11-17 |
+| 38-B | ホームの画面：「＋」を出し分け・「閲覧のみ」・チェックの `enabled` | ✅ 11-17（実機は 38-E） |
+| 38-C | 詳細の頭脳：予定の `calendarId` から `canEdit` を求める | |
+| 38-D | 詳細の画面：［編集］［削除］を出し分け | |
+| 38-E | 実機確認（tester を閲覧者に戻して確認） | |
+
+**38-A（2026-11-17）。** `observeRole(calendar)` を `observeMonth` の直後で呼ぶ。中は `roleJob?.cancel()` → マイカレンダーなら `true` →
+共有なら一旦 `false`（閲覧者に一瞬「＋」が出るちらつき防止）→ `observeMembers` を見張り
+`members.firstOrNull { member -> member.uid == myUid }?.role` が `OWNER` か `EDITOR` なら `true`（ルールの `in ['owner', 'editor']` と同じ基準）。
+踏んだところ：呼ぶ場所に `observeMonth(_uiState.collect { calendar -> calendarId } }` と書いた（係の取り違え＋すでに `collect` の中なのに受け取り直そうとした）。
+
+**38-B（2026-11-17）。** 上のバーのボタンの中身を `Column { Row { 名前 ▼ } ; if (!uiState.canEdit) Text("閲覧のみ") }` に組み替え、
+「＋」は `if (uiState.canEdit)`、`ScheduleItemRow` に `canEdit: Boolean`（**既定値なし**＝渡し忘れをビルドで止める）を足して `Checkbox(enabled = canEdit)`。
+踏んだところ：`uiState.canEdit != MemberRole.VIEWER`（`Boolean` と肩書きを比べた。画面は肩書きを知らず「はい／いいえ」だけ見る）、`!` の付け忘れで出す条件が逆。
+
 #### Step 31（カレンダー一覧画面）
 
 設定 →「カレンダー」で `presentation/calendarlist/` の一覧を開く。`CalendarListViewModel` は

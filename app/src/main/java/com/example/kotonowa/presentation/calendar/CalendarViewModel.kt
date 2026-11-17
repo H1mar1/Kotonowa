@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.impl.utils.forName
 import com.example.kotonowa.domain.model.Calendar
+import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
@@ -46,6 +47,7 @@ class CalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CalendarUiState())
 
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
+
     /** ログイン中のユーザーの uid。マイカレンダー（個人）の id でもある（要件定義書 §4）。 */
     private val uid = authRepository.currentUser?.uid
 
@@ -57,6 +59,9 @@ class CalendarViewModel @Inject constructor(
 
     private var observeJob: Job? = null
 
+    /** 肩書きの見張り（Step 38）。カレンダーを切り替えたら前のカレンダーの見張りを止めるために持つ（observeJob と同じ）。 */
+    private var roleJob: Job? = null
+
     init {
         // 掲示板を見張る。StateFlow は collect した瞬間に「今貼ってある紙」を 1 回流してくれるので、
         // 最初の observeMonth もここから始まる（grammar §2-(121)）。
@@ -64,7 +69,7 @@ class CalendarViewModel @Inject constructor(
             selectedCalendarRepository.selected.collect { calendar ->
                 // TODO(33-C-2) 誰の：この頭脳の calendarId に ／ 何をする：貼られたカレンダーの id を入れる。
                 //              白紙（null）なら自分の uid（§4-⑮ の ?:）
-                calendarId = calendar?.id?:uid
+                calendarId = calendar?.id ?: uid
 
                 // TODO(33-C-2) 誰の：_uiState の ／ 何をする：calendarName を、貼られたカレンダーの名前に書き換える。
                 //              白紙なら "マイカレンダー"（§4-⑮、§2-(58) の update）
@@ -75,6 +80,10 @@ class CalendarViewModel @Inject constructor(
 
                 // TODO(33-C-2) 誰の：この頭脳の observeMonth を ／ 何をする：今表示している月で呼び直す（＝購読の張り直し）
                 observeMonth(_uiState.value.currentMonth)
+
+                // TODO(38-A-2) 誰の：この頭脳の observeRole を ／ 何をする：貼られたカレンダーで呼ぶ（＝肩書きの見張りの張り直し）
+                //   すぐ上の observeMonth の行と同じ考え方。渡すのは collect で受け取った calendar（白紙なら null のまま渡す）
+                observeRole(calendar)
             }
         }
 
@@ -94,7 +103,7 @@ class CalendarViewModel @Inject constructor(
         // TODO(36-D-2-1) 誰の：ログイン中のユーザーの ／ 何を：メールアドレスを、小文字にして受け取る。無ければここで終わり
         //   uid の行（48 行目）と observeCalendars の 1 行目を合わせた形。email は String? なので ?. で繋ぐ（§4-⑮）
         //   小文字にするのは、招待状の宛先が小文字で保存されているため（35-D-3 / 35-F）
-        val myEmail = authRepository.currentUser?.email?.lowercase()?: return
+        val myEmail = authRepository.currentUser?.email?.lowercase() ?: return
 
         viewModelScope.launch {
             try {
@@ -107,6 +116,45 @@ class CalendarViewModel @Inject constructor(
                 throw e   // 意図して取り止めた合図（grammar §2-(91)）。Exception より上に置く
             } catch (e: Exception) {
                 // 点が出ないだけで、ホームの予定は読める。画面全体のエラーにはしない（observeCalendars と同じ）
+            }
+        }
+    }
+
+    /**
+     * このカレンダーでの自分の肩書きを見張り、canEdit を UiState に入れる（Step 38）。
+     *
+     * マイカレンダー（null）には名簿が無いので、見張らずに「はい」。
+     * 共有カレンダーは名簿（observeMembers）から自分の行を探す。オーナーが肩書きを変えると、その場で切り替わる。
+     */
+    private fun observeRole(calendar: Calendar?) {
+        // 前のカレンダーの見張りを止める（observeMonth の先頭と同じ。grammar §2-(91)）
+        roleJob?.cancel()
+
+        if (calendar == null) {
+            _uiState.update { it.copy(canEdit = true) }
+            return
+        }
+
+        // 肩書きが分かるまでは「いいえ」にしておく。閲覧者の画面に一瞬「＋」が出るのを防ぐため
+        _uiState.update { it.copy(canEdit = false) }
+
+        val myUid = uid ?: return
+
+        roleJob = viewModelScope.launch {
+            try {
+                calendarRepository.observeMembers(calendar.id).collect { members ->
+                    // TODO(38-A-3) 名簿の中から自分の行を探し、その肩書きを取り出す。見つからなければ null
+                    //   誰の：名簿の ／ 何をする：uid が自分と同じ「最初の 1 人」を探す（firstOrNull { }。§4-(110)）→ その人の role
+                    //   見つからないことがあるので、role の前は ?.（§4-⑮）
+                    val myRole = members.firstOrNull { member -> member.uid == myUid }?.role
+
+                    // TODO(38-A-4) 書き換えてよいか ＝ 肩書きがオーナー「か」編集者（|| は「または」）
+                    _uiState.update { it.copy(canEdit = myRole == MemberRole.OWNER || myRole == MemberRole.EDITOR) }
+                }
+            } catch (e: CancellationException) {
+                throw e   // 意図して取り止めた合図（grammar §2-(91)）。Exception より上に置く
+            } catch (e: Exception) {
+                // 名簿を読めない（メンバーから外された等）。canEdit は「いいえ」のまま。予定の表示には影響しない
             }
         }
     }
@@ -153,22 +201,23 @@ class CalendarViewModel @Inject constructor(
         // 選んでも自動では閉じないので、自分で閉じる（grammar §3-(107)）
         closeCalendarMenu()
     }
+
     /** 前の月へ。升目の表示を変え、その月を購読し直す。 */
-    fun showPreviousMonth(){
-        val month=_uiState.value.currentMonth.minusMonths(1)
+    fun showPreviousMonth() {
+        val month = _uiState.value.currentMonth.minusMonths(1)
         _uiState.update { it.copy(currentMonth = month) }
         observeMonth(month)
     }
 
     /** 次の月へ。 */
-    fun showNextMonth(){
-       val month=_uiState.value.currentMonth.plusMonths(1)
+    fun showNextMonth() {
+        val month = _uiState.value.currentMonth.plusMonths(1)
         _uiState.update { it.copy(currentMonth = month) }
         observeMonth(month)
     }
 
     /** 升目の日付を選ぶ。下の一覧を絞るだけなので、購読は張り直さない。 */
-    fun selectDate(date: LocalDate){
+    fun selectDate(date: LocalDate) {
         _uiState.update { it.copy(selectedDate = date) }
     }
 
@@ -200,7 +249,7 @@ class CalendarViewModel @Inject constructor(
 
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-        observeJob =  viewModelScope.launch {
+        observeJob = viewModelScope.launch {
             try {
                 scheduleRepository.observeItems(id, from, to)
                     .collect { list ->
@@ -234,9 +283,9 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    fun toggleCompleted(task: ScheduleItem.Task){
+    fun toggleCompleted(task: ScheduleItem.Task) {
         viewModelScope.launch {
-            val update=task.copy(
+            val update = task.copy(
                 isCompleted = !task.isCompleted,
                 updatedAt = Instant.now(),
             )

@@ -44,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.ui.theme.KotonowaTheme
 import java.time.Instant
@@ -84,28 +85,43 @@ fun CalendarScreen(
                     // ボタンとメニューを同じ Box に入れる。メニューは「どのボタンから出たか」を Box で知る
                     Box {
                         TextButton(onClick = viewModel::openCalendarMenu) {
-                            // 名前と ▼ を別の Text に分けた（Step 36-D）。▼ にだけ赤い点を付けるため。
-                            // TextButton の { } の中は横並び（Row と同じ）なので、2 つ書けば左右に並ぶ
-                            Text(
-                                text = uiState.calendarName,
-                                style = MaterialTheme.typography.titleLarge,   // バーの見出しと同じ大きさ
-                                color = MaterialTheme.colorScheme.onSurface,   // ボタンの色（primary）ではなく見出しの色
-                            )
-                            // ▼ の右上に赤い点を重ねる部品（grammar §3-(132)）
-                            BadgedBox(
-                                badge = {
-                                    // TODO(36-D-3-1) 点を出す条件。誰の：状態の ／ 何か：招待の数が 0 より多いか
-                                    //   Badge() は中身を書かないと「小さな赤い点」になる
-                                    if (uiState.pendingInviteCount > 0) {
-                                        Badge()
+                            // Step 38-B：「名前 ▼」の行の下に「閲覧のみ」を足すため、縦に積む Column で包んだ。
+                            //   上の段 ＝ Row（名前と ▼ の横並び）／ 下の段 ＝ 閲覧者のときだけ「閲覧のみ」
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // 名前と ▼ を別の Text に分けた（Step 36-D）。▼ にだけ赤い点を付けるため
+                                    Text(
+                                        text = uiState.calendarName,
+                                        style = MaterialTheme.typography.titleLarge,   // バーの見出しと同じ大きさ
+                                        color = MaterialTheme.colorScheme.onSurface,   // ボタンの色（primary）ではなく見出しの色
+                                    )
+                                    // ▼ の右上に赤い点を重ねる部品（grammar §3-(132)）
+                                    BadgedBox(
+                                        badge = {
+                                            // TODO(36-D-3-1) 点を出す条件。誰の：状態の ／ 何か：招待の数が 0 より多いか
+                                            //   Badge() は中身を書かないと「小さな赤い点」になる
+                                            if (uiState.pendingInviteCount > 0) {
+                                                Badge()
+                                            }
+                                        },
+                                    ) {
+                                        Text(
+                                            text = " ▼",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
                                     }
-                                },
-                            ) {
-                                Text(
-                                    text = " ▼",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
+                                }
+
+                                // TODO(38-B-1) 「閲覧のみ」を出す条件。誰の：状態の ／ 何か：書き換えて「よくない」とき
+                                //   「〜ではない」は頭に ! を付ける（InviteListScreen の enabled = !isProcessing と同じ）
+                                if (!uiState.canEdit) {
+                                    Text(
+                                        text = "閲覧のみ",
+                                        style = MaterialTheme.typography.labelSmall,          // 名前より小さく
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,   // 名前より薄い色
+                                    )
+                                }
                             }
                         }
 
@@ -173,8 +189,12 @@ fun CalendarScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddClick) {
-                Text("＋")
+            // TODO(38-B-2) 「＋」を出す条件。誰の：状態の ／ 何か：書き換えてよいとき（38-B-1 の逆。! は要らない）
+            //   出さないときは何も描かない（Scaffold は空っぽの floatingActionButton を許す）
+            if (uiState.canEdit) {
+                FloatingActionButton(onClick = onAddClick) {
+                    Text("＋")
+                }
             }
         },
     ) { innerPadding ->
@@ -232,6 +252,8 @@ fun CalendarScreen(
                                 item = item,
                                 onClick = { onItemClick(item.id) },
                                 onToggleCompleted = viewModel::toggleCompleted,
+                                // TODO(38-B-5) 誰の：状態の ／ 何か：書き換えてよいか（38-B-2 と同じものをそのまま渡す）
+                                canEdit = uiState.canEdit,
                             )
                         }
                     }
@@ -269,6 +291,9 @@ private fun ScheduleItemRow(
     item: ScheduleItem,
     onClick: () -> Unit,
     onToggleCompleted: (ScheduleItem.Task) -> Unit,
+    // TODO(38-B-3) 完了チェックを押せるか（Step 38）。型は「はい／いいえ」。既定値は付けない
+    //   （付けると呼ぶ側が渡し忘れてもビルドが通り、閲覧者でも押せるままになる）
+    canEdit: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val rowStyle = when (item) {
@@ -317,7 +342,11 @@ private fun ScheduleItemRow(
                 if (item is ScheduleItem.Task) {
                     Checkbox(
                         checked = item.isCompleted,
-                        onCheckedChange = { onToggleCompleted(item) })
+                        onCheckedChange = { onToggleCompleted(item) },
+                        // TODO(38-B-4) 押せる条件。誰の：この行が受け取った ／ 何か：canEdit
+                        //   false だと灰色になり、押しても onCheckedChange が鳴らない（MemberListScreen の招待ボタンと同じ enabled）
+                        enabled = canEdit,
+                    )
                 }
                 Surface(
                     color = rowStyle.badgeColor,
@@ -432,6 +461,7 @@ private fun ScheduleItemRowPreview() {
                     item = item,
                     onClick = {},
                     onToggleCompleted = {},
+                    canEdit = true,   // Preview は編集できる人の見た目（Claude が記入済み）
                 )
             }
         }
