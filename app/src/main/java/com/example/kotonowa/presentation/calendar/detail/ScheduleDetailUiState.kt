@@ -25,5 +25,11 @@ data class ScheduleDetailUiState(
 
     val errorMessage: String? = null,
 
-
-    )
+    /**
+     * この予定・タスクを書き換えてよいか（Step 38）。「いいえ」なら［編集］［削除］を出さない。
+     * ホーム（CalendarUiState）と違い、最初は「いいえ」。開いた瞬間はまだ予定も肩書きも分かっていないため、
+     * 分かってから出す（閲覧者の画面に一瞬だけ［削除］が出るのを防ぐ）。
+     */
+    // TODO(38-C-1) 型は「はい／いいえ」、最初は「いいえ」
+    val canEdit: Boolean = false,
+)

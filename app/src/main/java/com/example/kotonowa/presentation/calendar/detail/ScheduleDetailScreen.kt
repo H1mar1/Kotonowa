@@ -138,15 +138,19 @@ private fun ScheduleDetailContent(
                 //   KotonowaNavHost 側で navController.navigate(Routes.scheduleEditItem(id)) を渡す
                 //   （onDeleteClick / onNavigateBack と同じ「呼び鈴」の形。行き先は NavHost だけが知る）。
 
-                Button(onClick = {onEditClick(item.id)},
-                    enabled =  !uiState.isDeleting,) {
-                    Text("編集")
-                }
-                Button(
-                    onClick = onDeleteClick,
-                    enabled = !uiState.isDeleting
-                ) {
-                    Text("削除")
+                // Step 38-D：［編集］［削除］は書き換えてよい人にだけ出す。［戻る］は誰にでも出す
+                // TODO(38-D-1) 出す条件。誰の：状態の ／ 何か：書き換えてよいか（ホームの「＋」の 38-B-2 と同じ形）
+                if (uiState.canEdit) {
+                    Button(onClick = {onEditClick(item.id)},
+                        enabled =  !uiState.isDeleting,) {
+                        Text("編集")
+                    }
+                    Button(
+                        onClick = onDeleteClick,
+                        enabled = !uiState.isDeleting
+                    ) {
+                        Text("削除")
+                    }
                 }
 
                 TextButton(onClick = onNavigateBack, enabled = !uiState.isDeleting) {
@@ -189,12 +193,13 @@ private val PREVIEW_TASK = ScheduleItem.Task(
     isCompleted = false,
 )
 
-@Preview(showBackground = true)
+// Step 38：予定の Preview は「編集できる人」、タスクの Preview は「閲覧者」（canEdit は既定で false）の見た目
+@Preview(showBackground = true, name = "予定・編集できる人")
 @Composable
 private fun ScheduleDetailContentEventPreview() {
     KotonowaTheme {
         ScheduleDetailContent(
-            uiState = ScheduleDetailUiState(item = PREVIEW_EVENT, isLoading = false),
+            uiState = ScheduleDetailUiState(item = PREVIEW_EVENT, isLoading = false, canEdit = true),
             onDeleteClick = {},
             onNavigateBack = {},
             onEditClick = {},
@@ -202,7 +207,7 @@ private fun ScheduleDetailContentEventPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "タスク・閲覧者（編集・削除なし）")
 @Composable
 private fun ScheduleDetailContentTaskPreview() {
     KotonowaTheme {
