@@ -45,6 +45,14 @@ data class CalendarUiState(
     // TODO(36-D-1) 型は整数（Int）、最初は 0 件
     val pendingInviteCount: Int = 0,
 
+    /**
+     * 今表示しているカレンダーの予定・タスクを書き換えてよいか（Step 38）。
+     * マイカレンダー・オーナー・編集者なら「はい」、閲覧者なら「いいえ」。
+     * 「いいえ」のとき、画面は「＋」を出さず、完了チェックを灰色にし、名前の下に「閲覧のみ」と出す。
+     */
+    // TODO(38-A-1) 型は「はい／いいえ」、最初は「はい」（アプリはマイカレンダーから始まるため）
+    val canEdit: Boolean = true,
+
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
