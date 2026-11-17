@@ -2607,7 +2607,33 @@ allow update: if isCalendarOwner(calendarId)
 ルールにできるのは「この書き込みを通すか、断るか」だけ。だから「小文字に直す」ではなく
 「**小文字にしても変わらない（＝最初から小文字だった）ときだけ通す**」と書く。
 
-### (131) `private` と `internal` — どこまで見せるか
+### (134) セキュリティルールの `allow` を 2 行書く ／ `token.email` ／ 住所を組み立てる ／ `hasAll` と `size()`
+
+```
+function myInvitePath(calendarId) {
+  return /databases/$(database)/documents/invites/$(calendarId + '_' + myEmail());
+}
+
+allow update: if（オーナーの条件）;
+allow update: if（招待された人の条件）
+  && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+  && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1;
+```
+
+2026-11-17、Step 36-G で記録。(118)(122)(127)(130) の続き。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| 同じ `allow update:` を 2 行 | 「どちらか 1 つでも『はい』なら通す」 | 別々の人（オーナー／招待された人）の条件を、`||` で 1 行に詰めずに分けて書ける。読みやすい |
+| `request.auth.token.email` | 「ログイン中の人の・身分証の・メール」 | token（トークン）は Firebase Auth が発行する身分証。uid と同じく**本人が書き換えられない** |
+| `$(a + '_' + b)` | 「a と `_` と b をつないだ文字を、住所に差し込む」 | Kotlin の `"${a}_$b"`（36-A）と同じことを、ルールの言葉で書いている。`+` は文字をつなぐ |
+| 住所を返す `function` | 「住所を作る係」 | 同じ住所を何度も書かずに済む。`get(myInvitePath(id))` のように渡す |
+| `リスト.hasAll(別のリスト)` | 「別のリストの中身を、全部持っているか」 | 書き換え後の名簿が、前の名簿の人を**誰も消していない**ことの確認 |
+| `リスト.size()` | 「リストの数」 | Kotlin の `list.size` と同じ。ルールでは `()` が付く |
+
+**「全員残っている」＋「1 人だけ増えた」＋「増えたのは自分」** の 3 つを並べると、「自分だけを足した」以外の書き換え
+（他人を足す・誰かを消す）を全部断れる。
+
 
 ```kotlin
 internal const val COLLECTION_CALENDARS = "calendars"

@@ -94,7 +94,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
-Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。Step 35（招待送信）完了（2026-11-16）。次は Step 36（招待受信・承認/拒否）。
+Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。Step 35（招待送信）完了（2026-11-16）。Step 36（招待受信・承認/拒否）完了（2026-11-17）。次は Step 37（ロールベースのルール）。
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -745,7 +745,7 @@ grammar §8-(99)。
 | 33-H | 切り替えを設定からホームの「名前 ▼」のメニューへ移す | ✅ 10-22 |
 | 34 | メンバー一覧・ロール変更・外す（オーナーのみ） | ✅ 11-02 |
 | 35 | 招待送信（`invites`） | ✅ 11-16 |
-| 36 | 招待受信・承認/拒否 | |
+| 36 | 招待受信・承認/拒否 | ✅ 11-17 |
 | 37 | セキュリティルールをロールベースに作り替える | |
 | 38 | 画面のロール出し分け（閲覧者には「＋」も「編集」も出さない） | |
 
@@ -1118,9 +1118,9 @@ match /invites/{inviteId} {
 | 36-C | `InviteRepositoryImpl`（`toInvite`・購読・承認の `runBatch`・拒否） | ✅ 11-17（直しは Claude） |
 | 36-D | ▼ の赤い点＋メニューの「届いた招待（n）」（`CalendarViewModel` が件数を購読） | ✅ 11-17（実機の点は 36-G 後） |
 | 36-E | 招待一覧画面（`presentation/invites/`。UiState / ViewModel / Screen） | ✅ 11-17 |
-| 36-F | `Routes` ＋ `NavHost` に登録 | |
-| 36-G | ルール：`invites` の `read` / `update`、招待による `members` の `create`・部屋の `memberUids` の `update`（Claude が書く） | |
-| 36-H | 実機確認（2 アカウントで 招待→承認→▼ にカレンダーが出る／拒否） | |
+| 36-F | `Routes` ＋ `NavHost` に登録 | ✅ 11-17 |
+| 36-G | ルール：`invites` の `read` / `update`、招待による `members` の `create`・部屋の `memberUids` の `update`（Claude が書く） | ✅ 11-17 |
+| 36-H | 実機確認（2 アカウントで 招待→承認→▼ にカレンダーが出る／拒否） | ✅ 11-17（Claude が adb で操作） |
 
 **36-A（2026-11-16）。** `id = "${calendarId}_$email"`。踏んだところ（どれもビルドが通る）：
 §4-(124) の画面の住所 `"calendar_members/$calendarId"` を写した（メール無し・`/` は Firestore の id に使えない）、
@@ -1149,6 +1149,67 @@ match /invites/{inviteId} {
 結果の一言 `actionMessage` は `errorMessage` と分ける（出ても一覧を消さない）。肩書きの日本語化 `MemberRole.label()` は
 `MemberListScreen` と重複して持つ（`private`。3 画面目で共通化）。新しい部品 `OutlinedButton`（grammar §3-(133)）。
 踏んだところ：呼ぶ場所に**宣言の形** `acceptInvite(invite: Invite, uid: String）` を写した（呼ぶときは型を書かず箱を渡す）＋全角の `）`。
+
+**36-G：ルールを追加（2026-11-17 適用）。** 足した分（既存分はそのまま。全文はコンソール）。
+
+```
+function myEmail() { return request.auth.token.email.lower(); }
+function myInvitePath(calendarId) {
+  return /databases/$(database)/documents/invites/$(calendarId + '_' + myEmail());
+}
+function isAcceptingInvite(calendarId) {
+  return get(myInvitePath(calendarId)).data.status == 'pending'
+    && getAfter(myInvitePath(calendarId)).data.status == 'accepted';
+}
+// isValidNewInvite(inviteId) … 35-F の create の条件を関数化＋「住所 == calendarId_invitedEmail」を追加
+
+// calendars：招待された人が memberUids に自分だけを足す
+allow update: if request.auth != null
+  && !(request.auth.uid in resource.data.memberUids)
+  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+  && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+  && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+  && request.auth.uid in request.resource.data.memberUids
+  && isAcceptingInvite(calendarId);
+
+// members：招待された人が自分の行を作る（肩書き・招待した人は招待状のとおり）
+allow create: if request.auth != null
+  && memberUid == request.auth.uid
+  && request.resource.data.uid == request.auth.uid
+  && request.resource.data.role == get(myInvitePath(calendarId)).data.role
+  && request.resource.data.invitedBy == get(myInvitePath(calendarId)).data.invitedBy
+  && isAcceptingInvite(calendarId);
+
+// invites
+allow read: if request.auth != null && resource.data.invitedEmail == myEmail();
+allow create: if request.auth != null && isValidNewInvite(inviteId);
+allow update: if request.auth != null && isValidNewInvite(inviteId)      // オーナーの送り直し（同じ住所に上書き）
+  && request.resource.data.calendarId == resource.data.calendarId
+  && request.resource.data.invitedEmail == resource.data.invitedEmail;
+allow update: if request.auth != null                                    // 本人の返事
+  && resource.data.invitedEmail == myEmail()
+  && resource.data.status == 'pending'
+  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+  && request.resource.data.status in ['accepted', 'declined'];
+```
+
+- 同じ `allow update:` を 2 行書くと「どちらかが『はい』なら通る」（grammar §4-(134)）
+- `get`（前）が `pending` で `getAfter`（後）が `accepted` ＝ **招待状を承認済みにする書き込みと同時でないと名簿に入れない**。使い回しもできない
+- ⚠️ **弱点：メールアドレスの持ち主確認をしていない。** 他人のアドレスで先に登録すると、その人宛ての招待を受けられる。
+  直すにはサインアップ時の確認メール＋ルールの `request.auth.token.email_verified == true`（テスト用アカウントが使いにくくなるので保留）
+
+**36-H（2026-11-17）。** ユーザーの依頼で Claude が adb（`uiautomator dump` で文字の位置を探してタップ）で操作した。
+テスト用アカウントは **`test@example.com`（school のオーナー）** と **`tester@example.com`（36-H でサインアップして作成）**。パスワードはどちらも同じ。
+1. test が school のメンバー画面で `Tester@example.com`（大文字まじり）を編集者で招待 →「招待を送りました」
+2. tester でログイン → ▼ に赤い点、メニューに「届いた招待(1)」→ 一覧に「school ／ 編集者として招待されています」
+3. ［承認］→「「school」に参加しました」、カードが消える。ホームの赤い点が消え、▼ に school が増える
+4. test のメンバー画面に `tester@example.com ／ 編集者`
+5. test が tester を外す → 閲覧者で**送り直し**（同じ住所への上書き）→ 通る
+6. tester で［拒否］→「招待をお断りしました」。▼ に school は出ない
+すべて Logcat に `PERMISSION_DENIED` なし。**これで Step 36 は完了。**
+
+⚠️ 最初は「このメールアドレスの人は登録されていません」になった。`tester` のアカウント自体が無かったため（Auth に無い＝`users` の名刺も無い）。
+**招待のテストでは、相手が一度ログイン（またはサインアップ）して名刺がある状態にしておく。**
 
 #### Step 31（カレンダー一覧画面）
 

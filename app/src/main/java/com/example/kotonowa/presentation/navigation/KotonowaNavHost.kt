@@ -17,6 +17,7 @@ import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
 import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScreen
 import com.example.kotonowa.presentation.calendarlist.members.MemberListScreen
+import com.example.kotonowa.presentation.invites.InviteListScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
@@ -54,6 +55,10 @@ object Routes {
 
     // TODO(34-B-1) 誰の：この関数の ／ 何をする：受け取った id を住所の文字に差し込む（§6-㉖）
     fun calendarMembers(calendarId: String) = "calendar_members/$calendarId"
+
+    // Step 36-F: 届いた招待の一覧画面の住所。id は要らない（自分宛ての招待は頭脳がログイン情報から探す）
+    // TODO(36-F-1) CALENDAR_CREATE と同じ形。名前は INVITES、中身の文字は "invites"
+    const val INVITES = "invites"
 }
 
 /**
@@ -113,8 +118,9 @@ fun KotonowaNavHost(
                 onSetting = { navController.navigate(Routes.SETTING) },
                 onCreateCalendarClick = { navController.navigate(Routes.CALENDAR_CREATE) },
                 onManageCalendarsClick = { navController.navigate(Routes.CALENDAR_LIST) },
-                // 招待一覧画面はまだ無いので、押しても何も起きない。36-F で行き先を繋ぐ
-                onInvitesClick = { },
+                // TODO(36-F-3) 誰の：地図の係（navController）の ／ 何をする：招待一覧の住所へ行く
+                //   すぐ上の onManageCalendarsClick と同じ形
+                onInvitesClick = { navController.navigate(Routes.INVITES) },
             )
         }
 
@@ -194,7 +200,13 @@ fun KotonowaNavHost(
                 onAddClick = { navController.navigate(Routes.CALENDAR_CREATE) },
                 // TODO(34-D-6) 誰の：案内係の ／ 何をする：押されたカレンダーの id を載せた住所へ行く
                 //   住所は Routes の「id を差し込む関数」で作る（34-B-1）。お手本は HOME の onItemClick
-                onCalendarClick = { calendarId -> navController.navigate(Routes.calendarMembers(calendarId)) },
+                onCalendarClick = { calendarId ->
+                    navController.navigate(
+                        Routes.calendarMembers(
+                            calendarId
+                        )
+                    )
+                },
             )
         }
 
@@ -216,6 +228,14 @@ fun KotonowaNavHost(
             ),
         ) {
             MemberListScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        // Step 36-F: 招待一覧画面を地図に登録する。お手本は CALENDAR_CREATE（id の穴が無いので arguments も要らない）
+        // TODO(36-F-2) 住所は 36-F-1 で足したもの。「戻る」でホームへ 1 枚戻す
+        composable(Routes.INVITES) {
+            InviteListScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
