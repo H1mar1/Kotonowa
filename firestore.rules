@@ -33,14 +33,23 @@ service cloud.firestore {
       return request.auth.token.email.lower();
     }
 
+    // メールアドレスの持ち主確認が済んでいるか（Step 39）。確認メールのリンクを押した人だけ「はい」。
+    // Google でログインした人は最初から「はい」。値は通行証（ID トークン）に書かれているので、
+    // リンクを押したあとはアプリ側で通行証を作り直す（getIdToken(true)）まで古いまま
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
     // そのカレンダーから自分宛てに届いた招待状の住所（Step 36-A で決めた「カレンダーid_メール」）
     function myInvitePath(calendarId) {
       return /databases/$(database)/documents/invites/$(calendarId + '_' + myEmail());
     }
 
     // 自分宛ての招待状が「返事待ち」で、この書き込みで「承認済み」になるか（Step 36-G）
+    // メールの持ち主確認が済んでいること（Step 39）。名簿の行の作成・部屋の memberUids の追加も、この関数を通るので一緒に塞がる
     function isAcceptingInvite(calendarId) {
-      return get(myInvitePath(calendarId)).data.status == 'pending'
+      return isEmailVerified()
+        && get(myInvitePath(calendarId)).data.status == 'pending'
         && getAfter(myInvitePath(calendarId)).data.status == 'accepted';
     }
 
@@ -140,11 +149,12 @@ service cloud.firestore {
       }
     }
 
-    // ---- invites（Step 35-F / 36-G） ----
+    // ---- invites（Step 35-F / 36-G / 39） ----
 
     match /invites/{inviteId} {
-      // 宛先の本人だけが読める
+      // 宛先の本人だけが読める。ただしメールの持ち主確認が済んでいること（Step 39）
       allow read: if request.auth != null
+        && isEmailVerified()
         && resource.data.invitedEmail == myEmail();
 
       // オーナーが招待状を出す
@@ -157,8 +167,9 @@ service cloud.firestore {
         && request.resource.data.calendarId == resource.data.calendarId
         && request.resource.data.invitedEmail == resource.data.invitedEmail;
 
-      // 宛先の本人が返事をする（返事待ち → 承認 / 拒否。status 以外は変えられない）
+      // 宛先の本人が返事をする（返事待ち → 承認 / 拒否。status 以外は変えられない）。確認済みの人だけ（Step 39）
       allow update: if request.auth != null
+        && isEmailVerified()
         && resource.data.invitedEmail == myEmail()
         && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])

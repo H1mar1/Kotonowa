@@ -1,6 +1,5 @@
 package com.example.kotonowa.presentation.invites
 
-import androidx.collection.intIntMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.model.Invite
@@ -35,7 +34,57 @@ class InviteListViewModel @Inject constructor(
     private val uid = authRepository.currentUser?.uid
 
     init {
-        observeInvites()
+        // Step 39：確認済みの人だけ招待を見張る。未確認ならルールに読み取りを断られるので、見張らずにカードを出す
+        // TODO(39-C-2) 条件。誰の：認証の窓口の ／ 何か：確認済みか（39-A で作った val。() は付けない）
+        if (authRepository.isEmailVerified) {
+            observeInvites()
+        } else {
+            _uiState.update { it.copy(isEmailVerified = false, isLoading = false) }
+        }
+    }
+
+    /** ［確認メールを再送］が押された（Step 39）。 */
+    fun resendVerificationEmail() {
+        if (_uiState.value.isCheckingEmail) return
+        _uiState.update { it.copy(isCheckingEmail = true, actionMessage = null) }
+
+        viewModelScope.launch {
+            // TODO(39-C-3) 誰の：認証の窓口の ／ 何をする：確認メールを送る（39-B-1 と同じ 1 行）
+            authRepository.sendEmailVerification()
+                .onSuccess {
+                    _uiState.update { it.copy(actionMessage = "確認メールを送りました。メールのリンクを押してから［確認しました］を押してください") }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(actionMessage = "確認メールを送れませんでした。時間をおいて試してください") }
+                }
+            _uiState.update { it.copy(isCheckingEmail = false) }
+        }
+    }
+
+    /** ［確認しました］が押された（Step 39）。Firebase に問い合わせ直し、確認済みなら招待を見張り始める。 */
+    fun checkEmailVerified() {
+        if (_uiState.value.isCheckingEmail) return
+        _uiState.update { it.copy(isCheckingEmail = true, actionMessage = null) }
+
+        viewModelScope.launch {
+            // 読み直し ＋ 通行証の作り直し（39-A の refreshEmailVerified）。封筒の中身は「確認済みか」
+            authRepository.refreshEmailVerified()
+                .onSuccess { verified ->
+                    // TODO(39-C-4) 条件。verified（受け取った「はい／いいえ」）が「はい」か。Boolean なので == true は要らない
+                    if (verified) {
+                        // 確認できた：カードを消して読み込み中にし、招待の見張りを始める
+                        _uiState.update { it.copy(isEmailVerified = true, isLoading = true) }
+                        // TODO(39-C-5) 誰の：この頭脳の ／ 何をする：招待の見張りを始める（init の if の中と同じ 1 行）
+                        observeInvites()
+                    } else {
+                        _uiState.update { it.copy(actionMessage = "まだ確認できていません。メールのリンクを押してから、もう一度押してください") }
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(actionMessage = "確認できませんでした。通信状態を確かめてください") }
+                }
+            _uiState.update { it.copy(isCheckingEmail = false) }
+        }
     }
 
     private fun observeInvites() {
