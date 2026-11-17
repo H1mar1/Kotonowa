@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -220,7 +219,10 @@ class MemberListViewModel @Inject constructor(
             // TODO(35-D-3-6) 6 つの欄を埋める。左の名前と右の値の「綴り」と「意味」を 1 行ずつ声に出して照合する
             //   （全部 String なので、取り違えてもコンパイラは見つけられない。Step 19-D と同じ注意）
             val invite = Invite(
-                id = UUID.randomUUID().toString(),  // 招待状そのものの新しい ID（§4-(63)）
+                // TODO(36-A) 招待状の住所を「カレンダーの id」＋「_」＋「宛先のメール」にする（文字列テンプレート §6-㉖）
+                //   使う 2 つ：この画面のカレンダーの id（すぐ下の行の右側）と、小文字に揃えたメール（invitedEmail の行の右側）
+                //   ⚠️ 1 つ目の名前の直後に _ が来るので、1 つ目は { } で囲む（§6-㉖ の ⚠️）
+                id = "${calendarId}_$email",
                 calendarId = calendarId,            // どのカレンダーへ：この画面のカレンダー
                 calendarName = calendar.name,       // ② で読んだカレンダーの名前
                 invitedEmail = email,               // 誰宛て：小文字に揃えたほうのメールアドレス

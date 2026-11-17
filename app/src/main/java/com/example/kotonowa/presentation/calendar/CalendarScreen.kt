@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -67,6 +69,7 @@ fun CalendarScreen(
     onSetting: () -> Unit,
     onCreateCalendarClick: () -> Unit,     // ▼ のメニューの「＋ 新しいカレンダー」（Step 33-H）
     onManageCalendarsClick: () -> Unit,    // ▼ のメニューの「カレンダーの管理」（Step 33-H）
+    onInvitesClick: () -> Unit,            // ▼ のメニューの「届いた招待」（Step 36-D）
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -81,11 +84,29 @@ fun CalendarScreen(
                     // ボタンとメニューを同じ Box に入れる。メニューは「どのボタンから出たか」を Box で知る
                     Box {
                         TextButton(onClick = viewModel::openCalendarMenu) {
+                            // 名前と ▼ を別の Text に分けた（Step 36-D）。▼ にだけ赤い点を付けるため。
+                            // TextButton の { } の中は横並び（Row と同じ）なので、2 つ書けば左右に並ぶ
                             Text(
-                                text = "${uiState.calendarName} ▼",           // §4-㉖
+                                text = uiState.calendarName,
                                 style = MaterialTheme.typography.titleLarge,   // バーの見出しと同じ大きさ
                                 color = MaterialTheme.colorScheme.onSurface,   // ボタンの色（primary）ではなく見出しの色
                             )
+                            // ▼ の右上に赤い点を重ねる部品（grammar §3-(132)）
+                            BadgedBox(
+                                badge = {
+                                    // TODO(36-D-3-1) 点を出す条件。誰の：状態の ／ 何か：招待の数が 0 より多いか
+                                    //   Badge() は中身を書かないと「小さな赤い点」になる
+                                    if (uiState.pendingInviteCount > 0) {
+                                        Badge()
+                                    }
+                                },
+                            ) {
+                                Text(
+                                    text = " ▼",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
 
                         DropdownMenu(
@@ -109,6 +130,20 @@ fun CalendarScreen(
                             }
 
                             HorizontalDivider()   // 区切り線（§3-(123)）
+
+                            // 届いた招待（Step 36-D）。0 件なら行ごと出さない
+                            // TODO(36-D-3-2) 行を出す条件（上の赤い点と同じ式）
+                            if (uiState.pendingInviteCount > 0) {
+                                DropdownMenuItem(
+                                    // TODO(36-D-3-3) 表示する文字。「✉ 届いた招待（2）」のように、数を差し込む（§6-㉖ の ${ }）
+                                    text = { Text("届いた招待(${uiState.pendingInviteCount})") },
+                                    // TODO(36-D-3-4) 下の「カレンダーの管理」と同じ形。先にメニューを閉じてから、呼び鈴 onInvitesClick を鳴らす
+                                    onClick = {
+                                        viewModel.closeCalendarMenu()
+                                        onInvitesClick()
+                                    },
+                                )
+                            }
 
                             // 別の画面へ行く 2 つ。先にメニューを閉じておかないと、戻ってきたとき開いたままになる
                             DropdownMenuItem(

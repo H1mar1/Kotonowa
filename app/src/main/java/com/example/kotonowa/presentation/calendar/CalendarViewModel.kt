@@ -7,6 +7,7 @@ import com.example.kotonowa.domain.model.Calendar
 import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.InviteRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +40,7 @@ class CalendarViewModel @Inject constructor(
     private val authRepository: AuthRepository, //ログイン中のユーザーを知る窓口
     private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
     private val calendarRepository: CalendarRepository, // ▼ のメニューに並べるカレンダーを読む窓口（Step 33-H）
+    private val inviteRepository: InviteRepository, // 届いた招待の数を見張る窓口（Step 36-D）
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -78,6 +80,35 @@ class CalendarViewModel @Inject constructor(
 
         // ▼ のメニューに並べるカレンダーも見張る（Step 33-H）
         observeCalendars()
+
+        // 届いた招待の数も見張る（Step 36-D）
+        observeInvites()
+    }
+
+    /**
+     * 自分宛て・返事待ちの招待状を見張り、その**数だけ**を UiState に入れる（Step 36-D）。
+     * 招待状の中身はホームでは使わない（一覧は 36-E の画面が自分で見張る）。
+     * お手本はすぐ下の observeCalendars。形はほぼ同じ。
+     */
+    private fun observeInvites() {
+        // TODO(36-D-2-1) 誰の：ログイン中のユーザーの ／ 何を：メールアドレスを、小文字にして受け取る。無ければここで終わり
+        //   uid の行（48 行目）と observeCalendars の 1 行目を合わせた形。email は String? なので ?. で繋ぐ（§4-⑮）
+        //   小文字にするのは、招待状の宛先が小文字で保存されているため（35-D-3 / 35-F）
+        val myEmail = authRepository.currentUser?.email?.lowercase()?: return
+
+        viewModelScope.launch {
+            try {
+                // TODO(36-D-2-2) 誰の：招待の窓口の ／ 何をする：自分宛ての招待状を見張り、流れてくるたびに「数」を UiState に入れる
+                //   リストの数は .size（サイズ）で取れる。observeCalendars の collect の 3 行と同じ形
+                inviteRepository.observeMyInvites(myEmail).collect { list ->
+                    _uiState.update { it.copy(pendingInviteCount = list.size) }
+                }
+            } catch (e: CancellationException) {
+                throw e   // 意図して取り止めた合図（grammar §2-(91)）。Exception より上に置く
+            } catch (e: Exception) {
+                // 点が出ないだけで、ホームの予定は読める。画面全体のエラーにはしない（observeCalendars と同じ）
+            }
+        }
     }
 
     /**

@@ -1098,6 +1098,58 @@ match /invites/{inviteId} {
 未登録のアドレス・すでにメンバーの人では招待状ができないこと、オーナー以外にカードが出ないことも確認した。
 途中で 2 回 DNS が切れた（検証環境のハマりどころ 2026-11-16 を参照）。**これで Step 35 は完了。**
 
+#### Step 36 の内訳（招待受信・承認/拒否）
+
+**設計（2026-11-16 にユーザーが選択）。**
+- 入口はホームの ▼ メニューの「届いた招待（n）」（33-H のメニューに足す。0 件なら行を出さない）。
+- **メニューを開かなくても届いていると分かるように、上のバーの ▼ の角に赤い点（`Badge`）を付ける**
+  （2026-11-16 にユーザーが指定）。件数は点には出さず、メニューの行で見せる。0 件なら点も出さない。
+- 承認したあとは**一覧に残る**（ホームは切り替えない。招待状が一覧から消えるだけ）。
+- **招待状の id を `「カレンダーid」_「小文字のメール」` にする**（35-D-3 の UUID から変更）。
+  ルールが住所を組み立てて招待状を直接引けるため（承認時に「その人宛ての招待状があるか」を確かめる）。
+  同じ人を同じカレンダーへ 2 回招待しても同じ住所に上書きされ、招待状が 2 枚にならない。
+- 承認は `runBatch` で 3 つ同時：名簿 `members/{自分}` を作る・部屋の `memberUids` に自分を足す・招待状を `accepted` に。
+  拒否は招待状を `declined` にするだけ。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 36-A | `sendInvite` の id を `「カレンダーid」_「メール」` に変更＋コンソールの UUID の招待状を削除 | ✅ 11-16 |
+| 36-B | `InviteRepository` に `observeMyInvites` / `acceptInvite` / `declineInvite` | ✅ 11-17 |
+| 36-C | `InviteRepositoryImpl`（`toInvite`・購読・承認の `runBatch`・拒否） | ✅ 11-17（直しは Claude） |
+| 36-D | ▼ の赤い点＋メニューの「届いた招待（n）」（`CalendarViewModel` が件数を購読） | ✅ 11-17（実機の点は 36-G 後） |
+| 36-E | 招待一覧画面（`presentation/invites/`。UiState / ViewModel / Screen） | ✅ 11-17 |
+| 36-F | `Routes` ＋ `NavHost` に登録 | |
+| 36-G | ルール：`invites` の `read` / `update`、招待による `members` の `create`・部屋の `memberUids` の `update`（Claude が書く） | |
+| 36-H | 実機確認（2 アカウントで 招待→承認→▼ にカレンダーが出る／拒否） | |
+
+**36-A（2026-11-16）。** `id = "${calendarId}_$email"`。踏んだところ（どれもビルドが通る）：
+§4-(124) の画面の住所 `"calendar_members/$calendarId"` を写した（メール無し・`/` は Firestore の id に使えない）、
+`"{$calendarId}_email"`（`$` と `{` が逆で `{ }` が文字のまま残る／`$` の無い `email` は 5 文字そのもの）。
+**`${ }` は `$` と `{` がくっついて 1 つの合図。** 文字列テンプレートは、できあがる文字を 1 回書き出して確かめる。
+
+**36-C（2026-11-17）。** ユーザーが書いたあと、直しを依頼により Claude が行った。踏んだところ：
+- `whereArrayContains` を `whereEqualTo` の代わりに使った（`invitedEmail` / `status` は配列ではなく文字 1 つ。**0 件に見えるだけでエラーにならない**）
+- `update` / `whereEqualTo` に enum（`InviteStatus.PENDING`）をそのまま渡した（大文字の `"PENDING"` になり保存値 `"pending"` と合わない。`.name.lowercase()` が要る）。
+  **Firestore の API は `Any` を受け取るのでビルドが通る**（Step 30 の ⚠️ と同じ）
+- `valueOf(…).uppercase()`（大文字化は**文字に**かける。`valueOf((… ?: throw …).uppercase())` の順）／ `status` に `MemberRole.valueOf`
+- `acceptInvite` の住所 3 つがずれた（`calendarDoc` に `invite.id`、`inviteDoc` に名簿の行の住所）。
+  `memberDoc` は `calendarDoc.collection(SUBCOLLECTION_MEMBERS).document(uid)` と**部屋から 1 段降りる**形にすると取り違えにくい
+- `COLLECTION_CALENDARS` などの定数と `CalendarMember.toMap()` を `internal` にして招待の承認から借りた（grammar §4-(131)）
+
+**36-D（2026-11-17）。** `CalendarViewModel.observeInvites()` が `observeMyInvites(myEmail)` を見張り、`list.size` を `pendingInviteCount` に入れる。
+上のバーは名前と ▼ を別の `Text` に分け、▼ を `BadgedBox` で包んで数 > 0 のとき `Badge()`（grammar §3-(132)）。メニューの行も同じ式で出し分ける。
+今のルールでは `invites` を読めないので、見張りは失敗して（握りつぶして）0 件のまま。**点が実機で出るのは 36-G のあと。**
+踏んだところ：型の名前 `InviteRepository.observeMyInvites` で呼んだ（呼ぶのは窓口の人 `inviteRepository`）、
+引数に `uid` を渡した（宛先はメール。`String` 同士でビルドが通る）、`myEmail` の `?.lowercase()` 忘れ、
+メニューの行で `onCreateCalendarClick()` を鳴らした（`() -> Unit` 同士でビルドが通る）。
+
+**36-E（2026-11-17）。** `presentation/invites/`。承認・拒否のあとに一覧を読み直す処理は書かない（`pending` でなくなると
+`observeMyInvites` の絞り込みから外れ、Flow が 1 枚減った束を流す。ホームの赤い点も同時に消える）。
+「送っている途中」は `Boolean` ではなく **`processingInviteId: String?`**（押した 1 枚のボタンだけ止めるため）。
+結果の一言 `actionMessage` は `errorMessage` と分ける（出ても一覧を消さない）。肩書きの日本語化 `MemberRole.label()` は
+`MemberListScreen` と重複して持つ（`private`。3 画面目で共通化）。新しい部品 `OutlinedButton`（grammar §3-(133)）。
+踏んだところ：呼ぶ場所に**宣言の形** `acceptInvite(invite: Invite, uid: String）` を写した（呼ぶときは型を書かず箱を渡す）＋全角の `）`。
+
 #### Step 31（カレンダー一覧画面）
 
 設定 →「カレンダー」で `presentation/calendarlist/` の一覧を開く。`CalendarListViewModel` は

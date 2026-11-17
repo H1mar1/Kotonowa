@@ -17,10 +17,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import java.time.Instant
 
-/** Firestore 上の名前。打ち間違い防止のため定数にする（§5-㉓）。 */
-private const val COLLECTION_CALENDARS = "calendars"
-private const val SUBCOLLECTION_MEMBERS = "members"
-private const val FIELD_MEMBER_UIDS = "memberUids"
+/**
+ * Firestore 上の名前。打ち間違い防止のため定数にする（§5-㉓）。
+ * 36-C で招待の承認（InviteRepositoryImpl）からも使うので、private ではなく internal（§4-(131)）。
+ */
+internal const val COLLECTION_CALENDARS = "calendars"
+internal const val SUBCOLLECTION_MEMBERS = "members"
+internal const val FIELD_MEMBER_UIDS = "memberUids"
 
 /**
  * [CalendarRepository] の約束を Cloud Firestore で実際に果たすクラス。
@@ -209,8 +212,11 @@ private fun Calendar.toMap(memberUids: List<String>): Map<String, Any?> = mapOf(
     FIELD_MEMBER_UIDS to memberUids,
 )
 
-/** [CalendarMember] を Map に詰め替える。`role` は enum なので文字に直す（§4-(111)）。 */
-private fun CalendarMember.toMap(): Map<String, Any?> = mapOf(
+/**
+ * [CalendarMember] を Map に詰め替える。`role` は enum なので文字に直す（§4-(111)）。
+ * 36-C で招待の承認からも使うので internal（§4-(131)）。名簿の行の書き方を 1 か所にまとめておくため。
+ */
+internal fun CalendarMember.toMap(): Map<String, Any?> = mapOf(
     "uid" to uid,
     "role" to role.name.lowercase(),        // enum は文字に直す。Step 37 のルールが小文字で照合する
     "joinedAt" to Date.from(joinedAt),    // Instant は直接保存できない
