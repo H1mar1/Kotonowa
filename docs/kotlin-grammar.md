@@ -1382,6 +1382,53 @@ OutlinedTextField(
 中身の確認は ViewModel（または Firestore の検索結果）でする。
 💡 仲間に `KeyboardType.Password`（サインアップ画面）、`KeyboardType.Number`（数字だけのキーボード）がある。
 
+### (132) `BadgedBox` と `Badge` — 部品の角に小さな印を重ねる
+
+```kotlin
+BadgedBox(
+    badge = {
+        if (uiState.pendingInviteCount > 0) {
+            Badge()
+        }
+    },
+) {
+    Text(" ▼")
+}
+```
+
+2026-11-17、Step 36-D で記録。
+
+| 書き方 | 読み方 | 意味 |
+|---|---|---|
+| `BadgedBox(badge = { … }) { 本体 }` | 「印付きの箱。印は `badge`、本体は後ろの `{ }`」 | badged（バッジド）は「バッジが付いた」。本体（▼）の**右上の角に**、`badge` の中身を重ねて描く |
+| `Badge()` | 「印」 | 中身を書かないと**小さな赤い点**。`Badge { Text("3") }` と書くと数字入りの丸になる |
+| `badge = { if (…) { Badge() } }` | 「条件が『はい』のときだけ印を描く」 | 条件が「いいえ」なら `badge` の中で何も描かれず、本体だけが出る |
+
+**`{ }` が 2 つある形。** `badge = { }` は名前付きの引数、最後の `{ }` は**最後の引数のラムダは `( )` の外に出せる**決まり（§3-(83)）で外に出たもの。
+`Scaffold(topBar = { … }) { 本体 }` と同じ形。
+
+💡 色は `MaterialTheme.colorScheme.error`（赤）が自動で使われる。`Color.Red` を直書きしなくてよい（Step 16-D-3-d の色の決まりと同じ）。
+💡 `if` を `BadgedBox` の**外**に書いて「点ありの版／無しの版」で部品ごと出し分けると、点が出た瞬間に ▼ の位置がずれることがある。
+箱はいつも置いておき、**中の印だけ**出し分ける（Step 24 の「透明な `Surface` を置いたまま」と同じ考え方）。
+
+### (133) `Button` と `OutlinedButton` — 目立たせたい方を塗りつぶす
+
+```kotlin
+Button(onClick = onAccept) { Text("承認") }
+OutlinedButton(onClick = onDecline) { Text("拒否") }
+```
+
+2026-11-17、Step 36-E で記録。
+
+| 部品 | 見た目 | 使いどころ |
+|---|---|---|
+| `Button` | 色で**塗りつぶした**ボタン | いちばん押してほしい操作（保存・承認） |
+| `OutlinedButton`（アウトラインド） | **枠線だけ**のボタン | 2 番目の操作（拒否・キャンセル） |
+| `TextButton` | 文字だけ | もっと控えめな操作（戻る・設定） |
+
+使い方（`onClick` / `enabled` / 中身の `{ Text(…) }`）は 3 つとも同じ。違うのは見た目だけ。
+並べたときに**どちらが主役かが一目で分かる**ように使い分ける。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子

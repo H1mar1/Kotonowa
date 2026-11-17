@@ -113,6 +113,8 @@ fun KotonowaNavHost(
                 onSetting = { navController.navigate(Routes.SETTING) },
                 onCreateCalendarClick = { navController.navigate(Routes.CALENDAR_CREATE) },
                 onManageCalendarsClick = { navController.navigate(Routes.CALENDAR_LIST) },
+                // 招待一覧画面はまだ無いので、押しても何も起きない。36-F で行き先を繋ぐ
+                onInvitesClick = { },
             )
         }
 

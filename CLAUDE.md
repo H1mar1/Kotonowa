@@ -1116,8 +1116,8 @@ match /invites/{inviteId} {
 | 36-A | `sendInvite` の id を `「カレンダーid」_「メール」` に変更＋コンソールの UUID の招待状を削除 | ✅ 11-16 |
 | 36-B | `InviteRepository` に `observeMyInvites` / `acceptInvite` / `declineInvite` | ✅ 11-17 |
 | 36-C | `InviteRepositoryImpl`（`toInvite`・購読・承認の `runBatch`・拒否） | ✅ 11-17（直しは Claude） |
-| 36-D | ▼ の赤い点＋メニューの「届いた招待（n）」（`CalendarViewModel` が件数を購読） | |
-| 36-E | 招待一覧画面（`presentation/invites/`。UiState / ViewModel / Screen） | |
+| 36-D | ▼ の赤い点＋メニューの「届いた招待（n）」（`CalendarViewModel` が件数を購読） | ✅ 11-17（実機の点は 36-G 後） |
+| 36-E | 招待一覧画面（`presentation/invites/`。UiState / ViewModel / Screen） | ✅ 11-17 |
 | 36-F | `Routes` ＋ `NavHost` に登録 | |
 | 36-G | ルール：`invites` の `read` / `update`、招待による `members` の `create`・部屋の `memberUids` の `update`（Claude が書く） | |
 | 36-H | 実機確認（2 アカウントで 招待→承認→▼ にカレンダーが出る／拒否） | |
@@ -1135,6 +1135,20 @@ match /invites/{inviteId} {
 - `acceptInvite` の住所 3 つがずれた（`calendarDoc` に `invite.id`、`inviteDoc` に名簿の行の住所）。
   `memberDoc` は `calendarDoc.collection(SUBCOLLECTION_MEMBERS).document(uid)` と**部屋から 1 段降りる**形にすると取り違えにくい
 - `COLLECTION_CALENDARS` などの定数と `CalendarMember.toMap()` を `internal` にして招待の承認から借りた（grammar §4-(131)）
+
+**36-D（2026-11-17）。** `CalendarViewModel.observeInvites()` が `observeMyInvites(myEmail)` を見張り、`list.size` を `pendingInviteCount` に入れる。
+上のバーは名前と ▼ を別の `Text` に分け、▼ を `BadgedBox` で包んで数 > 0 のとき `Badge()`（grammar §3-(132)）。メニューの行も同じ式で出し分ける。
+今のルールでは `invites` を読めないので、見張りは失敗して（握りつぶして）0 件のまま。**点が実機で出るのは 36-G のあと。**
+踏んだところ：型の名前 `InviteRepository.observeMyInvites` で呼んだ（呼ぶのは窓口の人 `inviteRepository`）、
+引数に `uid` を渡した（宛先はメール。`String` 同士でビルドが通る）、`myEmail` の `?.lowercase()` 忘れ、
+メニューの行で `onCreateCalendarClick()` を鳴らした（`() -> Unit` 同士でビルドが通る）。
+
+**36-E（2026-11-17）。** `presentation/invites/`。承認・拒否のあとに一覧を読み直す処理は書かない（`pending` でなくなると
+`observeMyInvites` の絞り込みから外れ、Flow が 1 枚減った束を流す。ホームの赤い点も同時に消える）。
+「送っている途中」は `Boolean` ではなく **`processingInviteId: String?`**（押した 1 枚のボタンだけ止めるため）。
+結果の一言 `actionMessage` は `errorMessage` と分ける（出ても一覧を消さない）。肩書きの日本語化 `MemberRole.label()` は
+`MemberListScreen` と重複して持つ（`private`。3 画面目で共通化）。新しい部品 `OutlinedButton`（grammar §3-(133)）。
+踏んだところ：呼ぶ場所に**宣言の形** `acceptInvite(invite: Invite, uid: String）` を写した（呼ぶときは型を書かず箱を渡す）＋全角の `）`。
 
 #### Step 31（カレンダー一覧画面）
 

@@ -37,6 +37,14 @@ data class CalendarUiState(
     /** ▼ のメニューが開いているか。部品は自分で開かないので、ここに持つ（grammar §3-(107)）。 */
     val isCalendarMenuOpen: Boolean = false,
 
+    /**
+     * 自分宛て・返事待ちの招待状の数（Step 36-D）。
+     * 1 以上なら ▼ の角に赤い点、メニューに「届いた招待（n）」を出す。
+     * 点と行が**同じ 1 つの数字**を見るので、「点はあるのにメニューに無い」という食い違いが起きない。
+     */
+    // TODO(36-D-1) 型は整数（Int）、最初は 0 件
+    val pendingInviteCount: Int = 0,
+
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
