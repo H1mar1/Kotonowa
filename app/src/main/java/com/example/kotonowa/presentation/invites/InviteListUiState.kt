@@ -33,4 +33,14 @@ data class InviteListUiState(
      * errorMessage と分けるのは、これが出ても一覧は消さないため（MemberListUiState の inviteMessage と同じ考え方）。
      */
     val actionMessage: String? = null,
+
+    /**
+     * メールアドレスの持ち主確認が済んでいるか（Step 39）。「いいえ」なら一覧の代わりに確認のカードを出す。
+     * 最初は「はい」にしておき、確認していない人だけ init で「いいえ」に切り替える。
+     */
+    // TODO(39-C-1) 型は「はい／いいえ」、最初は「はい」
+    val isEmailVerified: Boolean = true,
+
+    /** ［確認メールを再送］［確認しました］の通信中か（二度押し防止。ボタンを灰色にする）。 */
+    val isCheckingEmail: Boolean = false,
 )

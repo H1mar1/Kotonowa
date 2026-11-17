@@ -2758,6 +2758,26 @@ if (user == null) { ...; return@launch }
 先に `isFailure` で封筒を確かめ、そのあと中身の `null` を見る。
 💡 `getCalendar` では区別していない。どちらでも「先へ進めない」で同じ対応になるため。**区別するかは、利用者に違う一言を見せたいかで決める。**
 
+### (135) `val 名前: 型 get() = …` — 読むたびに作り直すプロパティ
+
+2026-11-17、Step 39-A で記録（`AuthRepositoryImpl.currentUser` から使っていたが説明していなかった）。
+
+```kotlin
+override val isEmailVerified: Boolean
+    get() = firebaseAuth.currentUser?.isEmailVerified ?: false
+```
+
+| 書き方 | 読み方 | いつ右側が動くか |
+|---|---|---|
+| `val a = 式` | 「a は（作った瞬間の）式の答え」 | **1 回だけ**。あとは覚えた値を返す |
+| `val a get() = 式` | 「a を読まれたら、そのたびに式を計算して答える」 | **読まれるたびに毎回** |
+
+`get`（ゲット）は「取り出すとき」。`val` でも、中身が外の状況（ログイン中の人）に合わせて変わるものは `get()` にする。
+`= 式` のままにすると、**クラスが作られた瞬間（＝アプリ起動直後）の値**を覚え続け、ログインし直しても古い人のままになる。
+
+💡 呼ぶ側は `authRepository.isEmailVerified` と、普通の `val` と同じに書く（`()` は付けない）。
+interface 側は `val isEmailVerified: Boolean` と型だけ書き、「どう計算するか」は実装（Impl）が `get()` で決める。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

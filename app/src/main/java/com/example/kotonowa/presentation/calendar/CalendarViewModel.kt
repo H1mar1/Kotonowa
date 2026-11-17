@@ -90,8 +90,13 @@ class CalendarViewModel @Inject constructor(
         // ▼ のメニューに並べるカレンダーも見張る（Step 33-H）
         observeCalendars()
 
-        // 届いた招待の数も見張る（Step 36-D）
-        observeInvites()
+        // 届いた招待の数も見張る（Step 36-D）。ただし確認済みの人だけ（Step 39）
+        // TODO(39-D-4) 招待一覧の init（39-C-2）と同じ形。確認済みなら見張り、未確認なら UiState に「いいえ」を入れる
+        if (authRepository.isEmailVerified) {
+            observeInvites()
+        } else {
+            _uiState.update { it.copy(isEmailVerified = false) }
+        }
     }
 
     /**
@@ -185,6 +190,25 @@ class CalendarViewModel @Inject constructor(
     /** ▼ が押された。お手本は ScheduleEditViewModel.onReminderMenuOpen（Step 26）。 */
     fun openCalendarMenu() {
         _uiState.update { it.copy(isCalendarMenuOpen = true) }
+        refreshEmailVerifiedState()
+    }
+
+    /**
+     * 「確認済みか」を UiState に写す（Step 39）。init とメニューを開くたびに呼ぶ。
+     *
+     * 招待一覧で［確認しました］を押すと、端末のユーザー情報が新しくなる（39-A の reload）。
+     * ホームの頭脳は生き残っているので、メニューを開いたときに写し直して気づく。
+     * 未確認 → 確認済み に変わった瞬間に、招待の件数の見張りを始める
+     * （未確認のうちに見張るとルールに断られて止まってしまうため、それまでは見張らない）。
+     */
+    private fun refreshEmailVerifiedState() {
+        val wasVerified = _uiState.value.isEmailVerified
+        val nowVerified = authRepository.isEmailVerified
+        _uiState.update { it.copy(isEmailVerified = nowVerified) }
+
+        if (nowVerified && !wasVerified) {
+            observeInvites()
+        }
     }
 
     /** メニューの外側や「戻る」が押された。 */

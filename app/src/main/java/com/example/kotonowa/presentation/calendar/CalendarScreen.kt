@@ -148,11 +148,17 @@ fun CalendarScreen(
                             HorizontalDivider()   // 区切り線（§3-(123)）
 
                             // 届いた招待（Step 36-D）。0 件なら行ごと出さない
-                            // TODO(36-D-3-2) 行を出す条件（上の赤い点と同じ式）
-                            if (uiState.pendingInviteCount > 0) {
+                            // Step 39：未確認の人は件数を読めない（0 に見える）ので、確認を促す入口として行を出す
+                            // TODO(39-D-5) 行を出す条件。「招待が 0 より多い」または「確認済みではない」（|| と !）
+                            if (uiState.pendingInviteCount > 0 || !uiState.isEmailVerified) {
                                 DropdownMenuItem(
-                                    // TODO(36-D-3-3) 表示する文字。「✉ 届いた招待（2）」のように、数を差し込む（§6-㉖ の ${ }）
-                                    text = { Text("届いた招待(${uiState.pendingInviteCount})") },
+                                    // 確認済みなら件数、未確認なら「要メール確認」（値を返す if。§5-(68)）
+                                    text = {
+                                        Text(
+                                            if (uiState.isEmailVerified) "届いた招待(${uiState.pendingInviteCount})"
+                                            else "届いた招待（要メール確認）"
+                                        )
+                                    },
                                     // TODO(36-D-3-4) 下の「カレンダーの管理」と同じ形。先にメニューを閉じてから、呼び鈴 onInvitesClick を鳴らす
                                     onClick = {
                                         viewModel.closeCalendarMenu()

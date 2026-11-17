@@ -54,6 +54,10 @@ fun InviteListScreen(
         //   型が (Invite) -> Unit で一致するので { } で包まない。MemberListScreen の onRemove と同じ形
         onAccept = viewModel::accept,
         onDecline = viewModel::decline,
+        // TODO(39-D-1) 誰の：頭脳の ／ 何を：［確認メールを再送］［確認しました］の関数をそのまま手渡す（上の 2 行と同じ形）
+        //   型は () -> Unit（引数なし）。39-C で作った 2 つの関数の名前を ____ に
+        onResendEmail = viewModel::resendVerificationEmail,
+        onCheckEmail = viewModel::checkEmailVerified,
         modifier = modifier,
     )
 }
@@ -68,6 +72,8 @@ private fun InviteListContent(
     onNavigateBack: () -> Unit,
     onAccept: (Invite) -> Unit,    // 押された招待状を添えて鳴らす
     onDecline: (Invite) -> Unit,
+    onResendEmail: () -> Unit,     // ［確認メールを再送］（Step 39）
+    onCheckEmail: () -> Unit,      // ［確認しました］（Step 39）
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -84,6 +90,21 @@ private fun InviteListContent(
 
         // 条件だけの when（§5-(64)）。お手本は CalendarListScreen とまったく同じ順番
         when {
+            // Step 39：未確認なら、読み込み中やエラーより先にカードを出す（when は上から順に見る。§5-(64)）
+            !uiState.isEmailVerified -> {
+                Column(modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp)) {
+                    VerifyEmailCard(
+                        message = uiState.actionMessage,
+                        isChecking = uiState.isCheckingEmail,
+                        onResendEmail = onResendEmail,
+                        onCheckEmail = onCheckEmail,
+                    )
+                }
+            }
+
             uiState.isLoading -> {
                 Column(modifier = Modifier
                     .fillMaxSize()
@@ -195,6 +216,58 @@ private fun InviteRow(
 }
 
 /**
+ * メールアドレスの確認を促すカード（Step 39）。
+ * 招待は「メールの持ち主」本人だけが受け取れる。リンクを押してから［確認しました］で一覧が出る。
+ * 状態は持たない（§3-(76)）。一言・通信中か・呼び鈴 2 つを引数でもらう。
+ */
+@Composable
+private fun VerifyEmailCard(
+    message: String?,
+    isChecking: Boolean,
+    onResendEmail: () -> Unit,
+    onCheckEmail: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "メールアドレスの確認が必要です", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "招待を受け取るには、登録したメールアドレスに届いた確認メールのリンクを押してください。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            // 結果の一言（「送りました」「まだ確認できていません」など）
+            if (message != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(text = message, style = MaterialTheme.typography.bodySmall)
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // 横に 2 つ。押してほしい［確認しました］を塗りつぶし、［再送］を枠線にする（InviteRow と同じ考え方。§3-(133)）
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    // TODO(39-D-2) 押されたら鳴らす呼び鈴。誰の：このカードが受け取った ／ どれ：［確認しました］の方
+                    //   InviteRow の onClick = onAccept と同じく、() を付けずに渡す
+                    onClick = onCheckEmail,
+                    // TODO(39-D-3) 押せる条件。「通信中ではない」とき（InviteRow の enabled = !isProcessing と同じ形）
+                    enabled = !isChecking,
+                ) {
+                    Text(if (isChecking) "確認中…" else "確認しました")
+                }
+                OutlinedButton(
+                    onClick = onResendEmail,
+                    enabled = !isChecking,
+                ) {
+                    Text("確認メールを再送")
+                }
+            }
+        }
+    }
+}
+
+/**
  * 肩書きを画面に出す日本語にする（拡張関数。§4-㊱）。
  * MemberListScreen にも同じものがあるが private なので、ここに置く。
  * 3 画面目で要るようになったら共通のファイルへ切り出す（Step 18-D の「案B」と同じ判断）。
@@ -245,6 +318,8 @@ private fun InviteListPreview() {
             onNavigateBack = {},
             onAccept = {},
             onDecline = {},
+            onResendEmail = {},
+            onCheckEmail = {},
         )
     }
 }
@@ -258,6 +333,27 @@ private fun InviteListEmptyPreview() {
             onNavigateBack = {},
             onAccept = {},
             onDecline = {},
+            onResendEmail = {},
+            onCheckEmail = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "メール未確認（Step 39）")
+@Composable
+private fun InviteListUnverifiedPreview() {
+    KotonowaTheme {
+        InviteListContent(
+            uiState = InviteListUiState(
+                isLoading = false,
+                isEmailVerified = false,
+                actionMessage = "まだ確認できていません。メールのリンクを押してから、もう一度押してください",
+            ),
+            onNavigateBack = {},
+            onAccept = {},
+            onDecline = {},
+            onResendEmail = {},
+            onCheckEmail = {},
         )
     }
 }

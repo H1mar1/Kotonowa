@@ -67,6 +67,43 @@ class AuthRepositoryImpl @Inject constructor(
     }catch (e: Exception){
         Result.failure(e.toAuthException())
     }
+
+    // ---- メールアドレスの持ち主確認（Step 39） ----
+
+    // ログインしていなければ「いいえ」。currentUser の get() と同じ形（?. と ?:。§4-⑮）
+    override val isEmailVerified: Boolean
+        // TODO(39-A-4) 誰の：Firebase の今のユーザーの ／ 何か：isEmailVerified。いなければ false
+        get() = firebaseAuth.currentUser?.isEmailVerified?:false
+
+    override suspend fun sendEmailVerification(): Result<Unit> = try {
+        val firebaseUser = firebaseAuth.currentUser
+            ?: throw AuthException("ログインしていません")
+        // TODO(39-A-5) 誰の：このユーザーの ／ 何をする：確認メールを送り、届け終わるまで待つ（.await()）
+        //   お手本は sendPasswordResetEmail の 1 行目（あちらは firebaseAuth に宛先を渡す。こちらはユーザー本人に頼む）
+        firebaseUser.sendEmailVerification().await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e.toAuthException())
+    }
+
+    override suspend fun refreshEmailVerified(): Result<Boolean> = try {
+        val firebaseUser = firebaseAuth.currentUser
+            ?: throw AuthException("ログインしていません")
+
+        // ① 端末が覚えているユーザー情報を、Firebase から読み直す（リンクを押したことがここで端末に届く）
+        firebaseUser.reload().await()
+
+        // ② 通行証（ID トークン）を作り直す。true ＝「まだ使えても新しく発行し直して」
+        //    ⚠️ これを忘れると、アプリは「確認済み」と分かっても、Firestore のルールが見る通行証は古いまま
+        //    （email_verified が false のまま）で、招待を読めない
+        firebaseUser.getIdToken(true).await()
+
+        // TODO(39-A-6) 誰の：読み直したこのユーザーの ／ 何か：isEmailVerified を封筒に入れて返す
+        //   お手本は login の最後の行 Result.success(firebaseUser.toUser())
+        Result.success(firebaseUser.isEmailVerified)
+    } catch (e: Exception) {
+        Result.failure(e.toAuthException())
+    }
 }
 
 /** Firebase のユーザー情報を、アプリ内で使う [User] に詰め替える。 */

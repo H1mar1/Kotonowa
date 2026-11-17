@@ -55,6 +55,14 @@ class SignUpViewModel @Inject constructor(
             authRepository.signUp(current.email.trim(), current.password)
                 .onSuccess {user ->
                     userRepository.saveUser(user)
+
+                    // Step 39-B：確認メールを送る。届いたリンクを押すと、招待を受け取れるようになる。
+                    //   失敗しても登録自体は成功しているので、結果は見ない（saveUser と同じ考え方。Step 28）。
+                    //   招待一覧の［確認メールを再送］からいつでも送り直せる。
+                    //   ⚠️ isSignUpSuccess = true より「前」に呼ぶ（画面が消えると viewModelScope が打ち切られる。Step 28 の ⚠️）
+                    // TODO(39-B-1) 誰の：認証の窓口の ／ 何をする：確認メールを送る（39-A で作った関数。引数なし）
+                    authRepository.sendEmailVerification()
+
                     _uiState.update { state ->
                         state.copy(isLoading = false, isSignUpSuccess = true)
                     }
