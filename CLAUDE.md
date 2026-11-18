@@ -19,6 +19,8 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 - 勝手に中身まで書いて完成させない。ユーザーが「書いて」と明示したときだけ実装する。
 - **Firestore のセキュリティルールは例外で、Claude が完成形を書く**（2026-10-14 にユーザーが指示）。
   ユーザーは 1 行ずつの解説（grammar §4-(118)）で理解する。Kotlin のコードは引き続き穴埋め。
+- **Cloud Functions（`functions/` の TypeScript）も同じく Claude が完成形を書く**（2026-11-18 にユーザーが選択）。
+  1 行ずつ解説する。FCM の受信・トークン登録など Android 側は穴埋め。
 - 出すのは**空の骨組みと `TODO` コメント、穴埋めの `____`**まで。中身のロジックはユーザーが書く。
 - ユーザーが書いたコードのレビュー、エラーの原因説明、詰まったときのヒント出しは積極的に行う。答えを即出しせず、まずヒントから。
 
@@ -94,7 +96,7 @@ Kotonowa（ことのわ）のリポジトリ。作業前に以下を必ず読む
 **Phase 3（共有カレンダー＋ロールベース認可）に着手（2026-09-23〜）。ブランチは `feature/phase3-shared-calendar`。
 Step 27〜30（モデル・`users` 自己登録・`CalendarRepository`）完了、Step 31（カレンダー一覧画面）完了（2026-10-04）。
 Step 32（カレンダー作成画面）完了（2026-10-14）。Step 33（表示するカレンダーの切り替え）完了（2026-10-22）。
-Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。Step 35（招待送信）完了（2026-11-16）。Step 36（招待受信・承認/拒否）完了（2026-11-17）。Step 37（ロールベースのルール）完了（2026-11-17）。Step 38（画面のロール出し分け）完了（2026-11-17）— Phase 3 の予定ステップはすべて完了。手直しとして Step 39（メールアドレスの持ち主確認）完了（2026-11-17）。
+Step 34（メンバー一覧・ロール変更・外す）完了（2026-11-02）。Step 35（招待送信）完了（2026-11-16）。Step 36（招待受信・承認/拒否）完了（2026-11-17）。Step 37（ロールベースのルール）完了（2026-11-17）。Step 38（画面のロール出し分け）完了（2026-11-17）— Phase 3 の予定ステップはすべて完了。手直しとして Step 39（メールアドレスの持ち主確認）完了（2026-11-17）。**Phase 4（プッシュ通知）に着手（2026-11-18〜）。ブランチは `feature/phase4-push-notification`。**
 
 Phase 1（認証）完了（2026-08-02）。Phase 2（個人のスケジュール/タスク管理＋ローカル通知）
 完了（2026-09-22）— Step 26 でリマインダー通知が実機で鳴るところまで確認した。
@@ -730,6 +732,40 @@ grammar §8-(99)。
 5 分以内の予定だと通知時刻が過去になり、仕様どおり予約されない。
 鳴らないときは Logcat の `WM-WorkerWrapper`（Worker が動いたか）と
 `dumpsys notification`（通知が投稿されたか）を見ると、どこで止まっているか切り分けられる。
+
+### Phase 4 の進捗（プッシュ通知）— ブランチ `feature/phase4-push-notification`（2026-11-18〜）
+
+**設計（2026-11-18 にユーザーが選択）。**
+- 通知を送るのは 3 種類：**招待が届いた**（招待された人へ）／**他のメンバーが予定・タスクを追加**／**他のメンバーが編集**（自分以外のメンバーへ）。削除は送らない。マイカレンダーは対象外
+- 送るのは **Cloud Functions**（Firestore の書き込みをきっかけに動くサーバーの関数）。コードは **Claude が完成形を書く**（TypeScript）
+- 届け先の住所は **FCM トークン**（端末ごとの宛先）。`users/{uid}.fcmTokens[]` に端末が自分で登録する（Step 28 で `merge` にしておいた理由）
+- 「誰が編集したか」を Functions が知るため、`events` に **`updatedBy`** を足す（今は `createdBy` しか無く、編集者が分からない）
+- 最後に、設定画面の「通知設定」で**カレンダーごとの ON/OFF** を作る
+- 道具：Node.js（Homebrew）＋ Firebase CLI（`npm install -g firebase-tools`）。2026-11-18 に Claude が導入（node v26.13.1 / firebase-tools 15.36.0）
+
+| Step | 内容 | 状態 |
+|---|---|---|
+| 40 | Firebase CLI の準備（ログイン・`firebase init`・ルールを CLI で公開できるように） | ✅ 11-18 |
+| 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | |
+| 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | |
+| 43 | Functions：招待が届いたら通知 | |
+| 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | |
+| 45 | 通知設定（カレンダーごとの ON/OFF） | |
+
+**Step 40（2026-11-18）。** `firebase login` はユーザーが**ターミナル.app** で実行（この会話の `!` は入力を受け付けないので、
+Gemini・統計の質問やコードの貼り付けで止まる。どちらも `n` でよい）。`firebase init` は対話式なので、Claude が同じファイルを手で作った。
+
+| ファイル | 役割 |
+|---|---|
+| `.firebaserc` | このフォルダの既定のプロジェクト ＝ `kotonowa-3b2fb` |
+| `firebase.json` | 何をどこから送り込むか（ルール ＝ `firestore.rules`、Functions ＝ `functions/`。送る前に `npm run build`） |
+| `functions/package.json` | Functions の材料（`firebase-functions` 7.4.0 / `firebase-admin` 14.5.1 / `typescript` 7.0.2）と動かす Node の版（22） |
+| `functions/tsconfig.json` | TypeScript → JavaScript の変換設定（`src/` → `lib/`。TS 7 は `rootDir` の指定が必須） |
+| `functions/src/index.ts` | 関数を書く場所（今は `initializeApp()` だけ） |
+
+**ルールはコマンドで公開できるようになった。** `firebase deploy --only firestore:rules`（`--dry-run` を付けると公開せず文法チェックだけ）。
+今後は**リポジトリの `firestore.rules` が正**で、コピー＆貼り付けは不要。公開は外に出る操作なので、毎回ユーザーに確認してから行う。
+💡 `npm install` で `protobufjs` などの install script が保留された（npm 11 の新しい安全機能）。ビルドには不要なのでそのまま。
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
@@ -1569,8 +1605,8 @@ com.example.kotonowa/
 Phase0: セットアップ（Firebase疎通）      ← 完了
 Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 完了
 Phase2: 個人のスケジュール/タスク管理 + ローカル通知  ← 完了（2026-09-22）
-Phase3: 共有カレンダー + ロールベース認可
-Phase4: プッシュ通知
+Phase3: 共有カレンダー + ロールベース認可  ← 完了（2026-11-17。Step 39 の手直しまで）
+Phase4: プッシュ通知                      ← 着手（2026-11-18〜）
 ```
 
 各フェーズ終了時に必ず「動くアプリ」がある状態を保つ。

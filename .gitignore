@@ -20,3 +20,8 @@ local.properties
 
 # Kotlin ビルドの作業用フォルダ
 .kotlin/
+
+# Firebase CLI（Step 40）
+firebase-debug.log
+firestore-debug.log
+.firebase/
