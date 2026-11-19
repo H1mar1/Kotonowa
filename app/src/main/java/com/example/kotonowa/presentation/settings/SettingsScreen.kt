@@ -38,10 +38,10 @@ fun SettingsScreen(
     SettingsContent(
         user = viewModel.user,
         onNavigateBack = onNavigateBack,
-        onLogoutClick = {
-            viewModel.logout()
-            onLoggedOut()
-        },
+        // Step 41：ログアウトは通信するようになったので、「終わったら onLoggedOut を鳴らして」と頼む形に変えた
+        // TODO(41-D-3) 誰の：頭脳の logout を ／ 何を渡す：終わりの合図として、この画面の呼び鈴 onLoggedOut
+        //   呼び鈴を「渡す」ので () は付けない（35-E の onClick = onInvite と同じ）
+        onLogoutClick = { viewModel.logout(onDone = onLoggedOut) },
         modifier = modifier,
     )
 }
