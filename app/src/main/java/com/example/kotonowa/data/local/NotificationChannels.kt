@@ -14,6 +14,15 @@ import android.content.Context
 const val CHANNEL_ID_REMINDER = "reminder"
 
 /**
+ * プッシュ通知（共有カレンダーのお知らせ）のチャンネル id（Step 42）。
+ *
+ * リマインダーとは別の郵便受けにする。端末の設定で「リマインダーは鳴らす、共有のお知らせは鳴らさない」
+ * のように、ユーザーが種類ごとに切り替えられるようにするため。
+ * AndroidManifest.xml の default_notification_channel_id にも同じ文字列を書いている。
+ */
+const val CHANNEL_ID_PUSH = "shared_updates"
+
+/**
  * 通知チャンネル（＝通知の種類ごとの受け皿）を作る。
  *
  * Android 8.0 以降、通知はチャンネルに属していないと**エラーも出ないまま表示されない**
@@ -37,4 +46,17 @@ fun createNotificationChannels(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
 
     manager.createNotificationChannel(channel)
+
+    // ── Step 42：共有カレンダーのお知らせ用の郵便受け ──
+    // 作り方は上のリマインダーとまったく同じ。違うのは id・名前・説明の 3 つだけ
+    val pushChannel = NotificationChannel(
+        // TODO(42-A-1) 何を入れる：この郵便受けの id（このファイルの上で作った、プッシュ通知用の定数）
+        CHANNEL_ID_PUSH,
+        "共有カレンダーのお知らせ",
+        NotificationManager.IMPORTANCE_HIGH,
+    )
+    pushChannel.description = "招待や、他のメンバーによる予定の追加・編集をお知らせします"
+
+    // TODO(42-A-2) 誰の：通知係（manager）の ／ 何をする：上で作ったプッシュ通知用の郵便受けを設置する（3 行上のリマインダーと同じ命令）
+    manager.createNotificationChannel(pushChannel)
 }

@@ -31,6 +31,28 @@
         </activity>
 
         <!--
+          Step 42：プッシュ通知を受け取る係（KotonowaMessagingService）を OS に知らせる。
+          ここに書かないと、通知が届いてもこの係は呼ばれない（エラーも出ない）。
+          - exported="false" … 他のアプリからは呼べない（呼ぶのは Firebase だけ）
+          - intent-filter …「Firebase のメッセージが来たら、ここへ」という宛名
+        -->
+        <service
+            android:name=".data.remote.KotonowaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
+          アプリが裏にいるとき、Firebase が代わりに出す通知をどの郵便受けに入れるか。
+          NotificationChannels.kt の CHANNEL_ID_PUSH と同じ文字列にする（打ち間違えても静かに既定の郵便受けへ行くだけ）。
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="shared_updates" />
+
+        <!--
           WorkManager の「勝手に初期化する」仕組みを止める（grammar §8-(104)）。
           止めないと、KotonowaApplication が渡す HiltWorkerFactory を知らないまま
           初期化され、Worker を作る瞬間に失敗する。
