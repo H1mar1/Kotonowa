@@ -3682,6 +3682,114 @@ WorkManager.getInstance(context).enqueueUniqueWork(
 **アプリ全体の Context**（画面より長生き）が配られる。画面の Context を持ち続けると
 画面が閉じた後も参照が残るので、こちらを使う。
 
+### (136) `FirebaseMessagingService` — プッシュ通知を受け取る係
+
+Firebase が「**通知が来たよ**」「**住所が変わったよ**」と呼びに来る係。自分では呼ばない。
+
+```kotlin
+class KotonowaMessagingService : FirebaseMessagingService() {
+    override fun onNewToken(token: String) { … }              // 住所（FCM トークン）が変わった
+    override fun onMessageReceived(message: RemoteMessage) { … } // 通知が届いた
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `: FirebaseMessagingService()` | Firebase が用意した親を受け継ぐ（§7-㉛ の `override` で入口を埋める） |
+| `onNewToken(token)` | 住所が**新しくなったとき**に呼ばれる。名刺の住所を更新する場所 |
+| `onMessageReceived(message)` | 通知が**届いたとき**に呼ばれる。中身を取り出して自分で通知を出す |
+| `message.data` | 送る側が決めた**名札つきの中身**（`Map<String, String>`。§4-㉟）。`data["title"]` で取り出し、無ければ `null` |
+| `message.notification` | Firebase コンソールのテスト送信などが使う形。`?.title` / `?.body` |
+
+⚠️ **アプリが裏にいるときの動きが、中身の形で変わる。**
+
+| 送られた形 | アプリが前にいる | アプリが裏にいる／閉じている |
+|---|---|---|
+| `data` だけ | `onMessageReceived` が呼ばれる | `onMessageReceived` が呼ばれる |
+| `notification` つき | `onMessageReceived` が呼ばれる | **呼ばれない**。Firebase が代わりに通知を出す（郵便受けはマニフェストの `default_notification_channel_id`） |
+
+だから Kotonowa の Functions（Step 43 / 44）は **`data` だけで送る**。いつでも自分の係を通るので、見た目を 1 か所で決められる。
+
+⚠️ **マニフェストに `<service>` を書かないと呼ばれない**（エラーも出ない）。`intent-filter` の
+`com.google.firebase.MESSAGING_EVENT` が「Firebase のメッセージはここへ」という宛名。
+
+### (137) `@AndroidEntryPoint` ＋ `@Inject lateinit var` — OS が作るクラスに後から材料を配る
+
+`FirebaseMessagingService` は Firebase（OS）が作るので、ViewModel のように**コンストラクタで材料を受け取れない**。
+
+```kotlin
+@AndroidEntryPoint
+class KotonowaMessagingService : FirebaseMessagingService() {
+    @Inject lateinit var authRepository: AuthRepository
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `@AndroidEntryPoint` | 「このクラスにも Hilt が材料を配って」の印（`MainActivity` と同じ） |
+| `@Inject` | 「ここに材料を入れて」の印 |
+| `lateinit var` | **作られた瞬間は空で、あとから入れる**箱。`lateinit`（レイトイニット）＝「初期値はあとで」 |
+
+**コンストラクタ注入（§8-(104) の Worker・ViewModel）との違い。** あちらは「作るときに材料を手渡す」、
+こちらは「**作られたあとで**材料を差し込む」。OS が引数なしで作るクラスでは、後者しか使えない。
+Worker は `@AssistedInject` という専用の仕掛けがあったが、Service にはそれが無いのでこの形になる。
+
+⚠️ `lateinit var` を、入れる前に読むと `UninitializedPropertyAccessException`（まだ入っていない）で落ちる。
+Hilt は `onCreate` の時点で入れ終わるので、`onNewToken` / `onMessageReceived` の中で使う分には安全。
+
+### (138) `CoroutineScope(SupervisorJob() + Dispatchers.IO)` — 自分で作る「裏で走らせる場所」
+
+ViewModel には `viewModelScope`（画面の頭脳が消えると止まる場所）があったが、Service には無い。自分で作る。
+
+```kotlin
+private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+scope.launch { pushTokenRepository.registerToken(myUid) }
+
+override fun onDestroy() {
+    scope.cancel()       // 係が片付けられるとき、走っている作業も止める
+    super.onDestroy()
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `CoroutineScope(…)` | 「裏で走らせる場所」を 1 つ作る。`launch` はこの場所の上で動く（§2 の `launch` と同じ） |
+| `SupervisorJob()` | 中の作業が 1 つ失敗しても、**他の作業や場所そのものは止めない**。ふつうの `Job` だと 1 つの失敗で場所ごと止まる |
+| `Dispatchers.IO` | 通信やファイル読み書き向けの作業員たちに任せる |
+| `+` | 2 つの設定を**組み合わせる**（足し算ではなく「両方つける」） |
+| `scope.cancel()` | この場所で走っている作業を**全部止める**（§2-(91) の `cancel` と同じ） |
+
+💡 `viewModelScope` は、これを Android が**自動で作り・自動で止めて**くれている版。
+自分で作ったときは、**止める（`cancel`）のも自分の仕事**になる。止めないと、係が片付けられたあとも作業が残る。
+
+### (139) `PendingIntent` — 「あとで、これを開いて」を通知に預ける
+
+通知をタップしたときにアプリを開くには、**「どの画面を開くか」を通知に持たせておく**。
+
+```kotlin
+val intent = Intent(this, MainActivity::class.java).apply {
+    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+}
+val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+
+NotificationCompat.Builder(…)
+    .setContentIntent(pendingIntent)
+```
+
+| 部分 | 意味 |
+|---|---|
+| `Intent(this, MainActivity::class.java)` | 「`MainActivity` を開いて」という**依頼書**。`::class.java` は「このクラスそのもの」を指す |
+| `.apply { flags = … }` | 依頼書を作ったその場で設定を書き込む（`apply` ＝「作ったものに対して、続けてこれをして」） |
+| `FLAG_ACTIVITY_NEW_TASK` | アプリが閉じていても開けるようにする |
+| `FLAG_ACTIVITY_CLEAR_TOP` | すでに開いていたら、新しく重ねずにそれを前に出す |
+| `or` | 2 つの印を**両方**つける（Kotlin の数値の「ビットの または」。`||` とは別物） |
+| `PendingIntent.getActivity(…)` | 依頼書を**あとで**（タップされたときに）実行できる形に包む。`Pending`（ペンディング）＝保留中 |
+| `FLAG_IMMUTABLE` | 包んだ依頼書を**他のアプリが書き換えられない**ようにする。Android 12 以降は指定が必須 |
+| `setContentIntent(…)` | 通知に「タップされたらこれ」を持たせる |
+
+⚠️ `setContentIntent` を付けないと、タップしても**何も起きずに通知が消えるだけ**（`setAutoCancel(true)` のため）。
+
 ---
 
 ## 追記のしかた（Claude 向け）

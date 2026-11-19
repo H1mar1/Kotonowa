@@ -747,7 +747,7 @@ grammar §8-(99)。
 |---|---|---|
 | 40 | Firebase CLI の準備（ログイン・`firebase init`・ルールを CLI で公開できるように） | ✅ 11-18 |
 | 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | ✅ 11-20 |
-| 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | |
+| 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | ✅ 11-20 |
 | 43 | Functions：招待が届いたら通知 | |
 | 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | |
 | 45 | 通知設定（カレンダーごとの ON/OFF） | |
@@ -788,6 +788,24 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   ログアウトは `logout(onDone)`：外す → 掲示板を白紙 → サインアウト → `onDone()` の順（すぐ画面を移すと `viewModelScope` ごと通信が打ち切られる）
 - ⚠️ **`users` は「ログインしていれば誰でも読める」**（Step 28。招待の検索のため）ので、`fcmTokens` も他人から読める。
   住所だけでは通知を送れない（送るにはサーバーの鍵が要る）ので今は許容し、要件定義書 §7 の「`users` の読み取りの絞り込み」と一緒に後で直す
+
+#### Step 42 の内訳（通知を受け取って出す）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 42-A | 通知チャンネル `CHANNEL_ID_PUSH`（`"shared_updates"`）を `createNotificationChannels` に足す | ✅ 11-20（直しは Claude） |
+| 42-B | `data/remote/KotonowaMessagingService`（`onNewToken` で再登録／`onMessageReceived` で通知を出す） | ✅ 11-20（直しは Claude） |
+| 42-C | マニフェストに `<service>` ＋ `default_notification_channel_id`（Claude） | ✅ 11-20 |
+| 42-D | 実機確認（Firebase コンソールの「テスト メッセージ」をこの端末の住所へ送る） | ✅ 11-20 |
+
+- 中身の受け取りは `data` を先に、無ければ `notification` を見る。Functions は `data` だけで送る（裏にいても必ず自分の係を通るため。grammar §8-(136)）
+- Service はコンストラクタで材料を受け取れないので `@AndroidEntryPoint` ＋ `@Inject lateinit var`（§8-(137)）。`viewModelScope` が無いので自前の `scope` を作り `onDestroy` で止める（§8-(138)）
+- 通知をタップしたら `MainActivity` を開く（`PendingIntent`。§8-(139)）
+- 42-A/B で踏んだところ（ビルドが通るものが 2 つ）：`createNotificationChannel(channel)`（リマインダーの郵便受けを 2 回設置。プッシュ用が作られず**通知が静かに消える**）、
+  `scope.launch { CHANNEL_ID_PUSH }`（値を置いただけで何も頼んでいない）、`message.date[KEY_PUSH_BODY]`（綴り違い＋見出しに本文の名札）
+- **42-D（2026-11-20）。** コンソールの Messaging（`https://console.firebase.google.com/project/kotonowa-3b2fb/messaging`。Firestore の画面の中には無い）→
+  「Firebase Notification メッセージ」→「テスト メッセージを送信」に `fcmTokens` の住所を貼って送信。アプリが前にいるとき（係が出す）・裏にいるとき（Firebase が代わりに出す）の両方で表示され、
+  `dumpsys notification` で**どちらも `shared_updates` の郵便受け**に入ったことを確認。**これで Step 42 は完了。**
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
