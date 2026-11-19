@@ -9,6 +9,7 @@ import com.example.kotonowa.domain.model.ScheduleItem
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.example.kotonowa.domain.repository.InviteRepository
+import com.example.kotonowa.domain.repository.PushTokenRepository
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,6 +43,7 @@ class CalendarViewModel @Inject constructor(
     private val selectedCalendarRepository: SelectedCalendarRepository, // 選択中のカレンダーの掲示板（Step 33-A）
     private val calendarRepository: CalendarRepository, // ▼ のメニューに並べるカレンダーを読む窓口（Step 33-H）
     private val inviteRepository: InviteRepository, // 届いた招待の数を見張る窓口（Step 36-D）
+    private val pushTokenRepository: PushTokenRepository, // プッシュ通知の宛先の登録係（Step 41）
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -97,6 +99,9 @@ class CalendarViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(isEmailVerified = false) }
         }
+
+        // この端末の宛先を名刺に登録する（Step 41）
+        registerPushToken()
     }
 
     /**
@@ -104,6 +109,20 @@ class CalendarViewModel @Inject constructor(
      * 招待状の中身はホームでは使わない（一覧は 36-E の画面が自分で見張る）。
      * お手本はすぐ下の observeCalendars。形はほぼ同じ。
      */
+    /**
+     * この端末の宛先（FCM トークン）を、自分の名刺に登録する（Step 41）。
+     * ホームはログイン・自動ログイン・サインアップのどれでも必ず通るので、ここで毎回呼ぶ。
+     * 宛先は Firebase の都合で変わることがあるが、arrayUnion なので同じものは 2 つにならない。
+     * 失敗しても予定は見られるので、結果は見ない（次にホームを開いたとき、また試す）。
+     */
+    private fun registerPushToken() {
+        val myUid = uid ?: return
+        viewModelScope.launch {
+            // TODO(41-C-1) 誰の：宛先の登録係の ／ 何をする：自分（myUid）の名刺に、この端末の宛先を登録する
+            pushTokenRepository.registerToken(myUid)
+        }
+    }
+
     private fun observeInvites() {
         // TODO(36-D-2-1) 誰の：ログイン中のユーザーの ／ 何を：メールアドレスを、小文字にして受け取る。無ければここで終わり
         //   uid の行（48 行目）と observeCalendars の 1 行目を合わせた形。email は String? なので ?. で繋ぐ（§4-⑮）

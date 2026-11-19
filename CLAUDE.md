@@ -746,7 +746,7 @@ grammar §8-(99)。
 | Step | 内容 | 状態 |
 |---|---|---|
 | 40 | Firebase CLI の準備（ログイン・`firebase init`・ルールを CLI で公開できるように） | ✅ 11-18 |
-| 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | |
+| 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | ✅ 11-20 |
 | 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | |
 | 43 | Functions：招待が届いたら通知 | |
 | 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | |
@@ -766,6 +766,28 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 **ルールはコマンドで公開できるようになった。** `firebase deploy --only firestore:rules`（`--dry-run` を付けると公開せず文法チェックだけ）。
 今後は**リポジトリの `firestore.rules` が正**で、コピー＆貼り付けは不要。公開は外に出る操作なので、毎回ユーザーに確認してから行う。
 💡 `npm install` で `protobufjs` などの install script が保留された（npm 11 の新しい安全機能）。ビルドには不要なのでそのまま。
+
+#### Step 41 の内訳（FCM トークンの登録）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 41-A | 依存 `firebase-messaging` ＋ `FirebaseModule` に `FirebaseMessaging`（Claude） | ✅ 11-18 |
+| 41-B | `domain/repository/PushTokenRepository` ＋ `data/repository/PushTokenRepositoryImpl` ＋ `RepositoryModule` | ✅ 11-19（最後の直しは Claude） |
+| 41-C | ホームを開くたびに `registerToken`（`CalendarViewModel.init`） | ✅ 11-20 |
+| 41-D | ログアウトの直前に `unregisterToken`（`SettingsViewModel.logout`）＋ `logout(onDone)` | ✅ 11-20 |
+| 41-E | 実機確認（コンソールで `users/{uid}.fcmTokens` に住所が 1 つ入る／ログアウトで消える） | ✅ 11-20（Claude が adb で操作、ユーザーがコンソールを確認） |
+
+- 41-B で踏んだところ：`unregisterToken` に登録の 3 行（`set` ＋ `arrayUnion`）をそのまま写した（ログアウトで住所が**増える**）、
+  `.update(token, arrayUnion(uid))`（項目名に住所・値に uid）、`FIELD_FCM_TOKENS.token`（定数を住所をもらう行に入れた）。
+  **どれもビルドが通る**（Firestore の API は `Any`）。`.update(項目名, 値)` は「誰の・どの項目に・何をする」と声に出して読む
+- 住所の出し入れは `FieldValue.arrayUnion` / `arrayRemove`（Step 30 の `memberUids` と同じ）。登録は名刺が無くても失敗しないよう `set(…, merge)`
+- 登録は**ホームを開くたび**（自動ログイン・ログイン・サインアップのすべてがホームを通る／住所は Firebase の都合で変わることがある）
+- ⚠️ ログアウトでは**サインアウトより前に**外す（サインアウト後は自分の名刺を書き換える権限が無い）
+- **41-E（2026-11-20）。** `+tester@gmail.com` で ホームを開く→住所が 1 つ／ログアウト→`[]`／ログインし直す→同じ住所が 1 つ、を確認。
+  ログアウトの瞬間の `PERMISSION_DENIED` 3 行（予定・カレンダー・招待の見張り）は Step 28 の 💡 と同じもので、名刺の書き換えは断られていない。**これで Step 41 は完了。**
+  ログアウトは `logout(onDone)`：外す → 掲示板を白紙 → サインアウト → `onDone()` の順（すぐ画面を移すと `viewModelScope` ごと通信が打ち切られる）
+- ⚠️ **`users` は「ログインしていれば誰でも読める」**（Step 28。招待の検索のため）ので、`fcmTokens` も他人から読める。
+  住所だけでは通知を送れない（送るにはサーバーの鍵が要る）ので今は許容し、要件定義書 §7 の「`users` の読み取りの絞り込み」と一緒に後で直す
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
