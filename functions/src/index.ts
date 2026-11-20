@@ -126,3 +126,55 @@ export const notifyInvite = onDocumentWritten("invites/{inviteId}", async (event
     `「${calendarName}」に${roleLabel}として招待されました`,
   );
 });
+
+/**
+ * Step 44：共有カレンダーで予定・タスクが追加・編集されたら、書いた本人以外のメンバーへ通知する。
+ *
+ * 削除では送らない（設計。要件定義書 §3.5）。マイカレンダー（calendars に書類が無い）では送らない。
+ */
+export const notifyScheduleChange = onDocumentWritten("events/{eventId}", async (event) => {
+  const before = event.data?.before;
+  const after = event.data?.after;
+
+  // 消された場合は送らない
+  if (!after?.exists) return;
+
+  const calendarId: string = after.get("calendarId");
+  const writerUid: string | undefined = after.get("updatedBy");
+  const title: string = after.get("title");
+  const isTask = after.get("type") === "task";
+
+  // 書いた人が分からない（Step 44 より前のアプリで書かれた）なら、誰に送らないべきか決められないので送らない
+  if (!writerUid) return;
+
+  // マイカレンダーは calendars に書類が無い（Step 33）。書類が無ければ共有ではないので送らない
+  const calendarSnap = await getFirestore().collection("calendars").doc(calendarId).get();
+  if (!calendarSnap.exists) return;
+
+  const calendarName: string = calendarSnap.get("name");
+  const memberUids: string[] = calendarSnap.get("memberUids") ?? [];
+
+  // 書いた人の表示名。名刺の displayName → 無ければメールアドレス → それも無ければ「メンバー」
+  const writerSnap = await getFirestore().collection("users").doc(writerUid).get();
+  const writerName: string = writerSnap.get("displayName") || writerSnap.get("email") || "メンバー";
+
+  // 何をしたかの一言を決める
+  const kind = isTask ? "タスク" : "予定";
+  let action: string;
+  if (!before?.exists) {
+    action = "追加しました";
+  } else if (isTask && before.get("isCompleted") !== after.get("isCompleted")) {
+    // タスクの完了チェック（Step 21）だけ、言い方を変える
+    action = after.get("isCompleted") ? "完了にしました" : "未完了に戻しました";
+  } else {
+    action = "編集しました";
+  }
+
+  // 書いた本人を除いた全員へ、同時に送る
+  const receivers = memberUids.filter((uid) => uid !== writerUid);
+  await Promise.all(
+    receivers.map((uid) =>
+      sendToUser(uid, calendarName, `${writerName}さんが${kind}「${title}」を${action}`),
+    ),
+  );
+});
