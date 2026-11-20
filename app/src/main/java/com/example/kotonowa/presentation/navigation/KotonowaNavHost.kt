@@ -19,6 +19,7 @@ import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScree
 import com.example.kotonowa.presentation.calendarlist.members.MemberListScreen
 import com.example.kotonowa.presentation.invites.InviteListScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
+import com.example.kotonowa.presentation.settings.notification.NotificationSettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
 
 
@@ -59,6 +60,10 @@ object Routes {
     // Step 36-F: 届いた招待の一覧画面の住所。id は要らない（自分宛ての招待は頭脳がログイン情報から探す）
     // TODO(36-F-1) CALENDAR_CREATE と同じ形。名前は INVITES、中身の文字は "invites"
     const val INVITES = "invites"
+
+    // Step 45: 通知設定画面の住所。id は要らない（自分の設定は頭脳がログイン情報から探す）
+    // TODO(45-C-1) INVITES と同じ形。名前は NOTIFICATION_SETTINGS、中身の文字は "notification_settings"
+    const val NOTIFICATION_SETTINGS = "notification_settings"
 }
 
 /**
@@ -185,11 +190,20 @@ fun KotonowaNavHost(
         composable(Routes.SETTING) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
+                // TODO(45-C-3) 「通知設定」が押されたら、通知設定画面の住所へ行く（すぐ下の CALENDAR_LIST の onAddClick と同じ形）
+                onNotificationSettingsClick = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onLoggedOut = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.HOME) { inclusive = true }
                     }
                 },
+            )
+        }
+
+        // Step 45：通知設定画面。戻るは popBackStack（設定画面へ戻る）
+        composable(Routes.NOTIFICATION_SETTINGS) {
+            NotificationSettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

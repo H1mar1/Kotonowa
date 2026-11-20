@@ -27,11 +27,13 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
  *
  * @param onNavigateBack 「戻る」を押したときに鳴らす呼び鈴
  * @param onLoggedOut ログアウトが済んだときに鳴らす呼び鈴。ログイン画面へ戻るのに使う
+ * @param onNotificationSettingsClick 「通知設定」を押したときに鳴らす呼び鈴（Step 45）
  */
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onLoggedOut: () -> Unit,
+    onNotificationSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -42,6 +44,8 @@ fun SettingsScreen(
         // TODO(41-D-3) 誰の：頭脳の logout を ／ 何を渡す：終わりの合図として、この画面の呼び鈴 onLoggedOut
         //   呼び鈴を「渡す」ので () は付けない（35-E の onClick = onInvite と同じ）
         onLogoutClick = { viewModel.logout(onDone = onLoggedOut) },
+        // 頭脳を通さない（画面を移るだけで、覚えることが無い）ので、呼び鈴をそのまま見た目係へ渡す
+        onNotificationSettingsClick = onNotificationSettingsClick,
         modifier = modifier,
     )
 }
@@ -55,6 +59,7 @@ private fun SettingsContent(
     user: User?,
     onNavigateBack: () -> Unit,
     onLogoutClick: () -> Unit,
+    onNotificationSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 
 ) {
@@ -87,15 +92,15 @@ private fun SettingsContent(
             // ★5 メールアドレス。★4 と同じ形で、見る先を email に変えるだけ
             Text(user?.email ?: "メールアドレス不明")
 
-            // --- 通知設定（準備中） ---
-            // ★6 押せない状態にする。中身が無いので、押して空振りさせない（Step 21 の enabled と同じ）
+            // --- 通知設定（Step 45 で押せるようにした） ---
+            // Step 25 では enabled = false ＋「準備中」で置いていた行。行き先ができたので繋ぐ
             TextButton(
-                onClick = {},
-                enabled = false,
+                // TODO(45-C-2) 押されたら：引数でもらった呼び鈴 onNotificationSettingsClick を渡す（渡すので () は付けない）
+                onClick = onNotificationSettingsClick,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("通知設定", modifier = Modifier.weight(1f))
-                Text("準備中")
+                Text("›")
             }
 
             // --- ログアウト ---
@@ -120,6 +125,7 @@ private fun SettingsContentPreview() {
             ),
             onNavigateBack = {},
             onLogoutClick = {},
+            onNotificationSettingsClick = {},
         )
     }
 }

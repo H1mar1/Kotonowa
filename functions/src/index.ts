@@ -38,10 +38,28 @@ const ROLE_LABELS: Record<string, string> = {
 /**
  * 1 人の名刺（users/{uid}）に登録されている全端末へ、通知を送る。
  * Step 44 の「他のメンバーへの通知」からも使う。
+ *
+ * @param calendarId どのカレンダーについての通知か（Step 45）。渡したときは、その人が通知を止めていれば送らない。
+ *                   招待の通知は渡さない（止められない）
  */
-async function sendToUser(uid: string, title: string, body: string): Promise<void> {
+async function sendToUser(
+  uid: string,
+  title: string,
+  body: string,
+  calendarId?: string,
+): Promise<void> {
   const userRef = getFirestore().collection("users").doc(uid);
   const userSnap = await userRef.get();
+
+  // Step 45：このカレンダーの通知を止めている人には送らない。
+  // 名刺の mutedCalendarIds（Android の NotificationSettingRepositoryImpl と同じ名札）に入っていれば飛ばす
+  if (calendarId !== undefined) {
+    const muted: string[] = userSnap.get("mutedCalendarIds") ?? [];
+    if (muted.includes(calendarId)) {
+      logger.info("このカレンダーの通知を止めているので送らない", { uid, calendarId });
+      return;
+    }
+  }
 
   // 名刺の fcmTokens を読む。無い・配列でない場合は空として扱う
   const tokens: string[] = userSnap.get("fcmTokens") ?? [];
@@ -92,6 +110,8 @@ async function sendToUser(uid: string, title: string, body: string): Promise<voi
  * 「作成」だけ（onDocumentCreated）にしないのは、断られた招待を同じ住所へ送り直したとき（Step 36 の上書き）にも知らせたいため。
  */
 export const notifyInvite = onDocumentWritten("invites/{inviteId}", async (event) => {
+  logger.info("招待状の書き込みを受け取った", { inviteId: event.params.inviteId });
+
   const before = event.data?.before;
   const after = event.data?.after;
 
@@ -133,6 +153,9 @@ export const notifyInvite = onDocumentWritten("invites/{inviteId}", async (event
  * 削除では送らない（設計。要件定義書 §3.5）。マイカレンダー（calendars に書類が無い）では送らない。
  */
 export const notifyScheduleChange = onDocumentWritten("events/{eventId}", async (event) => {
+  // 呼ばれたことを記録に残す（関数が動いていないのか、動いたが送らなかったのかを見分けるため。Step 45-E で追加）
+  logger.info("予定の書き込みを受け取った", { eventId: event.params.eventId });
+
   const before = event.data?.before;
   const after = event.data?.after;
 
@@ -174,7 +197,7 @@ export const notifyScheduleChange = onDocumentWritten("events/{eventId}", async 
   const receivers = memberUids.filter((uid) => uid !== writerUid);
   await Promise.all(
     receivers.map((uid) =>
-      sendToUser(uid, calendarName, `${writerName}さんが${kind}「${title}」を${action}`),
+      sendToUser(uid, calendarName, `${writerName}さんが${kind}「${title}」を${action}`, calendarId),
     ),
   );
 });

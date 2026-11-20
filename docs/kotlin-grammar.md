@@ -2808,6 +2808,31 @@ class ScheduleRepositoryImpl @Inject constructor(
 ⚠️ 外から `item.toMapWithWriter()` と呼べるのは、このクラスの**中だけ**（`private` かつクラスの中に書いたため）。
 画面の頭脳などから「書いた人」を変えられないのは、この置き場所のおかげでもある。
 
+### (141) `as?` と `filterIsInstance<T>()` — 「何が入っているか分からない物」から、欲しい型だけ取り出す
+
+Firestore の `snapshot.get("名札")` は、中身の型が分からないので `Any?`（何でもあり）で返してくる。
+配列なら `List` のはずだが、コンパイラはそれを知らない。
+
+```kotlin
+val ids = (snapshot?.get("mutedCalendarIds") as? List<*>)
+    ?.filterIsInstance<String>()
+    ?.toSet()
+    ?: emptySet()
+```
+
+| 部分 | 意味 |
+|---|---|
+| `x as? List<*>` | 「`x` を List として扱ってみて。List でなければ `null`」。`as?`（アズ・クエスチョン）＝**安全な型の言い換え** |
+| `List<*>` | 「中身の型は分からない List」。`*`（スター）＝何でも |
+| `?.filterIsInstance<String>()` | 中から**文字（`String`）だけ**を拾った `List<String>` を作る。`< >` に欲しい型（§4-㊼） |
+| `?.toSet()` | `Set` に変える（§4-(94)） |
+| `?: emptySet()` | 途中で `null` になったら（項目が無い・List でない）空の `Set` |
+
+⚠️ **`as`（`?` なし）は使わない。** `as` は「絶対にこの型」と言い切る書き方で、違ったら**アプリが落ちる**（`ClassCastException`）。
+Firestore の中身は人の手（コンソール）でも書き換えられるので、`as?` で「違ったら null」と受けるのが安全。
+
+💡 `getString("name")`（Step 30）は、この「`as? String`」を Firebase が代わりにやってくれている版。配列には専用の取り出し口が無いので、自分で書く。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

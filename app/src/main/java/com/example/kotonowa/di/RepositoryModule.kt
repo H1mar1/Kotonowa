@@ -14,7 +14,9 @@ import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
 import com.example.kotonowa.domain.repository.SelectedCalendarRepository
 import com.example.kotonowa.domain.repository.UserRepository
+import com.example.kotonowa.data.repository.NotificationSettingRepositoryImpl
 import com.example.kotonowa.data.repository.PushTokenRepositoryImpl
+import com.example.kotonowa.domain.repository.NotificationSettingRepository
 import com.example.kotonowa.domain.repository.PushTokenRepository
 import dagger.Binds
 import dagger.Module
@@ -71,4 +73,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPushTokenRepository(impl: PushTokenRepositoryImpl): PushTokenRepository
+
+    // 通知設定の窓口（Step 45）。上と同じ形
+    @Binds
+    @Singleton
+    abstract fun bindNotificationSettingRepository(
+        impl: NotificationSettingRepositoryImpl,
+    ): NotificationSettingRepository
 }
