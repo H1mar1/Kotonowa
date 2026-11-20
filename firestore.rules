@@ -84,14 +84,17 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && canEdit(resource.data.calendarId);
 
+      // updatedBy（最後に書いた人。Step 44）は必ず自分。通知の「誰が」を詐称させない
       allow create: if request.auth != null
         && canEdit(request.resource.data.calendarId)
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid;
 
       allow update: if request.auth != null
         && canEdit(resource.data.calendarId)
         && request.resource.data.calendarId == resource.data.calendarId
-        && request.resource.data.createdBy == resource.data.createdBy;
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedBy == request.auth.uid;
     }
 
     // ---- calendars（Step 31 / 32 / 34 / 36） ----

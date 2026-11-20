@@ -749,7 +749,7 @@ grammar §8-(99)。
 | 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | ✅ 11-20 |
 | 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | ✅ 11-20 |
 | 43 | Functions：招待が届いたら通知 | ✅ 11-20 |
-| 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | |
+| 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | ✅ 11-20 |
 | 45 | 通知設定（カレンダーごとの ON/OFF） | |
 
 **Step 40（2026-11-18）。** `firebase login` はユーザーが**ターミナル.app** で実行（この会話の `!` は入力を受け付けないので、
@@ -826,6 +826,25 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   続けて `firebase functions:artifacts:setpolicy --location asia-northeast1 --days 1 --force` で古いコンテナイメージの自動削除を設定（保管料の抑制）
 - **43-C（2026-11-20）。** エミュレータ 1 台では招待する側に切り替えるとログアウトで住所が外れるため、コンソールで既存の招待状の `status` を `pending` に書き換えて確認。
   通知が表示され、`firebase functions:log --only notifyInvite` に `通知を送った success:1` を確認。**これで Step 43 は完了。**
+
+#### Step 44 の内訳（他のメンバーの追加・編集で通知）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 44-A | `ScheduleRepositoryImpl`：`toMapWithWriter()`（中身＋`updatedBy`＝今ログインしている自分）で保存 | ✅ 11-20 |
+| 44-B | ルール：`events` の `create` / `update` で `updatedBy == 自分` を必須に（Claude） | ✅ 11-20 |
+| 44-C | Functions：`notifyScheduleChange`（共有カレンダーのみ・書いた本人以外へ・追加／編集／完了の言い分け）（Claude） | ✅ 11-20 |
+| 44-D | 公開（アプリを先に入れ替えてから、ルールと Functions） | ✅ 11-20 |
+| 44-E | 実機確認 | ✅ 11-20 |
+
+- `updatedBy` は `ScheduleItem` に持たせず data 層で付ける（`type` / `sortAt` と同じ。頭脳の入れ忘れ・他人の uid を防ぐ）。`toggleCompleted` も `updateItem` を通るので自動で付く
+- ⚠️ **公開の順番。** ルールを先に公開すると、`updatedBy` を送らない古いアプリの保存がすべて断られる。アプリを入れ替えてから公開する
+- 書いた人の名前は名刺の `displayName` → 無ければ `email`（メールで登録した人は `displayName` が無い）
+- 44-A で踏んだところ：`toMap(FIELD_UPDATED_BY to myUid)`（`+` で足さずに引数にした）、`.set(addItem(item))`（**addItem の中で addItem を呼ぶ＝終わらない呼び出し**。
+  `set` は `Any` を受け取るのでビルドが通る。`update` は形が合わずビルドで止まった）。`( )` に入れるのは仕事ではなく中身（Map）
+- **44-E（2026-11-20）。** ① Claude が adb で tester として school に「NotifyTest」を保存 → 新ルールで通る・本人に通知なし・関数の記録に他の 2 人あて（住所なしで送らず）。
+  ② ユーザーがコンソールでその書類の `updatedBy` を test の uid（school の `ownerUid`）に書き換え → エミュレータに「school ／ test@example.comさんが予定「NotifyTest」を編集しました」。
+  確認用の予定は adb で削除。💡 `events` の一覧は id で並ぶので、コンソールのフィルタ（`title == …`）で探す。**これで Step 44 は完了。**
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 

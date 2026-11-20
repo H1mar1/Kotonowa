@@ -2778,6 +2778,36 @@ override val isEmailVerified: Boolean
 💡 呼ぶ側は `authRepository.isEmailVerified` と、普通の `val` と同じに書く（`()` は付けない）。
 interface 側は `val isEmailVerified: Boolean` と型だけ書き、「どう計算するか」は実装（Impl）が `get()` で決める。
 
+### (140) クラスの中に書く拡張関数 ／ `Map + (名札 to 値)` — 1 項目足した Map を作る
+
+**クラスの中に書いた拡張関数**は、そのクラスの持ち物（コンストラクタの `val` など）をそのまま使える。
+
+```kotlin
+class ScheduleRepositoryImpl @Inject constructor(
+    private val firestore: FirebaseFirestore,
+    private val firebaseAuth: FirebaseAuth,
+) : ScheduleRepository {
+
+    private fun ScheduleItem.toMapWithWriter(): Map<String, Any?> {
+        val myUid = firebaseAuth.currentUser?.uid ?: throw IllegalStateException("…")
+        return toMap() + (FIELD_UPDATED_BY to myUid)
+    }
+}
+```
+
+| 部分 | 意味 |
+|---|---|
+| `ScheduleItem.toMapWithWriter()` | 予定に「書いた人つきの Map に変身する」技を足す（§4-㊲ の拡張関数） |
+| クラスの**中**に書く | `firebaseAuth`（このクラスの持ち物）が使える。ファイルの外側に書いた `toMap()` からは使えない |
+| `toMap()` | 中では `this` が予定なので、`this.toMap()` の `this.` を省略できる（§4-㊲） |
+| `Map + (名札 to 値)` | **1 項目増えた新しい Map** を作る。元の Map は変わらない（`+` は「足した物を作る」で、書き換えではない） |
+| `( )` で包む理由 | `+` と `to` の組み合わせで、先に `名札 to 値` の組を作らせるため |
+
+💡 同じ名札がすでにあるときは、`+` の右側の値で**上書き**された Map になる。
+
+⚠️ 外から `item.toMapWithWriter()` と呼べるのは、このクラスの**中だけ**（`private` かつクラスの中に書いたため）。
+画面の頭脳などから「書いた人」を変えられないのは、この置き場所のおかげでもある。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
