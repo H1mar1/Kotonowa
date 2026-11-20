@@ -750,7 +750,7 @@ grammar §8-(99)。
 | 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | ✅ 11-20 |
 | 43 | Functions：招待が届いたら通知 | ✅ 11-20 |
 | 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | ✅ 11-20 |
-| 45 | 通知設定（カレンダーごとの ON/OFF） | |
+| 45 | 通知設定（カレンダーごとの ON/OFF） | ✅ 11-20 |
 
 **Step 40（2026-11-18）。** `firebase login` はユーザーが**ターミナル.app** で実行（この会話の `!` は入力を受け付けないので、
 Gemini・統計の質問やコードの貼り付けで止まる。どちらも `n` でよい）。`firebase init` は対話式なので、Claude が同じファイルを手で作った。
@@ -845,6 +845,31 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 - **44-E（2026-11-20）。** ① Claude が adb で tester として school に「NotifyTest」を保存 → 新ルールで通る・本人に通知なし・関数の記録に他の 2 人あて（住所なしで送らず）。
   ② ユーザーがコンソールでその書類の `updatedBy` を test の uid（school の `ownerUid`）に書き換え → エミュレータに「school ／ test@example.comさんが予定「NotifyTest」を編集しました」。
   確認用の予定は adb で削除。💡 `events` の一覧は id で並ぶので、コンソールのフィルタ（`title == …`）で探す。**これで Step 44 は完了。**
+
+#### Step 45 の内訳（通知設定：カレンダーごとの ON/OFF）
+
+**設計（2026-11-20 にユーザーが選択）。** 止めたカレンダーの id を**名刺の `users/{uid}.mutedCalendarIds`** に並べる（今のルールのまま自分で書ける・Functions は名刺を 1 回読むだけ）。
+切り替えは設定の「**通知設定**」画面（Step 25 で置いた「準備中」の行を使う）に共有カレンダーを並べ、1 行ずつスイッチ。招待の通知は止めない（いつも届く）。
+⚠️ `users` は誰でも読めるので、止めているカレンダーも他人から見える（`fcmTokens` と同じ既知の弱点）。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 45-A | `NotificationSettingRepository`（`observeMutedCalendarIds` / `setCalendarMuted`）＋実装＋`RepositoryModule` | ✅ 11-20 |
+| 45-B | 通知設定画面（`presentation/settings/notification/`。UiState / ViewModel / Screen） | ✅ 11-20（画面側の直しは Claude） |
+| 45-C | `Routes` ＋ `NavHost` ＋ 設定画面の行を押せるように | ✅ 11-20 |
+| 45-D | Functions：`sendToUser` が止めている人を飛ばす（Claude）＋各関数の先頭に「受け取った」の記録 | ✅ 11-20 |
+| 45-E | 公開＋実機確認 | ✅ 11-20 |
+
+- 45-A で踏んだところ：`if (muted) arrayUnion else arrayUnion`（両方の枝が同じ命令。ビルドが通り、一度止めると戻せなくなる）
+- ⚠️ **45-E で分かったこと（2026-11-20）。** `firebase functions:log` は**新しい記録を取ってこないことがある**（10:44 の公開の記録すら出なかった）。
+  これを根拠に「関数が呼ばれていない」と誤診し、不要な公開し直しをした。**関数の記録はブラウザの Logs Explorer で見る**：
+  `https://console.cloud.google.com/logs/query;query=resource.labels.service_name%3D%22notifyschedulechange%22?project=kotonowa-3b2fb`
+  （関数の先頭に「〜の書き込みを受け取った」の記録を足したので、呼ばれたかどうかはそこで分かる）
+- ⚠️ **エミュレータは FCM の配達が数分遅れることがある。** 関数は 20:28:40 に「通知を送った」のに、表示は 20:30:56（Logcat に `FcmRetry`）。
+  10 秒で「来ない」と判断しない。`dumpsys notification --noredact` で届いているか確かめる
+- **45-E（2026-11-20）。** ① スイッチ OFF → 名刺の `mutedCalendarIds` に school の id。② test が書いた扱いで編集 → 記録に「このカレンダーの通知を止めているので送らない」、通知は来ない。
+  ③ ON に戻す（一覧が空）→ 編集 → 「通知を送った」→ 約 2 分後に表示。確認用の予定は削除、スイッチは ON に戻した。**これで Step 45、Phase 4 の予定ステップはすべて完了。**
+- 45-B で踏んだところ：`uiState.mutedCalendarIds in calendar`（`in` の左右が逆。左が 1 つ・右が集まり）、`onCheckedChange = onToggle(item { })`（`{ }` で包まず鳴らした＋`LazyColumn` の `item` を混ぜた）
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
@@ -1685,7 +1710,7 @@ Phase0: セットアップ（Firebase疎通）      ← 完了
 Phase1: 認証（サインアップ/ログイン/ログアウト）  ← 完了
 Phase2: 個人のスケジュール/タスク管理 + ローカル通知  ← 完了（2026-09-22）
 Phase3: 共有カレンダー + ロールベース認可  ← 完了（2026-11-17。Step 39 の手直しまで）
-Phase4: プッシュ通知                      ← 着手（2026-11-18〜）
+Phase4: プッシュ通知                      ← 完了（2026-11-20。Step 40〜45）
 ```
 
 各フェーズ終了時に必ず「動くアプリ」がある状態を保つ。

@@ -50,8 +50,27 @@ sealed class ScheduleItem {
 - メンバーのロール変更・メンバーを外す（オーナーのみ）
 
 ### 通知
-- **ローカル通知** — 自分の予定/タスクのリマインダー
-- **プッシュ通知**（Phase 4・未実装） — 共有カレンダーへの招待、他メンバーによる予定の追加・編集（Firestore トリガー）
+- **ローカル通知** — 自分の予定/タスクのリマインダー（WorkManager で予約。予定の id を名前にして、編集時は置き換え・削除時は取り消し）
+- **プッシュ通知** — Firestore への書き込みをきっかけに Cloud Functions が送る
+
+| きっかけ | 送る相手 | 例 |
+|---|---|---|
+| 招待状が「返事待ち」になった | 招待された人 | 「school」に編集者として招待されました |
+| 共有カレンダーの予定・タスクの追加・編集・完了チェック | 書いた本人以外のメンバー | test さんが予定「会議」を編集しました |
+
+```
+アプリ ──書き込み──▶ Firestore ──トリガー──▶ Cloud Functions（asia-northeast1）
+                                              │ users/{uid}.fcmTokens を読む
+                                              ▼
+端末 ◀──────────── FCM ◀───────────────── sendEachForMulticast（data メッセージ）
+ └ FirebaseMessagingService が通知チャンネル「共有カレンダーのお知らせ」に表示
+```
+
+- **宛先の管理**：端末の FCM トークンを `users/{uid}.fcmTokens[]` に `arrayUnion` で登録（ホームを開くたび・トークン更新時）、ログアウト時はサインアウトの**前**に `arrayRemove` で外す。配達に失敗した無効なトークンは Functions が掃除する
+- **「誰が書いたか」をサーバーで信用できる形に**：`events.updatedBy` は data 層が「今ログインしている自分」で付け、ルールが `updatedBy == request.auth.uid` を必須にする。Functions はこれを使って書いた本人を宛先から外す
+- **data メッセージだけで送る**：アプリが前面でも背面でも必ず自前の `FirebaseMessagingService` を通るので、表示を 1 か所で決められる
+- **カレンダーごとの ON/OFF**：設定 →「通知設定」で切り替え、`users/{uid}.mutedCalendarIds[]` に保存。Functions は送る前にこれを見て飛ばす（招待の通知は止めない）
+- 招待の受け取りは**メールアドレス確認済み**の人に限る（ルールで `request.auth.token.email_verified == true`）
 
 ---
 
@@ -65,7 +84,7 @@ sealed class ScheduleItem {
 | 認証 | Firebase Authentication | 複数プロバイダの管理・切り替えなど実務に近い認証フローを学べる |
 | DB | Cloud Firestore | リアルタイム同期＋セキュリティルールによる宣言的な認可設計 |
 | ローカル通知 | WorkManager / AlarmManager | 個人リマインダー用 |
-| プッシュ通知 | Firebase Cloud Messaging + Cloud Functions | 共有更新・招待の配信 |
+| プッシュ通知 | Firebase Cloud Messaging + Cloud Functions（2nd gen / TypeScript / Node 22） | 共有更新・招待の配信。送信はサーバー側の Firestore トリガーで行い、端末は書き込むだけ |
 | 日時 | java.time | minSdk 26 のため desugaring 不要で直接利用可 |
 | 言語 / ビルド | Kotlin 2.2.10 / Gradle Kotlin DSL (AGP 9.2.1) | |
 
@@ -79,6 +98,8 @@ com.example.kotonowa/
 ├── domain/        # モデル、Repository インターフェース、UseCase
 ├── presentation/  # Compose 画面と ViewModel
 └── di/            # Hilt モジュール
+
+functions/src/     # Cloud Functions（招待・予定の更新でプッシュ通知を送る）
 ```
 
 依存の向きは `presentation → domain ← data`。ドメイン層は Android にも Firebase にも依存しません。
@@ -91,10 +112,10 @@ com.example.kotonowa/
 
 | コレクション | 構造 | 主なフィールド |
 |---|---|---|
-| `users` | トップレベル | uid, displayName, email, photoUrl, fcmTokens[], createdAt |
+| `users` | トップレベル | uid, displayName, email, photoUrl, fcmTokens[], mutedCalendarIds[], createdAt |
 | `calendars` | トップレベル | calendarId, name, ownerUid, type, color, createdAt, memberUids[] |
 | `calendars/{id}/members` | サブコレクション | uid, role, joinedAt, invitedBy |
-| `events` | トップレベル | eventId, calendarId, type, title, startAt, endAt, dueAt, isCompleted, ... |
+| `events` | トップレベル | eventId, calendarId, type, title, startAt, endAt, dueAt, isCompleted, createdBy, updatedBy, ... |
 | `invites` | トップレベル | inviteId（`{calendarId}_{小文字のメール}`）, calendarId, calendarName, invitedEmail, role, status, invitedBy, createdAt |
 
 **設計意図**
@@ -114,7 +135,7 @@ com.example.kotonowa/
 - [x] **Phase 1** — 認証（サインアップ・ログイン・ログアウト）
 - [x] **Phase 2** — 個人のスケジュール/タスク管理 + ローカル通知
 - [x] **Phase 3** — 共有カレンダー + ロールベース認可
-- [ ] **Phase 4** — プッシュ通知（共有更新・招待）
+- [x] **Phase 4** — プッシュ通知（共有更新・招待・カレンダーごとの ON/OFF）
 
 ## 画面一覧
 
@@ -139,8 +160,12 @@ com.example.kotonowa/
 1. リポジトリをクローン
 2. [Firebase Console](https://console.firebase.google.com/) でプロジェクトを作成し、パッケージ名 `com.example.kotonowa` で Android アプリを登録
 3. ダウンロードした `google-services.json` を `app/` 直下に配置
-4. Firebase Console で **Authentication**（メール/パスワード・Google）と **Cloud Firestore** を有効化
-5. Firestore の「ルール」に [`firestore.rules`](firestore.rules) の内容を貼り付けて公開
+4. Firebase Console で **Authentication**（メール/パスワード・Google）と **Cloud Firestore** を有効化（Cloud Functions を使うため Blaze プランが必要）
+5. Firebase CLI（`npm install -g firebase-tools`）でログインし、`.firebaserc` のプロジェクト id を自分のものに書き換えて、ルールと Functions を公開
+   ```bash
+   (cd functions && npm install)
+   firebase deploy --only firestore:rules,functions
+   ```
 6. ビルド（初回に予定一覧を開くと複合インデックス作成用の URL がエラーに出るので、開いて作成する）
 
 ```bash
