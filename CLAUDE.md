@@ -748,7 +748,7 @@ grammar §8-(99)。
 | 40 | Firebase CLI の準備（ログイン・`firebase init`・ルールを CLI で公開できるように） | ✅ 11-18 |
 | 41 | Android：FCM の依存＋トークンを `users/{uid}.fcmTokens` に登録（ログアウトで外す） | ✅ 11-20 |
 | 42 | Android：通知を受け取って出す（`FirebaseMessagingService`＋新しい通知チャンネル） | ✅ 11-20 |
-| 43 | Functions：招待が届いたら通知 | |
+| 43 | Functions：招待が届いたら通知 | ✅ 11-20 |
 | 44 | `events` に `updatedBy` ＋ Functions：他のメンバーの追加・編集で通知 | |
 | 45 | 通知設定（カレンダーごとの ON/OFF） | |
 
@@ -806,6 +806,26 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 - **42-D（2026-11-20）。** コンソールの Messaging（`https://console.firebase.google.com/project/kotonowa-3b2fb/messaging`。Firestore の画面の中には無い）→
   「Firebase Notification メッセージ」→「テスト メッセージを送信」に `fcmTokens` の住所を貼って送信。アプリが前にいるとき（係が出す）・裏にいるとき（Firebase が代わりに出す）の両方で表示され、
   `dumpsys notification` で**どちらも `shared_updates` の郵便受け**に入ったことを確認。**これで Step 42 は完了。**
+
+#### Step 43 の内訳（招待が届いたら通知）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 43-A | `functions/src/index.ts`：`sendToUser`（名刺の全端末へ送る＋死んだ住所の掃除）＋ `notifyInvite`（Claude） | ✅ 11-20（`npm run build` 通過） |
+| 43-B | 公開（`firebase deploy --only functions`）＋古いイメージの自動削除（1 日） | ✅ 11-20 |
+| 43-C | 実機確認（コンソールで tester 宛ての招待状の `status` を `accepted` → `pending` に書き換え → エミュレータに通知） | ✅ 11-20 |
+
+- `onDocumentWritten`（作成・上書きの両方）にして、「返事待ちになった瞬間」だけ送る（断られた招待の送り直しも知らせる。返事待ちのままの上書きでは送らない）
+- 地域は `asia-northeast1`（Firestore と同じ）、`maxInstances: 10`（料金の暴走防止）
+- ⛔ **2026-11-20、`--dry-run` で `Billing account for project '936774280451' is not open` で止まった。**
+  Functions に要る API（Artifact Registry・Cloud Build・Cloud Functions）を有効にするには、プロジェクトに**開いている請求先アカウント**が要る。
+  Google Cloud コンソールの「お支払い」で、請求先アカウントの状態とプロジェクトへの紐付けを確認する
+  → 原因は **Google Cloud の無料トライアル（90 日）の終了**でアカウントが自動で閉じていたこと。ユーザーがアップグレードして解決
+  （一覧は既定で「ステータス：アクティブ」に絞られており、閉じたアカウントはフィルタを外さないと見えない）
+- 初回の公開は `Permission denied while using the Eventarc Service Agent`（きっかけを届ける係の権限がまだ行き渡っていない）で失敗し、**3 分待って再実行で成功**。
+  続けて `firebase functions:artifacts:setpolicy --location asia-northeast1 --days 1 --force` で古いコンテナイメージの自動削除を設定（保管料の抑制）
+- **43-C（2026-11-20）。** エミュレータ 1 台では招待する側に切り替えるとログアウトで住所が外れるため、コンソールで既存の招待状の `status` を `pending` に書き換えて確認。
+  通知が表示され、`firebase functions:log --only notifyInvite` に `通知を送った success:1` を確認。**これで Step 43 は完了。**
 
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
