@@ -28,4 +28,13 @@ interface ScheduleRepository {
         from: Instant,
         to: Instant,
     ): Flow<List<ScheduleItem>> //一覧を監視
+
+    /**
+     * 1 つのカレンダーの「タスクだけ」を、期限に関係なく全部見張る（Step 47。タスク一覧画面のため）。
+     *
+     * 戻り値を List<ScheduleItem.Task> にしているのは、タスク一覧の画面が予定（Event）を受け取らないようにするため。
+     * 型で「タスクしか来ない」と決めておけば、画面で Event の枝を書かずに済む（Step 21 の toggleCompleted(task) と同じ考え方）。
+     * 並べ替えはしないで返す（並べ方は画面ごとに違うので、受け取った側で決める）。
+     */
+    fun observeTasks(calendarId: String): Flow<List<ScheduleItem.Task>>
 }

@@ -644,6 +644,48 @@ init {
 **`collect` は終わらない**（§2-㉝）。なので `init` の中でも、必ず `viewModelScope.launch { }` で包んで別の作業として走らせる。
 包まないと `init` が `collect` で止まったままになる（そもそも `suspend` なのでビルドが通らない）。
 
+### (143) 管（Flow）を加工する・束ねる — `map` / `combine` / `flatMapLatest`
+
+Step 47 のタスク一覧は「カレンダーの数だけある見張り（管）」を 1 本にまとめて画面に流す。そのための 3 つの道具。
+
+**① `管.map { }` — 流れてくる中身を 1 つずつ作り変える**
+
+```kotlin
+scheduleRepository.observeTasks(uid)                    // List<Task> が流れてくる管
+    .map { tasks -> tasks.map { task -> TaskRowItem(task, "マイカレンダー", true) } }
+                                                        // → List<TaskRowItem> が流れてくる管
+```
+
+外側の `.map` は**管**の map（流れてくるたびに作り変える）、内側の `tasks.map` は**並び**の map（§4-(55)）。名前は同じだが相手が違う。
+
+**② `combine(管A, 管B) { a, b -> … }` — 2 本以上の管を束ねる**
+
+```kotlin
+combine(
+    scheduleRepository.observeTasks(calendarId),       // タスクの管
+    calendarRepository.observeMembers(calendarId),     // 名簿の管
+) { tasks, members -> /* 両方の最新を使って行を作る */ }
+```
+
+- **どちらか 1 本が流れてきたら**、もう片方の「最後に流れてきた値」と組にして `{ }` を動かす
+- 最初の 1 回は、**全部の管が 1 回ずつ流れてくるまで待つ**
+- 管が何本もある（並びで持っている）ときは `combine(管の並び) { 中身の配列 -> … }`。中身は `Array` で届くので `toList()` で並びにする
+
+**③ `管.flatMapLatest { 値 -> 新しい管 }` — 流れてきた値で「管そのもの」を作り直す**
+
+```kotlin
+calendarRepository.observeMyCalendars(uid)              // カレンダーの一覧が流れてくる管
+    .flatMapLatest { calendars ->
+        combine(カレンダーごとのタスクの管) { … }          // 一覧に合わせた「束ねた管」を返す
+    }
+```
+
+- カレンダーの一覧が変わる（招待を承認した、外された）と、**前の束を止めて**、新しい一覧で束ね直す
+- Latest（レイテスト）＝「いちばん新しいものだけ」。古い一覧の見張りは自動で止まる（Step 23 で `observeJob?.cancel()` を手で書いたのと同じことを、自動でやってくれる）
+- 実験中の道具なので `@OptIn(ExperimentalCoroutinesApi::class)` が要る（§7-(86)）
+
+💡 3 つとも**管を作り変えるだけで、まだ何も流れない**。最後に `collect`（§2）したとき、初めて見張りが始まる。
+
 ## §3 Compose 特有
 
 ### ⑪ `remember` 系 — 作り直しを防ぐ
@@ -2860,6 +2902,30 @@ val result = (response.getData() as? Map<*, *>)?.get("result") as? String
 アプリと関数の**両方を見比べる**。
 
 💡 関数が `HttpsError` を投げると、アプリ側では `FirebaseFunctionsException`（例外）として届く。`try { } catch` で `Result.failure` にしておけば、今までの窓口と同じ扱いになる。
+
+### (144) 時刻（`Instant`）を `<` `>=` で比べる ／ `sortedByDescending` — 大きい順に並べる
+
+**時刻は数と同じように比べられる。** 「前」が小さく、「後」が大きい。
+
+```kotlin
+val now = Instant.now()
+row.task.dueAt < now     // 期限が今より前 ＝ 期限切れ
+row.task.dueAt >= now    // 期限が今か、今より後 ＝ これから
+```
+
+`Instant` は「比べられる型」（`Comparable`）なので、`<` `>` `<=` `>=` がそのまま使える。
+`LocalDate` / `LocalTime` も同じ（Step 17-I の「開始 < 終了」の確かめもこれ）。
+
+**`sortedByDescending { }` は `sortedBy { }`（§4-(125)）の逆向き。** 大きい順（新しい順）に並べる。
+
+```kotlin
+rows.sortedBy { row -> row.task.dueAt }            // 期限の古い順（近い順）
+rows.sortedByDescending { row -> row.task.dueAt }  // 期限の新しい順
+```
+
+Descending（ディセンディング）＝「下っていく」。`{ }` の中は「何で比べるか」で、`sortedBy` と同じ。
+
+💡 どちらも**新しい並びを作る**だけで、元の並びは変わらない（`filter` と同じ）。
 
 ## §5 判定（条件分岐）
 
