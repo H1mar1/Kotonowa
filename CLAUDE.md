@@ -871,6 +871,35 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   ③ ON に戻す（一覧が空）→ 編集 → 「通知を送った」→ 約 2 分後に表示。確認用の予定は削除、スイッチは ON に戻した。**これで Step 45、Phase 4 の予定ステップはすべて完了。**
 - 45-B で踏んだところ：`uiState.mutedCalendarIds in calendar`（`in` の左右が逆。左が 1 つ・右が集まり）、`onCheckedChange = onToggle(item { })`（`{ }` で包まず鳴らした＋`LazyColumn` の `item` を混ぜた）
 
+### Step 47：タスク一覧画面（ブランチ `feature/task-list`、2026-11-22〜）
+
+**設計（2026-11-22 にユーザーが選択）。**
+- 対象は**入っている全部のカレンダー**（マイカレンダー＋共有カレンダー全部）のタスク。行にカレンダー名も出す
+- 上で「**未完了**」「**完了**」を切り替え。未完了は「期限切れ」（赤）と「これから」に分け、期限の近い順。完了は期限の新しい順
+- 入口は**画面の下のタブ**（カレンダー／タスク。`NavigationBar`）
+- 行はホームと同じく、チェックで完了切り替え・押すと詳細。閲覧者のカレンダーのタスクはチェックを押せない（Step 38）
+- 取り方：カレンダーごとに `observeTasks(calendarId)`（`calendarId ==` かつ `type == "task"`。等しい条件だけなので**複合インデックス不要**）を見張り、頭脳で束ねる。並べ替えは頭脳／画面
+
+| | 内容 | 状態 |
+|---|---|---|
+| 47-A | `ScheduleRepository.observeTasks(calendarId)` ＋ 実装 | ✅ 11-22 |
+| 47-B | `TaskListUiState`（行＝タスク・カレンダー名・`canEdit`／未完了か完了か） | ✅ 11-22 |
+| 47-C | `TaskListViewModel`（全カレンダーのタスクと肩書きを束ねる・完了切り替え・タブ切り替え） | ✅ 11-22（束ねる部分は Claude） |
+| 47-D | `TaskListScreen`（タブ・期限切れ／これから・行） | 🔧 骨組みを作成 |
+| 47-E | 下のタブ（カレンダー／タスク）＋ `Routes` ＋ `NavHost` | |
+| 47-F | 実機確認 | |
+
+- 47-A で踏んだところ：`val calendarId = firestore.collection(calendarId)`（絞り込みではなく別の棚を指し、`.` の鎖も切れた）、
+  `.whereEqualTo("Task", type)`（項目名と値の取り違え＋`" "` 忘れ）、`filterIsInstance<String>(ScheduleItem.Task)`（型は `< >` に、`( )` は空）
+- 47-B/C で踏んだところ：`rows: List<Calendar>`（お手本の型を写した）、`filter: Boolean`（2 択でも enum にすると名前で読める）、
+  `it.copy(TaskListUiState = TaskListUiState)`（`copy` の中は「項目名 = 値」。型の名前ではない）、`launch` の中に `launch` を写した。入力中に Android Studio が無関係な `import`（`Keyboard`）を取り込んでいた
+- ⏸ **再開メモ（2026-11-22 中断）。** 47-D の穴埋め 6 か所（`presentation/tasks/TaskListScreen.kt`）が未記入のまま WIP コミットした（**ビルドは通らない**）。
+  再開したら、まずこの 6 か所の説明（§2.6 の順。新しい文法は §4-(144)）を表示してから進める：
+  47-D-1 期限切れ／これから（`row.task.dueAt < now` / `>= now`）・47-D-2 完了を期限の新しい順（`sortedByDescending`）・
+  47-D-3〜5 未完了／完了のボタン（`selected` / `onClick`）・47-D-6 `TaskRow` で `ScheduleItemRow` に 4 つ渡す（`row.task` など）。
+  そのあと 47-E（下のタブ：`NavigationBar`＋`Routes`＋`NavHost`）→ 47-F（実機確認）
+- 47-D：ホームの行の部品 `ScheduleItemRow` を `private` → `internal` にして使い回す。カレンダー名を出す引数 `calendarName: String? = null` を足した（ホームは省略）
+
 ### Step 46：`users` を本人だけ読めるようにする（Phase 4 の後の手直し。ブランチ `feature/restrict-users-read`、2026-11-20〜）
 
 **理由。** `users` は「ログインしていれば誰でも読めた」（Step 28。招待の検索のため）ので、全員のメールアドレス・`fcmTokens`・`mutedCalendarIds` が他人から読めた。

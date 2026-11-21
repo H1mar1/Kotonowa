@@ -291,9 +291,12 @@ private data class RowStyle(
  * 一覧の 1 行。予定（Event）とタスク（Task）で表示を変える。
  *
  * 見た目だけを担当し、データの取得や判断は [CalendarViewModel] が済ませている。
+ * Step 47 でタスク一覧画面（presentation/tasks/）からも使うため、private から internal にした（grammar §4-(131)）。
+ *
+ * @param calendarName 日時の後ろに小さく出すカレンダー名（Step 47。タスク一覧だけが渡す。ホームは 1 つのカレンダーしか出さないので省略）
  */
 @Composable
-private fun ScheduleItemRow(
+internal fun ScheduleItemRow(
     item: ScheduleItem,
     onClick: () -> Unit,
     onToggleCompleted: (ScheduleItem.Task) -> Unit,
@@ -301,6 +304,7 @@ private fun ScheduleItemRow(
     //   （付けると呼ぶ側が渡し忘れてもビルドが通り、閲覧者でも押せるままになる）
     canEdit: Boolean,
     modifier: Modifier = Modifier,
+    calendarName: String? = null,
 ) {
     val rowStyle = when (item) {
         is ScheduleItem.Event ->
@@ -374,7 +378,11 @@ private fun ScheduleItemRow(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Text(subText, style = MaterialTheme.typography.bodySmall)
+            // カレンダー名があれば「期限 11/23(日) 23:59 ・ school」のように後ろに付ける（Step 47）
+            Text(
+                if (calendarName != null) "$subText ・ $calendarName" else subText,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }

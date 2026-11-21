@@ -142,6 +142,38 @@ class ScheduleRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * 1 つのカレンダーのタスクを全部見張る（Step 47）。形は observeItems とほぼ同じ。違いは 2 つ。
+     *  ① 期間（sortAt の範囲）で絞らず、代わりに type が "task" のものだけに絞る
+     *  ② orderBy を付けない。「〜と等しい」の条件だけなら、Firestore は複合インデックス（Step 16-F）を作らなくても検索できる。
+     *     並べ替えは受け取った側（タスク一覧の頭脳）が行う
+     */
+    override fun observeTasks(calendarId: String): Flow<List<ScheduleItem.Task>> = callbackFlow {
+        val registration = firestore.collection(COLLECTION_EVENTS)
+            // TODO(47-A-1) 絞り込み 2 つ。どちらも「〜と等しい」（observeItems の 1 つ目と同じ命令）
+            //   1 つ目：calendarId が、引数の calendarId と等しい
+            //   2 つ目：type が "task" と等しい（保存するとき toMap で付けている文字。予定は "event"）
+            .whereEqualTo("calendarId",calendarId)
+            .whereEqualTo("type", "task")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val tasks = snapshot?.documents
+                    ?.mapNotNull { doc -> runCatching { doc.toScheduleItem() }.getOrNull() }
+                    // TODO(47-A-2) 翻訳した ScheduleItem の並びから、Task だけを拾う（grammar §4-(141) の filterIsInstance）
+                    //   type で絞っているので全部 Task のはずだが、型（List<ScheduleItem>）はそれを知らない。ここで Task の並びに変える
+                    ?.filterIsInstance<ScheduleItem.Task>()
+                    ?: emptyList()
+
+                trySend(tasks)
+            }
+
+        awaitClose { registration.remove() }
+    }
+
     override fun observeItem(itemId: String): Flow<ScheduleItem?> = callbackFlow {
         val registration = firestore.collection(COLLECTION_EVENTS)
             .document(itemId)
