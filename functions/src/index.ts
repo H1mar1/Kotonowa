@@ -6,12 +6,14 @@
  *
  * Step 43：招待が届いたら通知
  * Step 44：他のメンバーが予定・タスクを追加・編集したら通知
+ * Step 46：招待を送る（アプリから呼び出す。users をアプリから読めなくするため、相手探しをサーバーへ移した）
  */
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/firestore";
+import { HttpsError, onCall } from "firebase-functions/https";
 import { setGlobalOptions } from "firebase-functions/options";
 
 // サーバー側の Firebase を使えるようにする（1 回だけ）。
@@ -200,4 +202,72 @@ export const notifyScheduleChange = onDocumentWritten("events/{eventId}", async 
       sendToUser(uid, calendarName, `${writerName}さんが${kind}「${title}」を${action}`, calendarId),
     ),
   );
+});
+
+/** sendInvite がアプリへ返す結果。Android の InviteSendResult と同じ 3 つ */
+type SendInviteResult = "sent" | "not_registered" | "already_member";
+
+/**
+ * Step 46：招待を送る（アプリから呼び出す関数）。
+ *
+ * これまでアプリが自分でやっていた「相手を users から探す → すでにメンバーか確かめる → 招待状を書く」を、
+ * まとめてサーバーで行う。こうすると users をアプリから読めなくしても招待できる（他人のメールや uid がアプリに渡らない）。
+ *
+ * onCall は「アプリから名前を指定して呼べる関数」。呼んだ人のログイン情報（request.auth）が自動で付いてくる。
+ * 失敗は HttpsError で返す（アプリ側では例外として届く）。
+ */
+export const sendInvite = onCall(async (request): Promise<{ result: SendInviteResult }> => {
+  // 呼んだ人。ログインしていなければ断る
+  const myUid = request.auth?.uid;
+  if (!myUid) {
+    throw new HttpsError("unauthenticated", "ログインしてください");
+  }
+
+  // アプリから届いた 3 つ。形が違えば断る（アプリを通さずに呼ばれることもあるので、必ず確かめる）
+  const calendarId = request.data?.calendarId;
+  const role = request.data?.role;
+  const email = String(request.data?.email ?? "").trim().toLowerCase();
+  if (typeof calendarId !== "string" || calendarId === "" || email === "") {
+    throw new HttpsError("invalid-argument", "カレンダーとメールアドレスが必要です");
+  }
+  if (role !== "editor" && role !== "viewer") {
+    throw new HttpsError("invalid-argument", "肩書きは編集者か閲覧者です");
+  }
+
+  const db = getFirestore();
+
+  // 招待できるのはそのカレンダーのオーナーだけ（35-F のルールと同じ条件）
+  const calendarSnap = await db.collection("calendars").doc(calendarId).get();
+  if (!calendarSnap.exists || calendarSnap.get("ownerUid") !== myUid) {
+    throw new HttpsError("permission-denied", "招待できるのはオーナーだけです");
+  }
+
+  // 相手を名刺から探す（メールは保存時に小文字。Step 28）
+  const found = await db.collection("users").where("email", "==", email).limit(1).get();
+  if (found.empty) {
+    return { result: "not_registered" };
+  }
+
+  // すでにメンバーなら招待状を作らない
+  const memberUids: string[] = calendarSnap.get("memberUids") ?? [];
+  if (memberUids.includes(found.docs[0].id)) {
+    return { result: "already_member" };
+  }
+
+  // 招待状を書く。住所は「カレンダーid_メール」（Step 36-A。送り直しは同じ住所への上書き）
+  // 書くとすぐ notifyInvite（Step 43）が動いて、相手に通知が届く
+  const inviteId = `${calendarId}_${email}`;
+  await db.collection("invites").doc(inviteId).set({
+    id: inviteId,
+    calendarId,
+    calendarName: calendarSnap.get("name"),
+    invitedEmail: email,
+    role,
+    status: "pending",
+    invitedBy: myUid,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  logger.info("招待状を書いた", { inviteId });
+  return { result: "sent" };
 });

@@ -2,6 +2,7 @@ package com.example.kotonowa.di
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.Module
 import dagger.Provides
@@ -31,4 +32,10 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun provideFirebaseMessaging(): FirebaseMessaging = FirebaseMessaging.getInstance()
+
+    // サーバーの関数の呼び出し口（Step 46）。関数を置いた場所（東京）を指定する。
+    // 指定しないと既定の us-central1 に電話してしまい、「そんな関数は無い」（NOT_FOUND）になる
+    @Provides
+    @Singleton
+    fun provideFirebaseFunctions(): FirebaseFunctions = FirebaseFunctions.getInstance("asia-northeast1")
 }

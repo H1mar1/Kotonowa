@@ -871,6 +871,40 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   ③ ON に戻す（一覧が空）→ 編集 → 「通知を送った」→ 約 2 分後に表示。確認用の予定は削除、スイッチは ON に戻した。**これで Step 45、Phase 4 の予定ステップはすべて完了。**
 - 45-B で踏んだところ：`uiState.mutedCalendarIds in calendar`（`in` の左右が逆。左が 1 つ・右が集まり）、`onCheckedChange = onToggle(item { })`（`{ }` で包まず鳴らした＋`LazyColumn` の `item` を混ぜた）
 
+### Step 46：`users` を本人だけ読めるようにする（Phase 4 の後の手直し。ブランチ `feature/restrict-users-read`、2026-11-20〜）
+
+**理由。** `users` は「ログインしていれば誰でも読めた」（Step 28。招待の検索のため）ので、全員のメールアドレス・`fcmTokens`・`mutedCalendarIds` が他人から読めた。
+アプリが他人の名刺を読んでいたのは 2 か所：メンバー画面の名前（`getUser`。Step 34）と、招待の相手探し（`findUserByEmail`。Step 35）。
+
+**設計（2026-11-20 にユーザーが選択）。**
+- **招待は丸ごとサーバーの関数（`onCall` の `sendInvite`）に任せる。** アプリは「カレンダー・メール・肩書き」を渡し、結果（送った／未登録／すでにメンバー）だけ受け取る。他人の uid もアプリに渡らない
+- **メンバー画面の名前・メールは、名簿の行（`members/{uid}`）に写しておく**（`displayName` / `email`）。名簿に入るとき（作成・承認）に本人が自分の分を書く。メンバーなら名簿は読めるので、名刺は要らない
+- 最後にルールで `users` の `read` を「本人だけ」に、`invites` の `create` / オーナーの送り直しの `update` を削除（招待状はサーバーだけが書く）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 46-A | Functions：`sendInvite`（`onCall`。オーナー確認 → 相手探し → メンバー確認 → 招待状）（Claude） | ✅ 11-22 |
+| 46-B | 依存 `firebase-functions` ＋ `FirebaseModule` に `FirebaseFunctions`（東京）（Claude） | ✅ 11-20 |
+| 46-C | `InviteSendResult`（enum）＋ `InviteRepository.sendInvite(calendarId, email, role)` を関数呼び出しに | ✅ 11-22 |
+| 46-D | `MemberListViewModel.sendInvite` を新しい窓口に（結果の 3 つで一言を出し分け） | ✅ 11-22 |
+| 46-E | 名簿の行に `displayName` / `email`（`CalendarMember`・作成・承認）＋メンバー画面は名簿から名前を出す | ✅ 11-22（直しは Claude） |
+| 46-F | ルール：`users` の `read` を本人だけ、`invites` の作成系を削除、名簿の `displayName` / `email` は本人のもの（Claude） | ✅ 11-22 |
+| 46-G | 公開（アプリ → 関数 → ルールの順）＋既存の名簿の行に名前を足す＋実機確認 | ✅ 11-22 |
+
+- 46-C で踏んだところ：`"role" to role`（enum をそのまま渡した。Map は `Any` を受け取るのでビルドは通るが、JSON にできず**呼ぶたびに失敗**）、
+  直すときに名札 `"role" to` まで消した（`mapOf` の中は 1 行ずつ「名札 to 値」）
+- 46-E：名前とメールは data 層が「今ログインしている自分」（`firebaseAuth.currentUser`）から写す。名簿の行を書くのは作成（オーナー本人）と承認（招待された本人）の 2 か所だけで、どちらも書くのは本人の行
+- `Invite.toMap`（招待状 → Map）、`UserRepository.findUserByEmail` / `getUser` と `toUser` は使われなくなったので削除した
+- 46-E で踏んだところ：消した箱 `user?.displayName` をそのまま書いた（名前は名簿の行 `member.` にある）、メールの `?.lowercase()` 忘れ（46-F のルールで小文字と照合するので、大文字まじりだと断られる）
+- 46-F：名簿の行の `create`（作成・承認の 2 本）に `isOwnNameAndEmail()`（`email` は無いか本人の小文字のメール、`displayName` は無いか通行証の `name`）を足した。
+  `request.resource.data.get(項目, 既定値)` は項目が無いときに既定値を使う（書かない古いアプリでも通る）
+- **46-G（2026-11-22）。** アプリ → 関数（`sendInvite` 新規）→ ルールの順に公開。tester でメンバー画面を開くと読めるが 3 人とも「（名前未登録）」
+  （Step 46 より前の行には名前が無い）→ ユーザーがコンソールで school の `members` 3 行に `email` を手で足す → その場でメールが出た。
+  ⚠️ コンソールで足すとき、school の**カレンダーの書類そのもの**に足してしまった（`members` の棚に入っていなかった）。画面上部の場所が `calendars > id > members > uid` か確かめる。
+  test でログインし直して招待：未登録 →「登録されていません」、すでにメンバー →「すでにメンバーです」、`tester@example.com` を外して招待 →「招待を送りました」
+  （招待状はコンソールで確認後に削除）。`PERMISSION_DENIED` なし。**これで Step 46 は完了。** 今の school のメンバーは test（オーナー）と `+tester`（編集者）の 2 人。
+  エミュレータは test でログイン中
+
 ### Phase 3 の進捗（共有カレンダー＋ロールベース認可）
 
 | Step | 内容 | 状態 |

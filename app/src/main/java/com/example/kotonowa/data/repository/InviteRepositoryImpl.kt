@@ -2,18 +2,20 @@ package com.example.kotonowa.data.repository
 
 import com.example.kotonowa.domain.model.CalendarMember
 import com.example.kotonowa.domain.model.Invite
+import com.example.kotonowa.domain.model.InviteSendResult
 import com.example.kotonowa.domain.model.InviteStatus
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.InviteRepository
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,18 +35,46 @@ private const val FIELD_STATUS = "status"
 @Singleton
 class InviteRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
+    // サーバーの関数の呼び出し口（Step 46。FirebaseModule が東京向けのものを届ける）
+    private val functions: FirebaseFunctions,
+    // Step 46：承認したとき、名簿の行に自分の名前とメールを写すため
+    private val firebaseAuth: FirebaseAuth,
 ) : InviteRepository {
 
-    override suspend fun sendInvite(invite: Invite): Result<Unit> = try {
-        firestore.collection(COLLECTION_INVITES)
-            // TODO(35-C-1) 誰の：招待状の ／ 何を：id を、書類の住所にする
-            .document(invite.id)
-            // TODO(35-C-2) 誰の：招待状の ／ 何をする：Firestore に渡せる形に詰め替えて、書く
-            //   詰め替え係は下の toMap
-            .set(invite.toMap())
-            .await()
+    /**
+     * 招待を送る（Step 46）。サーバーの関数 sendInvite（functions/src/index.ts）を呼ぶ。
+     *
+     * 関数へは Map で渡し、関数からは Map で返ってくる（JSON と同じ形。grammar §4-(142)）。
+     */
+    override suspend fun sendInvite(
+        calendarId: String,
+        email: String,
+        role: MemberRole,
+    ): Result<InviteSendResult> = try {
+        // 関数へ渡す 3 つ。名札は関数側（request.data.calendarId など）と同じ綴りにする
+        val data = mapOf(
+            "calendarId" to calendarId,
+            "email" to email,
+            // TODO(46-C-1) 肩書きを、関数が受け取れる小文字の英語（"editor" / "viewer"）にする
+            //   保存するときと同じ変換（Step 30 の role.name.lowercase()。grammar §4-(111)）
+            "role" to role.name.lowercase(),
+        )
 
-        Result.success(Unit)
+        // 関数を名前で呼び、終わるまで待つ。返ってきた中身（data）から result の文字を取り出す
+        val response = functions.getHttpsCallable("sendInvite").call(data).await()
+        val result = (response.getData() as? Map<*, *>)?.get("result") as? String
+
+        // TODO(46-C-2) 関数が返した文字を、アプリの InviteSendResult に翻訳する（残り 2 行）
+        //   "not_registered" → NOT_REGISTERED、"already_member" → ALREADY_MEMBER（1 行目の "sent" と同じ形）
+        //   どれでもない文字（関数とアプリの食い違い）は else で例外にする（下の catch で失敗になる）
+        val sendResult = when (result) {
+            "sent" -> InviteSendResult.SENT
+            "not_registered" -> InviteSendResult.NOT_REGISTERED
+            "already_member" -> InviteSendResult.ALREADY_MEMBER
+            else -> throw IllegalStateException("招待の結果が読めません: $result")
+        }
+
+        Result.success(sendResult)
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -128,6 +158,10 @@ class InviteRepositoryImpl @Inject constructor(
             role = invite.role,
             joinedAt = Instant.now(),
             invitedBy = invite.invitedBy,
+            // Step 46：承認しているのは招待された本人（今ログインしている人）なので、自分の名前とメールを写す（46-E-3 と同じ 2 行）
+            // TODO(46-E-4) 46-E-3 と同じ。こちらのクラスにも firebaseAuth を足してある
+            displayName = firebaseAuth.currentUser?.displayName,
+            email = firebaseAuth.currentUser?.email?.lowercase(),
         )
 
         firestore.runBatch { batch ->
@@ -148,19 +182,7 @@ class InviteRepositoryImpl @Inject constructor(
 
 // ---- 変換係（このファイルの中だけで使う。§4-㊱） --------------------------
 
-/** [Invite] を Firestore に渡せる形（Map）に詰め替える。お手本は `CalendarRepositoryImpl` の `Calendar.toMap`。 */
-private fun Invite.toMap(): Map<String, Any?> = mapOf(
-    "id" to id,
-    "calendarId" to calendarId,
-    "calendarName" to calendarName,
-    FIELD_INVITED_EMAIL to invitedEmail,
-    // TODO(35-C-3) enum は文字に直す（§4-(111)）。Calendar.toMap の "type" と同じ形
-    "role" to role.name.lowercase(),
-    FIELD_STATUS to status.name.lowercase(),
-    "invitedBy" to invitedBy,
-    // TODO(35-C-4) Instant は直接保存できない。Calendar.toMap の "createdAt" と同じ形
-    "createdAt" to Date.from(createdAt),
-)
+// Invite.toMap（招待状 → Map）は Step 46 で削除した。招待状はサーバーの関数 sendInvite が書くため。
 
 // ---- 36-C-1：書類 → Invite --------------------------------------------------
 

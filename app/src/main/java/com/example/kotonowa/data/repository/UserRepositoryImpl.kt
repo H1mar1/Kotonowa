@@ -2,7 +2,6 @@ package com.example.kotonowa.data.repository
 
 import com.example.kotonowa.domain.model.User
 import com.example.kotonowa.domain.repository.UserRepository
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
@@ -61,48 +60,6 @@ class UserRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Result.failure(e)
     }
-
-    override suspend fun findUserByEmail(email: String): Result<User?> = try {
-        // 保存側と同じく小文字に揃えて探す
-        val snapshot = firestore.collection(COLLECTION_USERS)
-            .whereEqualTo("email", email.lowercase())
-            .limit(1)
-            .get()
-            .await()
-
-        // 0 枚のこともあるので firstOrNull()（§4-(110)）。「1 枚あれば組み立てる」を ?. で繋ぐ
-        Result.success(snapshot.documents.firstOrNull()?.toUser())
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    override suspend fun getUser(uid: String): Result<User?> = try {
-        // TODO(34-A-2) 誰の：users の棚の ／ 何をする：この uid の住所の名刺を 1 回読む
-        //   名刺の住所は uid そのもの（saveUser の document(user.uid) と同じ）。お手本は ScheduleRepositoryImpl.getItem
-        val snapshot = firestore.collection(COLLECTION_USERS)
-            .document(uid)
-            .get()
-            .await()
-
-        // TODO(34-A-2) 名刺があれば User に組み立て、無ければ「無し」を返す（値を返す if。§5-(68)）
-        //   getItem と違って、無いのは異常ではないので throw しない
-        Result.success(if (snapshot.exists()) snapshot.toUser() else null)
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
 }
 
-/**
- * Firestore から取ってきた 1 件分のコピー（[DocumentSnapshot]）を [User] に組み立て直す。
- *
- * お手本は `ScheduleRepositoryImpl` の `toScheduleItem()`。ただしこちらは
- * displayName / email / photoUrl が「無い」ことが普通にある（Google ログインでない、
- * 写真を設定していない等）ので、無くても例外を投げない。
- */
-private fun DocumentSnapshot.toUser(): User = User(
-    // uid だけは欠けていたら壊れたデータなので、例外を投げて通さない（§4-⑮、§6-㊺）
-    uid = getString("uid") ?: throw IllegalStateException("uidが入っていません"),
-    email = getString("email"),
-    displayName = getString("displayName"),
-    photoUrl = getString("photoUrl"),
-)
+// toUser（書類 → User）は、使っていた findUserByEmail / getUser と一緒に Step 46 で削除した。

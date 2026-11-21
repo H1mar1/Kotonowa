@@ -53,22 +53,21 @@ service cloud.firestore {
         && getAfter(myInvitePath(calendarId)).data.status == 'accepted';
     }
 
-    // 招待状の中身が正しいか（作るときと、送り直しで上書きするときの共通。Step 35-F / 36-G）
-    function isValidNewInvite(inviteId) {
-      return isCalendarOwner(request.resource.data.calendarId)
-        && request.resource.data.invitedBy == request.auth.uid
-        && request.resource.data.id == inviteId
-        && inviteId == request.resource.data.calendarId + '_' + request.resource.data.invitedEmail
-        && request.resource.data.role in ['editor', 'viewer']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.calendarName == get(/databases/$(database)/documents/calendars/$(request.resource.data.calendarId)).data.name
-        && request.resource.data.invitedEmail == request.resource.data.invitedEmail.lower();
+    // 名簿の行に写す名前とメールが、本人のものか（Step 46）。
+    // 名簿の行は本人が自分の分を書く（作成・承認）。他人の名前やメールを名乗らせないため、通行証（ID トークン）と照合する。
+    // get(項目, 既定値) … 項目が無ければ既定値（null）を使う。書かなくてもよいが、書くなら本人のもの
+    function isOwnNameAndEmail() {
+      return request.resource.data.get('email', null) in [null, myEmail()]
+        && request.resource.data.get('displayName', null) in [null, request.auth.token.get('name', null)];
     }
 
-    // ---- users（Step 28） ----
+    // ---- users（Step 28 / 46） ----
 
+    // 名刺は本人だけが読める（Step 46）。他人のメール・fcmTokens・mutedCalendarIds を読ませない。
+    // 招待の相手探しはサーバーの関数 sendInvite、通知の宛先探しは notifyInvite / notifyScheduleChange が
+    // 管理者の権限で読む（ルールに縛られない）。メンバー画面の名前は名簿の行に写してある
     match /users/{userId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId;
       allow delete: if false;
     }
@@ -126,10 +125,11 @@ service cloud.firestore {
       match /members/{memberUid} {
         allow read: if request.auth != null && isMember(calendarId);
 
-        // カレンダーを作った人が、自分をオーナーとして書く（Step 32）
+        // カレンダーを作った人が、自分をオーナーとして書く（Step 32）。名前とメールは本人のもの（Step 46）
         allow create: if request.auth != null
           && memberUid == request.auth.uid
           && request.resource.data.role == 'owner'
+          && isOwnNameAndEmail()
           && getAfter(/databases/$(database)/documents/calendars/$(calendarId)).data.ownerUid == request.auth.uid;
 
         // 招待された人が、承認と同時に自分の行を書く（Step 36-G）
@@ -138,6 +138,7 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.role == get(myInvitePath(calendarId)).data.role
           && request.resource.data.invitedBy == get(myInvitePath(calendarId)).data.invitedBy
+          && isOwnNameAndEmail()
           && isAcceptingInvite(calendarId);
 
         allow update: if request.auth != null
@@ -152,23 +153,15 @@ service cloud.firestore {
       }
     }
 
-    // ---- invites（Step 35-F / 36-G / 39） ----
+    // ---- invites（Step 35-F / 36-G / 39 / 46） ----
+    // 招待状を作る・送り直すのは、Step 46 からサーバーの関数 sendInvite だけ（管理者の権限なのでルールは不要）。
+    // アプリからの create と、オーナーの送り直しの update は削除した
 
     match /invites/{inviteId} {
       // 宛先の本人だけが読める。ただしメールの持ち主確認が済んでいること（Step 39）
       allow read: if request.auth != null
         && isEmailVerified()
         && resource.data.invitedEmail == myEmail();
-
-      // オーナーが招待状を出す
-      allow create: if request.auth != null
-        && isValidNewInvite(inviteId);
-
-      // オーナーが同じ人へ送り直す（同じ住所に上書きになる）
-      allow update: if request.auth != null
-        && isValidNewInvite(inviteId)
-        && request.resource.data.calendarId == resource.data.calendarId
-        && request.resource.data.invitedEmail == resource.data.invitedEmail;
 
       // 宛先の本人が返事をする（返事待ち → 承認 / 拒否。status 以外は変えられない）。確認済みの人だけ（Step 39）
       allow update: if request.auth != null
