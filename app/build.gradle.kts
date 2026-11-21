@@ -70,6 +70,8 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     // プッシュ通知の受け取りと、端末の宛先（FCM トークン）の発行（Step 41）。版は上の BoM が決める
     implementation("com.google.firebase:firebase-messaging")
+    // サーバーの関数をアプリから呼ぶ（Step 46：招待を送る sendInvite）
+    implementation("com.google.firebase:firebase-functions")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

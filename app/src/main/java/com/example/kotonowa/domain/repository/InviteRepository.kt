@@ -1,6 +1,8 @@
 package com.example.kotonowa.domain.repository
 
 import com.example.kotonowa.domain.model.Invite
+import com.example.kotonowa.domain.model.InviteSendResult
+import com.example.kotonowa.domain.model.MemberRole
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -13,13 +15,13 @@ import kotlinx.coroutines.flow.Flow
 interface InviteRepository {
 
     /**
-     * 招待状を 1 枚出す。
+     * 招待を送る（Step 46 でサーバーの関数に任せる形に変えた）。
      *
-     * 通信が必要なので suspend。返すものは「成功したか、失敗したか」だけ。
+     * アプリは「どのカレンダーに・誰（メール）を・どの肩書きで」を渡すだけ。
+     * 相手探し・メンバーかの確認・招待状づくりはサーバーが行い、結果を [InviteSendResult] で返す。
+     * こうすると、他人の名刺（users）をアプリが読まずに済む。
      */
-    // TODO(35-B-1) 関数名は sendInvite。引数は招待状 1 枚（名前は invite）
-    //   お手本は CalendarRepository の createCalendar。形がまったく同じ
-    suspend fun sendInvite(invite: Invite): Result<Unit>
+    suspend fun sendInvite(calendarId: String, email: String, role: MemberRole): Result<InviteSendResult>
 
     // ---- 36-B：受け取る側 ---------------------------------------------------
 

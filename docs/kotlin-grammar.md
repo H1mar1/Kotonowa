@@ -2833,6 +2833,34 @@ Firestore の中身は人の手（コンソール）でも書き換えられる�
 
 💡 `getString("name")`（Step 30）は、この「`as? String`」を Firebase が代わりにやってくれている版。配列には専用の取り出し口が無いので、自分で書く。
 
+### (142) サーバーの関数を呼ぶ（`getHttpsCallable(名前).call(Map)`）— 渡すのも受け取るのも Map
+
+Cloud Functions の `onCall` で作った関数は、アプリから**名前を指定して**呼べる。電話をかけて用件を伝え、返事をもらうイメージ。
+
+```kotlin
+val data = mapOf("calendarId" to calendarId, "email" to email, "role" to "editor")
+
+val response = functions.getHttpsCallable("sendInvite").call(data).await()
+val result = (response.getData() as? Map<*, *>)?.get("result") as? String
+```
+
+| 部分 | 意味 |
+|---|---|
+| `functions` | サーバーの関数の呼び出し口（`FirebaseFunctions`）。**関数を置いた地域**（`asia-northeast1`）を指定して作る |
+| `getHttpsCallable("sendInvite")` | 呼ぶ関数を**名前で**選ぶ。TypeScript の `export const sendInvite` と同じ綴り |
+| `.call(data)` | 用件（Map）を渡して呼ぶ。Map は JSON（`{ "calendarId": "...", ... }`）になって届く |
+| `.await()` | 返事が来るまで待つ（Firestore と同じ `Task`。§2） |
+| `response.getData()` | 返事の中身。型が分からないので `Any?` |
+| `as? Map<*, *>` → `?.get("result") as? String` | 中身を Map として読み、`result` の項目を文字として取り出す（§4-(141) の `as?`） |
+
+⚠️ **地域を指定し忘れると見つからない。** `FirebaseFunctions.getInstance()`（地域なし）は既定の `us-central1` に電話する。
+関数は東京に置いたので「そんな関数は無い」（`NOT_FOUND`）になる。
+
+⚠️ **名札の綴りはコンパイラが確かめない。** `"calendarId"` を `"calenderId"` と書いても、ビルドは通り、関数側で「無い」と断られる。
+アプリと関数の**両方を見比べる**。
+
+💡 関数が `HttpsError` を投げると、アプリ側では `FirebaseFunctionsException`（例外）として届く。`try { } catch` で `Result.failure` にしておけば、今までの窓口と同じ扱いになる。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

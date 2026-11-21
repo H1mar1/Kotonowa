@@ -7,6 +7,7 @@ import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,8 @@ internal const val FIELD_MEMBER_UIDS = "memberUids"
 @Singleton
 class CalendarRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
+    // Step 46：オーナーの名簿の行に、今ログインしている自分の名前とメールを写すため
+    private val firebaseAuth: FirebaseAuth,
 ) : CalendarRepository {
 
     // ---- 30-B ----------------------------------------------------------
@@ -52,15 +55,20 @@ class CalendarRepositoryImpl @Inject constructor(
             uid = calendar.ownerUid,
             role = MemberRole.OWNER,
             joinedAt = Instant.now(),
-            invitedBy = null
+            invitedBy = null,
+            // Step 46：作っているのはオーナー本人（今ログインしている人）なので、自分の名前とメールを写す
+            // TODO(46-E-3) 誰の：認証の受付（firebaseAuth）の・今の人（currentUser）の ／ 何か：表示名（displayName）と、メール（email）を小文字にしたもの
+            //   今の人がいないことがあるので ?.（44-A-1 と同じ）。メールも無いことがあるので、小文字にするときも ?.（Step 28 の保存と同じ）
+            displayName = firebaseAuth.currentUser?.displayName,
+            email = firebaseAuth.currentUser?.email?.lowercase(),
         )
 
         firestore.runBatch { batch ->
-            batch.set(calenderDoc,calendar.toMap(memberUids = listOf(calendar.ownerUid)))
-            batch.set(ownerDoc,owner.toMap())
+            batch.set(calenderDoc, calendar.toMap(memberUids = listOf(calendar.ownerUid)))
+            batch.set(ownerDoc, owner.toMap())
         }.await()
         Result.success(Unit)
-    }catch (e: Exception){
+    } catch (e: Exception) {
         Result.failure(e)
     }
 
@@ -150,7 +158,7 @@ class CalendarRepositoryImpl @Inject constructor(
             .document(uid)
             // 書類が無ければエラーにしたいので set ではなく update（要件定義書 §3.3 の表）。
             // enum は文字に直す（§4-(111)）
-            .update("role",role.name.lowercase() )
+            .update("role", role.name.lowercase())
             .await()
 
         Result.success(Unit)
@@ -221,6 +229,9 @@ internal fun CalendarMember.toMap(): Map<String, Any?> = mapOf(
     "role" to role.name.lowercase(),        // enum は文字に直す。Step 37 のルールが小文字で照合する
     "joinedAt" to Date.from(joinedAt),    // Instant は直接保存できない
     "invitedBy" to invitedBy,   // String? なのでそのまま（null はそのまま保存される）
+    // TODO(46-E-1) Step 46 で足した 2 つも書く。名札は "displayName" と "email"（どちらも String? なのでそのまま。invitedBy と同じ形）
+    "displayName" to displayName,
+    "email" to email,
 )
 
 /** Firestore の書類 1 件を [Calendar] に組み立て直す。`toUser()` と同じ形（§4-⑮、§6-㊺）。 */
@@ -249,4 +260,7 @@ private fun DocumentSnapshot.toCalendarMember(): CalendarMember = CalendarMember
         ?: throw IllegalStateException("joinedAtが入っていません"),
     // invitedBy は「無いことがある」ので ?: throw を付けない（toUser の email と同じ）
     invitedBy = getString("invitedBy"),
+    // TODO(46-E-2) 名前とメールも読む。Step 46 より前の行には無いので ?: throw を付けない（invitedBy と同じ形）
+    displayName = getString("displayName"),
+    email = getString("email"),
 )

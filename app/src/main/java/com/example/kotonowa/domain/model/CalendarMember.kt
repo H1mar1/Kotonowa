@@ -21,4 +21,9 @@ data class CalendarMember(
     val role: MemberRole,
     val joinedAt: Instant,
     val invitedBy: String?,
+    // Step 46：名簿の行に、その人の名前とメールを写しておく（メンバー画面に出すため）。
+    //   他人の名刺（users）は読めなくなるので、名簿だけで名前を出せるようにする。
+    //   Step 46 より前に作られた行には無いので null になりうる。既定値 null は、作る側で省略してよい印（§7-(57)）
+    val displayName: String? = null,
+    val email: String? = null,
 )

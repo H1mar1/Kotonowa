@@ -21,19 +21,7 @@ interface UserRepository {
      */
     suspend fun saveUser(user: User): Result<Unit>
 
-    /**
-     * メールアドレスで名刺を 1 枚探す。
-     *
-     */
-    suspend fun findUserByEmail(email: String): Result<User?>
-
-    /**
-     * uid で名刺を 1 枚読む（Step 34。メンバー一覧に名前を出すため）。
-     *
-     * 名簿（members）には uid と肩書きしか無いので、名前はここから引く。
-     * 名刺が無い人もありうる（Step 28 より前に作られた・保存に失敗した等）ので、
-     * 「通信できたか」は Result、「名刺があったか」は中身の ? で表す（findUserByEmail と同じ考え方）。
-     */
-    // TODO(34-A-1) 戻り値の型。封筒（Result）の中に「名刺、または無し」を入れる。すぐ上の findUserByEmail と同じ
-    suspend fun getUser(uid: String): Result<User?>
+    // findUserByEmail（メールで名刺を探す）と getUser（uid で名刺を読む）は Step 46 で削除した。
+    //   他人の名刺はアプリから読めなくなったため。招待の相手探しはサーバーの関数 sendInvite、
+    //   メンバー画面の名前は名簿の行（members の displayName / email）が受け持つ
 }
