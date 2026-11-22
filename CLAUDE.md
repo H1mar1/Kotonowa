@@ -885,7 +885,7 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 47-A | `ScheduleRepository.observeTasks(calendarId)` ＋ 実装 | ✅ 11-22 |
 | 47-B | `TaskListUiState`（行＝タスク・カレンダー名・`canEdit`／未完了か完了か） | ✅ 11-22 |
 | 47-C | `TaskListViewModel`（全カレンダーのタスクと肩書きを束ねる・完了切り替え・タブ切り替え） | ✅ 11-22（束ねる部分は Claude） |
-| 47-D | `TaskListScreen`（タブ・期限切れ／これから・行） | 🔧 骨組みを作成 |
+| 47-D | `TaskListScreen`（タブ・期限切れ／これから・行） | ✅ 11-22（47-D-2 の直しは Claude） |
 | 47-E | 下のタブ（カレンダー／タスク）＋ `Routes` ＋ `NavHost` | |
 | 47-F | 実機確認 | |
 
@@ -893,11 +893,7 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   `.whereEqualTo("Task", type)`（項目名と値の取り違え＋`" "` 忘れ）、`filterIsInstance<String>(ScheduleItem.Task)`（型は `< >` に、`( )` は空）
 - 47-B/C で踏んだところ：`rows: List<Calendar>`（お手本の型を写した）、`filter: Boolean`（2 択でも enum にすると名前で読める）、
   `it.copy(TaskListUiState = TaskListUiState)`（`copy` の中は「項目名 = 値」。型の名前ではない）、`launch` の中に `launch` を写した。入力中に Android Studio が無関係な `import`（`Keyboard`）を取り込んでいた
-- ⏸ **再開メモ（2026-11-22 中断）。** 47-D の穴埋め 6 か所（`presentation/tasks/TaskListScreen.kt`）が未記入のまま WIP コミットした（**ビルドは通らない**）。
-  再開したら、まずこの 6 か所の説明（§2.6 の順。新しい文法は §4-(144)）を表示してから進める：
-  47-D-1 期限切れ／これから（`row.task.dueAt < now` / `>= now`）・47-D-2 完了を期限の新しい順（`sortedByDescending`）・
-  47-D-3〜5 未完了／完了のボタン（`selected` / `onClick`）・47-D-6 `TaskRow` で `ScheduleItemRow` に 4 つ渡す（`row.task` など）。
-  そのあと 47-E（下のタブ：`NavigationBar`＋`Routes`＋`NavHost`）→ 47-F（実機確認）
+- 47-D で踏んだところ：`val completedRows = uiState.rows.`（行末の `.` で止めた。次の行の `Scaffold` まで 1 つの式として読まれ、エラーが連鎖した）。Preview 2 枚（未完了／完了）で確認済み
 - 47-D：ホームの行の部品 `ScheduleItemRow` を `private` → `internal` にして使い回す。カレンダー名を出す引数 `calendarName: String? = null` を足した（ホームは省略）
 
 ### Step 46：`users` を本人だけ読めるようにする（Phase 4 の後の手直し。ブランチ `feature/restrict-users-read`、2026-11-20〜）

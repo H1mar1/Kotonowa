@@ -78,12 +78,14 @@ private fun TaskListContent(
 
     // TODO(47-D-1) 未完了のうち、期限が今より前のもの／今以降のものに分ける（Instant も < >= で比べられる。grammar §4-(144)）
     //   どちらも incompleteRows から filter { row -> 条件 } で絞る。条件の左は row.task.dueAt、右は now
-    val overdueRows = incompleteRows.filter { row -> ____ }
-    val upcomingRows = incompleteRows.filter { row -> ____ }
+    val overdueRows = incompleteRows.filter { row -> row.task.dueAt < now }
+    val upcomingRows = incompleteRows.filter { row -> row.task.dueAt >= now }
 
     // TODO(47-D-2) 完了したものを、期限の新しい順に（新しい＝大きい順。sortedBy の逆向きの sortedByDescending。grammar §4-(144)）
     //   すぐ上の incompleteRows と同じ形。filter の条件から ! を取り、並べ替えの道具を替える
-    val completedRows = ____
+    val completedRows = uiState.rows
+        .filter { row -> row.task.isCompleted }
+        .sortedByDescending { row -> row.task.dueAt }
 
     Scaffold(
         modifier = modifier,
@@ -103,15 +105,15 @@ private fun TaskListContent(
             ) {
                 SegmentedButton(
                     // TODO(47-D-3) 選ばれているか：状態の filter が「未完了」と同じか（ScheduleEditScreen の itemType の行と同じ形）
-                    selected = ____,
+                    selected = uiState.filter== TaskFilter.INCOMPLETE,
                     // TODO(47-D-4) 押されたら：呼び鈴 onFilterChange を「未完了」で鳴らす
-                    onClick = { ____ },
+                    onClick = { onFilterChange(TaskFilter.INCOMPLETE) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) { Text("未完了") }
                 SegmentedButton(
                     // TODO(47-D-5) 47-D-3 / 47-D-4 の「完了」版
-                    selected = ____,
-                    onClick = { ____ },
+                    selected = uiState.filter== TaskFilter.COMPLETED,
+                    onClick = { onFilterChange(TaskFilter.COMPLETED) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) { Text("完了") }
             }
@@ -184,11 +186,11 @@ private fun TaskRow(
         //   onClick … 押されたら、この行のタスクの id で onItemClick を鳴らす（ホームの { onItemClick(item.id) } と同じ形）
         //   canEdit … この行のカレンダーで押せるか（row の canEdit）
         //   calendarName … この行のカレンダー名（row の calendarName）
-        item = ____,
-        onClick = { ____ },
+        item = row.task,
+        onClick = { onItemClick(row.task.id) },
         onToggleCompleted = onToggleCompleted,
-        canEdit = ____,
-        calendarName = ____,
+        canEdit = row.canEdit,
+        calendarName = row.calendarName,
     )
 }
 
