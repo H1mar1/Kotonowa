@@ -143,6 +143,24 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
     追加・編集は「自分以外のメンバー」へ。削除は送らない。マイカレンダーは対象外。
     編集した人を知るため `events` に `updatedBy` を追加する。カレンダーごとの ON/OFF は設定画面の「通知設定」で切り替える
 
+### 3.6 チャット（Phase 5。2026-11-22 決定）
+- **2 種類のトーク**
+  - **グループ**：共有カレンダーごとに 1 つ。そのカレンダーのメンバー全員で話す（マイカレンダーには無い）
+  - **個人どうし（DM）**：1 対 1。始められるのは**共有カレンダーを 1 つでも一緒にしている人だけ**（メンバー画面の行から始める）。
+    名前は名簿の行（Step 46）にあるので、`users` を他人に開けない
+- **書き込めるのはメンバー全員**。閲覧者も書ける（予定の編集権限とチャットは別。予定は読むだけ、話し合いには参加できる）
+- できること
+  - 文字を送る・一覧で読む（新しい発言が下。開いている間は自動で増える）
+  - **自分の発言を消す**（送った本人だけ）
+  - **新着のプッシュ通知**（自分以外のメンバーへ「グループ名 ／ ○○さん：本文」）。グループは通知設定のカレンダー ON/OFF に従う
+  - **未読の印**（トーク一覧の行と下のタブに赤い点。Step 36 の `Badge` と同じ）
+  - **予定・タスクを貼る**（発言に予定を添え、押すと詳細画面へ）
+- **入口は画面の下のタブの 3 つ目「チャット」**（カレンダー ｜ タスク ｜ チャット）。押すと**トーク一覧**
+  （LINE のように、グループと DM を 1 つの一覧に新しい発言の順で並べる）→ 行を押すとそのトーク
+- **小さく区切って作る**（区切りごとに動くアプリを保つ）：
+  ① グループで送る・読む ＋ トーク一覧 ＋ 3 つ目のタブ → ② 消す・新着の通知 → ③ DM → ④ 未読の印 → ⑤ 予定を貼る
+- データの持ち方・ルールの細部は、各区切りの着手時にここへ追記する（下の §4 は現時点の案）
+
 ---
 
 ## 4. データモデル（Cloud Firestore）
@@ -156,6 +174,9 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | `calendars/{calendarId}/members` | サブコレクション | uid, role(owner/editor/viewer), joinedAt, invitedBy |
 | `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, sortAt, createdBy, reminderMinutesBefore, updatedAt |
 | `invites` | トップレベル | inviteId, calendarId, **calendarName**, invitedEmail, role, status, invitedBy, createdAt |
+| `calendars/{calendarId}/messages`（Phase 5 案） | サブコレクション | messageId, senderUid, senderName, text, attachedItemId?, createdAt |
+| `directChats`（Phase 5 案） | トップレベル | chatId（2 人の uid を小さい順に `_` でつなぐ）, memberUids[2], viaCalendarId, lastMessageText, lastMessageAt, createdAt |
+| `directChats/{chatId}/messages`（Phase 5 案） | サブコレクション | グループの messages と同じ |
 
 **設計メモ**
 - `events`はフラット構造にすることで、「自分が所属する全カレンダーの予定/タスクを横断表示」するクエリを1回で書けるようにしている
@@ -178,6 +199,14 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
     メンバーの増減時に `FieldValue.arrayUnion` / `arrayRemove` で名簿と同時に更新する
   - ⚠️ 代償：入退室のたびに `members` と `memberUids` の 2 か所を更新する必要がある。
     更新をまとめて書けるよう、`CalendarRepositoryImpl` の外からは配列の存在が見えない設計にする
+- **チャットの置き場所（Phase 5 の案。2026-11-22）**
+  - グループの発言は `calendars/{id}/messages` に置く。読み書きの判定は今の `isMember(calendarId)` がそのまま使え、
+    メンバーの出入りに合わせて別の名簿を更新しなくてよい（`memberUids` を 2 か所に持たない）
+  - トーク一覧の並び順・最後の発言の表示用に、`calendars` と `directChats` に `lastMessageText` / `lastMessageAt` を置く。
+    書くのは**発言の作成をきっかけに動くサーバーの関数だけ**（新着の通知と同じ関数。アプリからは書かせない）
+  - DM の住所は 2 人の uid から決める（同じ 2 人で 2 つ目の部屋ができない。招待状の住所と同じ考え方）。
+    「共有カレンダーを一緒にしている」はルールで `viaCalendarId` の部屋の `memberUids` に 2 人とも居るかで確かめる
+  - 未読は「最後に読んだ時刻」を自分の側に持ち、`lastMessageAt` と比べる（置き場所は ④ の着手時に決める）
 - **`sortAt` は期間クエリ・並べ替え専用の共通フィールド**（2026-08-07 決定）。予定は `startAt`、タスクは `dueAt` と同じ値を入れる。
   Firestore の範囲絞り込みは単一フィールドにしか掛けられないため、`type` によって見る場所が変わるのを避ける狙い。
   - Kotlin 側の `ScheduleItem` には持たせない。`startAt` / `dueAt` から導出できる重複情報なので、data 層の `toMap()` で保存直前に付与する（`type` と同じ扱い）
@@ -204,6 +233,9 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | | 招待送信 | メールアドレスで招待、ロール指定 |
 | | 招待受信（一覧） | 届いた招待の承認/拒否 |
 | Phase4: 通知 | 通知設定（詳細） | カレンダーごとの通知ON/OFF |
+| 追加改善 | タスク一覧 | 全カレンダー横断。未完了（期限切れ／これから）・完了の切り替え。画面下のタブ（Step 47） |
+| Phase5: チャット | トーク一覧 | 画面下のタブ 3 つ目。グループと DM を新しい発言順に。未読の印 |
+| | トーク（グループ／DM） | 発言の一覧・送信・自分の発言の削除・予定を貼る |
 
 ---
 
@@ -217,6 +249,7 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
   → Phase2: 個人のスケジュール/タスク管理 + ローカル通知
   → Phase3: 共有カレンダー + ロールベース認可
   → Phase4: プッシュ通知（共有更新・招待）
+  → Phase5: チャット（グループ → 消す・通知 → DM → 未読 → 予定を貼る）
 ```
 
 Cloud Functionsのデプロイ・FCM送受信は初見だと詰まりやすいため、Phase1に入る前に軽い疎通確認（PoC）を行うことを推奨。
