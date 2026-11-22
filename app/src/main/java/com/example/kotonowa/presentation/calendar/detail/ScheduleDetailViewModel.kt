@@ -47,6 +47,13 @@ class ScheduleDetailViewModel @Inject constructor(
     /** 肩書きの見張り（Step 38）。CalendarViewModel の roleJob と同じ。 */
     private var roleJob: Job? = null
 
+    /**
+     * 予定 1 件の見張り（Step 48）。削除する前に止めるために覚えておく。
+     * 止めないと、消えた予定を見張り続けてルールに断られる（PERMISSION_DENIED）。
+     */
+    // TODO(48-A-1) すぐ上の roleJob と同じ形の箱を、名前 itemJob で作る（最初は「まだ見張っていない」＝ null）
+    private var itemJob: Job? = null
+
     /** いま肩書きを見張っているカレンダーの id。同じカレンダーなら見張り直さないために覚えておく。 */
     private var roleCalendarId: String? = null
 
@@ -61,7 +68,8 @@ class ScheduleDetailViewModel @Inject constructor(
     /** itemId の 1 件を読み込んで uiState.item に入れる。 */
     private fun load() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        viewModelScope.launch {
+        // TODO(48-A-2) 始めた見張り（launch の戻り値）を、箱 itemJob に入れておく（observeRole の roleJob = … と同じ形）
+        itemJob = viewModelScope.launch {
             try {
                 scheduleRepository.observeItem(itemId)
                     .collect { item ->
@@ -75,7 +83,14 @@ class ScheduleDetailViewModel @Inject constructor(
                             observeRole(item.calendarId)
                         }
                     }
-            } catch (e: Exception) {
+            }
+            // TODO(48-A-3) 止めた（cancel）ときの合図は失敗ではないので、投げ直す受け止め口を、下の catch より「上」に足す
+            //   observeRole の 1 つ目の catch（catch (e: 〇〇) { throw e }）と同じ形。必ず Exception より上（順番が命。§6-㉕）
+            //   ⚠️ これが無いと、削除の前に見張りを止めた瞬間、下の catch に入って「読み込めません」が出る（Step 23 の ⚠️）
+            catch (e: CancellationException) {
+                throw e   // 意図して取り止めた合図（grammar §2-(91)）。Exception より上に置く
+            }
+            catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, errorMessage = "読み込めません")
                 }
@@ -128,6 +143,9 @@ class ScheduleDetailViewModel @Inject constructor(
         if (_uiState.value.isDeleting) return
         _uiState.update { it.copy(isDeleting = true, errorMessage = null) }
 
+        // TODO(48-A-4) 消す前に、予定の見張りを止める。誰の：箱 itemJob の ／ 何をする：止める（まだ無いかもしれないので ?.）
+        itemJob?.cancel()
+
         viewModelScope.launch {
             scheduleRepository.deleteItem(itemId)
                 .onSuccess {
@@ -141,6 +159,8 @@ class ScheduleDetailViewModel @Inject constructor(
                             errorMessage = "削除できませんでした"
                         )
                     }
+                    // TODO(48-A-5) 消せなかった＝予定はまだある。止めた見張りを始め直す（init で呼んでいるのと同じ関数を呼ぶ）
+                    load()
                 }
         }
     }

@@ -903,6 +903,17 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   確認用のタスクは削除、etetete は完了に戻した。💡 詳細画面で削除した瞬間の `PERMISSION_DENIED`（消えた書類の 1 件見張り）は Step 47 より前からのもので、画面は正しく戻る。**これで Step 47 は完了。**
 - 47-D：ホームの行の部品 `ScheduleItemRow` を `private` → `internal` にして使い回す。カレンダー名を出す引数 `calendarName: String? = null` を足した（ホームは省略）
 
+### Step 48：詳細画面で削除した瞬間の `PERMISSION_DENIED` を消す（ブランチ `fix/detail-delete-listener`、2026-11-22〜）
+
+**原因。** 詳細画面の頭脳は予定 1 件を見張っている（Step 20 の `observeItem`）。削除すると Firestore が見張りに知らせる前にルールで読めるか確かめ直すが、
+読み取りの条件 `isMember(resource.data.calendarId)` は**書類が無いと判定できず「断る」**になる。画面は `isDeleted` で一覧へ戻るので見た目は正しいが、Logcat に警告が出る。
+**直し方（ユーザーが選択）：** ルールは変えず、**削除する前に見張りを止める**（`itemJob?.cancel()`。Step 23 の `observeJob`・Step 38 の `roleJob` と同じ形）。削除に失敗したら `load()` で見張り直す。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 48-A | `ScheduleDetailViewModel`：`itemJob` に見張りを覚える・`CancellationException` を投げ直す・削除前に止める・失敗で見張り直す | ✅ 11-22（ユーザーの依頼で Claude が記入） |
+| 48-B | 実機確認（削除して Logcat に `PERMISSION_DENIED` が出ない） | ✅ 11-22（Claude が adb で操作。「DeleteTest」を作成→削除→一覧へ戻り、警告 0 件） |
+
 ### Step 46：`users` を本人だけ読めるようにする（Phase 4 の後の手直し。ブランチ `feature/restrict-users-read`、2026-11-20〜）
 
 **理由。** `users` は「ログインしていれば誰でも読めた」（Step 28。招待の検索のため）ので、全員のメールアドレス・`fcmTokens`・`mutedCalendarIds` が他人から読めた。
