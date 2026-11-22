@@ -1471,6 +1471,54 @@ OutlinedButton(onClick = onDecline) { Text("拒否") }
 使い方（`onClick` / `enabled` / 中身の `{ Text(…) }`）は 3 つとも同じ。違うのは見た目だけ。
 並べたときに**どちらが主役かが一目で分かる**ように使い分ける。
 
+### (145) `NavigationBar` と `NavigationBarItem` — 画面の下のタブ
+
+```kotlin
+NavigationBar {
+    NavigationBarItem(
+        selected = selected == MainTab.CALENDAR,
+        onClick = { onTabSelected(MainTab.CALENDAR) },
+        icon = { Text("📅") },
+        label = { Text("カレンダー") },
+    )
+    // 2 つ目の NavigationBarItem …
+}
+```
+
+2026-11-22、Step 47-E で記録。
+
+| 部品 | 役割 |
+|---|---|
+| `NavigationBar`（ナビゲーションバー） | 画面の下の帯。中にタブを横に並べる |
+| `NavigationBarItem` | タブ 1 つ。`selected`（選ばれているか）・`onClick`（押されたら）・`icon`（絵）・`label`（下の文字） |
+
+- `selected` / `onClick` は `SegmentedButton`（Step 17・47-D）と**まったく同じ形**。今の値は外から渡し、押されたら呼び鈴を鳴らすだけ（§3-(76) 状態ホイスティング）
+- `icon` は**必須**。アイコンの部品集（material-icons）はこのプロジェクトに入れていないので、「＋」ボタンや「▼」と同じく**文字（絵文字）**で描いている
+- `Scaffold` の `bottomBar = { … }` に入れると、画面の下に固定される（`topBar` の下版。§3-(90)）
+
+### (146) `navigate(住所) { popUpTo(住所); launchSingleTop = true }` — タブの行き来で履歴を積み上げない
+
+```kotlin
+navController.navigate(Routes.TASKS) {
+    popUpTo(Routes.HOME)        // HOME より上の履歴を片付けてから行く（HOME 自身は残す）
+    launchSingleTop = true      // もう一番上に TASKS がいるなら、もう 1 枚作らない
+}
+navController.popBackStack(Routes.HOME, inclusive = false)   // タスク → カレンダーは「戻る」
+```
+
+2026-11-22、Step 47-E で記録。
+
+`navigate` は、ふつう**履歴の一番上に 1 枚積む**（本の上に本を重ねる）。タブを「カレンダー → タスク → カレンダー → タスク…」と
+押すたびに積むと、端末の「戻る」を何度も押さないとアプリを閉じられなくなる。
+
+| 書き方 | 意味 |
+|---|---|
+| `{ }`（navigate の後ろ） | 行き方の注文を書く場所（ラムダ。§1-⑤） |
+| `popUpTo(Routes.HOME)` | HOME の**上**に積まれていたものを片付けてから行く。`inclusive = true` が無いので HOME は残る（§3-(120)、Step 22 との違い） |
+| `launchSingleTop = true` | 行き先がすでに一番上なら作り直さない（タスクのタブを 2 回押しても 1 枚） |
+
+結果、履歴はいつも `[HOME]` か `[HOME, TASKS]` のどちらか。タスク画面で「戻る」→ カレンダー、カレンダーで「戻る」→ アプリを閉じる。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子

@@ -17,10 +17,13 @@ import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
 import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScreen
 import com.example.kotonowa.presentation.calendarlist.members.MemberListScreen
+import com.example.kotonowa.presentation.common.MainBottomBar
+import com.example.kotonowa.presentation.common.MainTab
 import com.example.kotonowa.presentation.invites.InviteListScreen
 import com.example.kotonowa.presentation.settings.SettingsScreen
 import com.example.kotonowa.presentation.settings.notification.NotificationSettingsScreen
 import com.example.kotonowa.presentation.splash.SplashScreen
+import com.example.kotonowa.presentation.tasks.TaskListScreen
 
 
 object Routes {
@@ -64,6 +67,28 @@ object Routes {
     // Step 45: 通知設定画面の住所。id は要らない（自分の設定は頭脳がログイン情報から探す）
     // TODO(45-C-1) INVITES と同じ形。名前は NOTIFICATION_SETTINGS、中身の文字は "notification_settings"
     const val NOTIFICATION_SETTINGS = "notification_settings"
+
+    // Step 47-E: タスク一覧画面の住所。id は要らない（全カレンダーのタスクは頭脳がログイン情報から集める）
+    // TODO(47-E-4) NOTIFICATION_SETTINGS と同じ形。名前は TASKS、中身の文字は "tasks"
+    const val TASKS = "tasks"
+}
+
+/**
+ * 下のタブが押されたときの行き先（Step 47-E。grammar §3-(146)）。Claude が書いた。
+ *
+ * 履歴はいつも [HOME] か [HOME, TASKS] のどちらかにする（タブを押すたびに積み上げない）。
+ *  ・カレンダー … HOME まで戻る（HOME は消さない）
+ *  ・タスク … HOME より上を片付けてから TASKS へ。すでに TASKS が一番上なら作り直さない
+ * 地図の係（NavHostController）に足した拡張関数なので、navController.navigateToTab(tab) と呼べる（§4-㊱）。
+ */
+private fun NavHostController.navigateToTab(tab: MainTab) {
+    when (tab) {
+        MainTab.CALENDAR -> popBackStack(Routes.HOME, inclusive = false)
+        MainTab.TASKS -> navigate(Routes.TASKS) {
+            popUpTo(Routes.HOME)
+            launchSingleTop = true
+        }
+    }
 }
 
 /**
@@ -126,6 +151,29 @@ fun KotonowaNavHost(
                 // TODO(36-F-3) 誰の：地図の係（navController）の ／ 何をする：招待一覧の住所へ行く
                 //   すぐ上の onManageCalendarsClick と同じ形
                 onInvitesClick = { navController.navigate(Routes.INVITES) },
+                // Step 47-E: 画面の下のタブ。お手本はすぐ下の TASKS の bottomBar（選ばれているタブだけが違う）
+                bottomBar = {
+                    MainBottomBar(
+                        // TODO(47-E-7) ここはカレンダー画面。選ばれているのはどのタブか（MainTab の 2 つのどちらか）
+                        selected = MainTab.CALENDAR,
+                        // TODO(47-E-8) 誰の：地図の係（navController）の ／ 何をする：押されたタブ（tab）の行き先へ行く（上の navigateToTab）
+                        onTabSelected = { tab ->  navController.navigateToTab(tab) },
+                    )
+                },
+            )
+        }
+
+        // Step 47-E: タスク一覧画面
+        composable(Routes.TASKS) {
+            TaskListScreen(
+                // TODO(47-E-9) 行が押されたら、そのタスクの詳細画面へ（HOME の onItemClick とまったく同じ 1 行）
+                onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },
+                bottomBar = {
+                    MainBottomBar(
+                        selected = MainTab.TASKS,
+                        onTabSelected = { tab -> navController.navigateToTab(tab) },
+                    )
+                },
             )
         }
 

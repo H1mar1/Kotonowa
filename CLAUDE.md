@@ -886,14 +886,21 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 47-B | `TaskListUiState`（行＝タスク・カレンダー名・`canEdit`／未完了か完了か） | ✅ 11-22 |
 | 47-C | `TaskListViewModel`（全カレンダーのタスクと肩書きを束ねる・完了切り替え・タブ切り替え） | ✅ 11-22（束ねる部分は Claude） |
 | 47-D | `TaskListScreen`（タブ・期限切れ／これから・行） | ✅ 11-22（47-D-2 の直しは Claude） |
-| 47-E | 下のタブ（カレンダー／タスク）＋ `Routes` ＋ `NavHost` | |
-| 47-F | 実機確認 | |
+| 47-E | 下のタブ（カレンダー／タスク）＋ `Routes` ＋ `NavHost` | ✅ 11-22（`presentation/common/MainBottomBar.kt`。行き先の `navigateToTab` は Claude） |
+| 47-F | 実機確認 | ✅ 11-22（Claude が adb で操作） |
 
 - 47-A で踏んだところ：`val calendarId = firestore.collection(calendarId)`（絞り込みではなく別の棚を指し、`.` の鎖も切れた）、
   `.whereEqualTo("Task", type)`（項目名と値の取り違え＋`" "` 忘れ）、`filterIsInstance<String>(ScheduleItem.Task)`（型は `< >` に、`( )` は空）
 - 47-B/C で踏んだところ：`rows: List<Calendar>`（お手本の型を写した）、`filter: Boolean`（2 択でも enum にすると名前で読める）、
   `it.copy(TaskListUiState = TaskListUiState)`（`copy` の中は「項目名 = 値」。型の名前ではない）、`launch` の中に `launch` を写した。入力中に Android Studio が無関係な `import`（`Keyboard`）を取り込んでいた
 - 47-D で踏んだところ：`val completedRows = uiState.rows.`（行末の `.` で止めた。次の行の `Scaffold` まで 1 つの式として読まれ、エラーが連鎖した）。Preview 2 枚（未完了／完了）で確認済み
+- 47-E：タブの行き先は `NavHostController.navigateToTab(tab)`（カレンダー＝`popBackStack(HOME)`、タスク＝`navigate(TASKS) { popUpTo(HOME); launchSingleTop = true }`）。
+  履歴はいつも `[HOME]` か `[HOME, TASKS]`（grammar §3-(145)(146)）。アイコンの部品集は入れていないので絵文字で描く。
+  踏んだところ（どちらもビルドが通る）：`onTabSelected = { tab -> navController.navigate(Routes.TASKS) }`（`tab` を見ず、カレンダーのタブでもタスクへ飛ぶ＋履歴が積み上がる）、
+  `onItemClick = { id -> MainTab.TASKS }`（値を置いただけで何も頼んでいない。33-B の ⚠️ と同じ）
+- **47-F（2026-11-22）。** test でタブの行き来・完了⇄未完了（etetete が「期限切れ」の赤い見出しへ移る）・行→詳細→戻る、
+  school に「TaskListTest」を作ってマイカレンダーの分と 1 つの一覧に集まること、タブを何度押しても「戻る」1 回でホーム・2 回でアプリが閉じることを確認。
+  確認用のタスクは削除、etetete は完了に戻した。💡 詳細画面で削除した瞬間の `PERMISSION_DENIED`（消えた書類の 1 件見張り）は Step 47 より前からのもので、画面は正しく戻る。**これで Step 47 は完了。**
 - 47-D：ホームの行の部品 `ScheduleItemRow` を `private` → `internal` にして使い回す。カレンダー名を出す引数 `calendarName: String? = null` を足した（ホームは省略）
 
 ### Step 46：`users` を本人だけ読めるようにする（Phase 4 の後の手直し。ブランチ `feature/restrict-users-read`、2026-11-20〜）

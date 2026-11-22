@@ -72,12 +72,15 @@ fun CalendarScreen(
     onManageCalendarsClick: () -> Unit,    // ▼ のメニューの「カレンダーの管理」（Step 33-H）
     onInvitesClick: () -> Unit,            // ▼ のメニューの「届いた招待」（Step 36-D）
     modifier: Modifier = Modifier,
+    bottomBar: @Composable () -> Unit = {}, // 画面の下のタブ（Step 47-E。NavHost が MainBottomBar を渡す）
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
+        // TODO(47-E-5) 引数で受け取った下のタブを、Scaffold の bottomBar に渡す（TaskListScreen の Scaffold と同じ 1 行）
+        bottomBar = bottomBar,
         topBar = {
             TopAppBar(
                 // 「家族 ▼」を押すと、その場にカレンダーのメニューを開く（Step 33-H。grammar §3-(107)）
