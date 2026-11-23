@@ -4,11 +4,13 @@ import com.example.kotonowa.data.local.ReminderSchedulerImpl
 import com.example.kotonowa.data.local.SelectedCalendarRepositoryImpl
 import com.example.kotonowa.data.repository.AuthRepositoryImpl
 import com.example.kotonowa.data.repository.CalendarRepositoryImpl
+import com.example.kotonowa.data.repository.ChatRepositoryImpl
 import com.example.kotonowa.data.repository.InviteRepositoryImpl
 import com.example.kotonowa.data.repository.ScheduleRepositoryImpl
 import com.example.kotonowa.data.repository.UserRepositoryImpl
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.ChatRepository
 import com.example.kotonowa.domain.repository.InviteRepository
 import com.example.kotonowa.domain.repository.ReminderScheduler
 import com.example.kotonowa.domain.repository.ScheduleRepository
@@ -80,4 +82,9 @@ abstract class RepositoryModule {
     abstract fun bindNotificationSettingRepository(
         impl: NotificationSettingRepositoryImpl,
     ): NotificationSettingRepository
+
+    // チャットの窓口（Step 49）。上と同じ形
+    @Binds
+    @Singleton
+    abstract fun bindChatRepository(impl: ChatRepositoryImpl): ChatRepository
 }

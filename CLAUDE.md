@@ -903,6 +903,35 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   確認用のタスクは削除、etetete は完了に戻した。💡 詳細画面で削除した瞬間の `PERMISSION_DENIED`（消えた書類の 1 件見張り）は Step 47 より前からのもので、画面は正しく戻る。**これで Step 47 は完了。**
 - 47-D：ホームの行の部品 `ScheduleItemRow` を `private` → `internal` にして使い回す。カレンダー名を出す引数 `calendarName: String? = null` を足した（ホームは省略）
 
+### Phase 5：チャット（ブランチ `feature/phase5-chat`、2026-11-22〜）
+
+**設計は `docs/requirements.md` §3.6・§4（2026-11-22 にユーザーが選択）。** グループ（共有カレンダーごと）と DM（同じカレンダーの人だけ）。閲覧者も書ける。
+消す・新着の通知・未読の印・予定を貼る。入口は下のタブ 3 つ目「チャット」→ トーク一覧。小さく区切る：
+① グループで送る・読む（Step 49）→ ② 消す・通知 → ③ DM → ④ 未読 → ⑤ 予定を貼る。
+
+#### Step 49 の内訳（① グループで送る・読む）
+
+| | 内容 | 状態 |
+|---|---|---|
+| 49-A | `domain/model/ChatMessage` ＋ `domain/repository/ChatRepository` | ✅ 11-23 |
+| 49-B | `data/repository/ChatRepositoryImpl`（`calendars/{id}/messages`）＋ `RepositoryModule` | ✅ 11-24（49-B-2 の直しは Claude） |
+| 49-C | ルール：`messages` の `read` / `create`（メンバー・送り主は本人）（Claude）＋公開 | ✅ 11-24 公開済み |
+| 49-D | トーク画面（`presentation/chat/room/`。UiState / ViewModel / Screen） | 🔧 骨組みを作成（穴 11 か所。自動スクロール・入力欄の配置は Claude） |
+| 49-E | トーク一覧（`presentation/chat/list/`。入っている共有カレンダーを並べる） | |
+| 49-F | 下のタブの 3 つ目＋ `Routes` ＋ `NavHost` | |
+| 49-G | 実機確認（2 アカウントで送り合う） | |
+
+- ⏸ **再開メモ（2026-11-24 中断）。** 49-D の穴埋め 11 か所（`presentation/chat/room/` の 3 ファイル）が未記入のまま WIP コミットした（**ビルドは通らない**）。
+  再開したら、まず 49-D の説明（§2.6 の順。新しい文法は §3-(148)）と穴の表を表示してから進める：
+  UiState（49-D-1/2：`messages` の型と空の並び・`input` の空文字）、ViewModel（49-D-3 `collect` で `messages`/`isLoading` を更新・49-D-4 `input` を更新・
+  49-D-5 門番 `text.isEmpty() || state.isSending`・49-D-6 `chatRepository.sendMessage(calendarId, text)`）、
+  Screen（49-D-7 `isMine`・49-D-8 `if (isMine) Arrangement.End else Arrangement.Start`・49-D-9 入力欄の `value`/`onValueChange`・49-D-10 `onClick = onSend`）。
+  そのあと 49-E（トーク一覧）→ 49-F（下のタブ 3 つ目＋`Routes`＋`NavHost`）→ 49-G（2 アカウントで実機確認）
+
+- 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
+  `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
+  名札は保存と同じ定数（`FIELD_〇〇`）で読む
+
 ### Step 48：詳細画面で削除した瞬間の `PERMISSION_DENIED` を消す（ブランチ `fix/detail-delete-listener`、2026-11-22〜）
 
 **原因。** 詳細画面の頭脳は予定 1 件を見張っている（Step 20 の `observeItem`）。削除すると Firestore が見張りに知らせる前にルールで読めるか確かめ直すが、

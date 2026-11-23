@@ -1519,6 +1519,32 @@ navController.popBackStack(Routes.HOME, inclusive = false)   // タスク → �
 
 結果、履歴はいつも `[HOME]` か `[HOME, TASKS]` のどちらか。タスク画面で「戻る」→ カレンダー、カレンダーで「戻る」→ アプリを閉じる。
 
+### (148) チャット画面の部品 — `rememberLazyListState` / `LaunchedEffect(鍵)` / `animateScrollToItem` / `imePadding`
+
+```kotlin
+val listState = rememberLazyListState()                  // 一覧のスクロール位置を覚えておく係
+LaunchedEffect(uiState.messages.size) {                  // 鍵（発言の数）が変わったときだけ中身が動く
+    if (uiState.messages.isNotEmpty()) {
+        listState.animateScrollToItem(uiState.messages.lastIndex)   // いちばん下まで、なめらかにスクロール
+    }
+}
+LazyColumn(state = listState) { … }                      // 係を一覧に渡す
+Modifier.imePadding()                                    // キーボードが出ている分だけ、下に余白を入れて押し上げる
+```
+
+2026-11-24、Step 49-D で記録。
+
+| 書き方 | 意味 |
+|---|---|
+| `rememberLazyListState()` | 一覧が「今どこまでスクロールしているか」を覚えておく係。`LazyColumn(state = …)` に渡すと、外からスクロールを命令できる |
+| `LaunchedEffect(鍵) { … }` | 画面を描いたときに 1 回、そのあとは**鍵の値が変わったときだけ**中身を動かす（Step 17-E-4 で `isSaved` を見て `onSaved()` を鳴らしたのと同じ道具。あのときの鍵は `isSaved`） |
+| `animateScrollToItem(番号)` | その番号の行まで、なめらかにスクロールする。`suspend` なので `LaunchedEffect` の中から呼ぶ |
+| `lastIndex` | 並びの最後の番号（件数 − 1）。番号は 0 から数えるため |
+| `Modifier.imePadding()` | IME（アイエムイー＝キーボード）が出ている高さの分だけ余白を足す。入力欄がキーボードに隠れない |
+| `Modifier.navigationBarsPadding()` | 画面の一番下の操作バー（ホームの横線）の分だけ余白を足す |
+
+鍵を `messages.size` にしているので、**発言が増えたときだけ**下へスクロールする。入力欄に 1 文字打つたびに画面は描き直されるが、そのたびにスクロールはしない。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
@@ -2974,6 +3000,25 @@ rows.sortedByDescending { row -> row.task.dueAt }  // 期限の新しい順
 Descending（ディセンディング）＝「下っていく」。`{ }` の中は「何で比べるか」で、`sortedBy` と同じ。
 
 💡 どちらも**新しい並びを作る**だけで、元の並びは変わらない（`filter` と同じ）。
+
+### (147) チャットの発言を保存・読む道具 — `orderBy` / `add` / `FieldValue.serverTimestamp()` / `ServerTimestampBehavior.ESTIMATE`
+
+```kotlin
+messagesOf(calendarId).orderBy(FIELD_CREATED_AT)            // 時刻の古い順に並べてもらう
+messagesOf(calendarId).add(data).await()                    // 住所（id）は Firestore に決めてもらう
+FIELD_CREATED_AT to FieldValue.serverTimestamp()            // 時刻はサーバーが受け取った時刻を入れてもらう
+getTimestamp(FIELD_CREATED_AT, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)   // まだ無ければ見込みの時刻
+```
+
+2026-11-23、Step 49-B で記録。
+
+| 書き方 | 意味 | これまでとの違い |
+|---|---|---|
+| `.orderBy(項目名)` | その項目の小さい順（古い順）に並べて返してもらう | `whereEqualTo` は「絞る」、`orderBy` は「並べる」。絞り込み無しで並べ替え 1 つだけなら複合インデックスは要らない（Step 16-F で要ったのは「絞る＋別の項目で並べる」だったから） |
+| `.add(Map)` | 新しい書類を作り、**住所（id）は Firestore が決める** | 予定は `.document(id).set(…)` で自分で id を作った（編集で同じ住所に上書きするため）。発言は書き直さないので id を自分で持たなくてよい |
+| `FieldValue.serverTimestamp()` | 「時刻はサーバーが受け取ったときの時刻にして」という**予約の印** | 端末の時計（`Instant.now()`）はずれていることがある。チャットは全員の発言を 1 列に並べるので、全員に共通の時計（サーバー）を使う |
+| `ServerTimestampBehavior.ESTIMATE` | 読むときに、サーバーの時刻がまだ付いていなければ**見込みの時刻**を入れる | 送った直後、自分の端末には書類が先に届く（Firestore の「待たずに見せる」仕組み）。その瞬間は時刻が `null` なので、そのままだと組み立てに失敗して自分の発言が一瞬消える |
+| `doc.id` | 書類の住所そのもの | `getString("id")` は中身に書いた `id` を読む。`add` で作った書類は中身に `id` を書いていないので、住所の方を読む |
 
 ## §5 判定（条件分岐）
 
