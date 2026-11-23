@@ -151,6 +151,32 @@ service cloud.firestore {
           && isCalendarOwner(calendarId)
           && memberUid != request.auth.uid;
       }
+
+      // ---- グループチャットの発言（Phase 5 / Step 49） ----
+      // 共有カレンダーのメンバー全員が読み書きできる（閲覧者も書ける。要件定義書 §3.6）。
+      // isMember は使わない：あちらはマイカレンダー（id ＝ uid）も「はい」にするが、マイカレンダーにはチャットが無い。
+      // ここは部屋の memberUids に自分が居るかだけを見る（部屋の書類が無ければ「いいえ」）
+      match /messages/{messageId} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+
+        allow create: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids
+          // 書いてよい項目はこの 4 つだけ（余計な項目を足させない）
+          && request.resource.data.keys().hasOnly(['senderUid', 'senderName', 'text', 'createdAt'])
+          // 送り主は自分。名前は通行証の名前かメール（他人の名前を名乗らせない。Step 46 の isOwnNameAndEmail と同じ考え方）
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.senderName in [request.auth.token.get('name', null), request.auth.token.email]
+          // 本文は 1〜1000 文字の文字列
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          // 時刻はサーバーの時刻（serverTimestamp）だけ。端末の時計で過去・未来の発言を作らせない
+          && request.resource.data.createdAt == request.time;
+
+        // 書き換えは誰にもさせない。消す（delete）は ② で開ける
+        allow update, delete: if false;
+      }
     }
 
     // ---- invites（Step 35-F / 36-G / 39 / 46） ----
