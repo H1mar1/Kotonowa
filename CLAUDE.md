@@ -944,7 +944,7 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 50-D | トーク画面：自分の吹き出しの長押し ＋ 確認ダイアログ | ✅ 11-24（長押しの飾り・ダイアログの形は Claude。grammar §3-(149)） |
 | 50-E | Functions：`notifyChatMessage`（送った本人以外へ・通知設定に従う・`data` に `calendarId`）（Claude）＋公開 | ✅ 11-24 公開済み |
 | 50-F | Android：通知の `calendarId` を `MainActivity` → `NavHost` へ渡し、トーク画面を開く | ✅ 11-24（`PendingIntent` の番号・`rememberSaveable`・ホームでの `LaunchedEffect` は Claude。grammar §8-(150)） |
-| 50-G | 実機確認 | |
+| 50-G | 実機確認 | ✅ 11-24（Claude が adb で操作、ユーザーがコンソールで発言を追加） |
 
 - 50-A で踏んだところ：`firestore.collection(SUBCOLLECTION_MESSAGES)`（いちばん上の階の棚を指した。発言は部屋の 1 段下。ビルドは通り、実行すると `PERMISSION_DENIED`）。道順は `messagesOf(calendarId)` にまとめてある
 - 50-C で踏んだところ：`if (message.senderUid != _uiState.value.myUid)` の後ろの `return` 忘れ（**ビルドが通る**。空行とコメントを挟んでも次の文が `if` の中身になり、
@@ -954,6 +954,12 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 - 50-F で踏んだところ：`{ id -> navController.navigate(Routes.chatRoom(id)) }`（49-F-4 の呼び鈴の包み紙ごと写した。前の行の `navigateToTab(…)` に渡すラムダとして読まれ
   `Expression is treated as a trailing lambda argument`）。**渡すときは `{ }` で包む・今すぐやるときは包まない**
 - 50-E：`sendToUser` に `extraData`（見出し・本文のほかに載せる名札）を足し、チャットの通知には `chatCalendarId` を載せる（Android の受け取り係と同じ綴りにする）
+- **50-G（2026-11-24）。** ① test でログインしてアプリを裏へ → ② ユーザーがコンソールで school の `messages` に `+tester` 名義の「通知テスト」を追加 →
+  test に「school ／ himari20051226+tester@gmail.comさん：通知テスト」が届いた → ③ 押すと **school のトーク画面が直接開き**、「戻る」で一覧 → ホーム →
+  ④ `+tester` に切り替えると、50-D で test が消した「Hello from test」が**相手の画面からも消えていた** → ⑤ `+tester` が送っても本人には通知が来ない（3 分待って確認）。
+  確認用の 2 発言は `+tester` で長押し→消した。`PERMISSION_DENIED` 0 件。エミュレータは test でログイン中。**これで Step 50（② 消す・新着の通知）は完了。**
+  💡 コンソールで `createdAt` を日付だけで入れると 0:00 になり、トークの先頭に並ぶ（並びは `createdAt` の順）。
+  💡 `dumpsys notification` の見出し・本文は `android.title=` / `android.text=` の行にある（`pkg=` の行から 20 行ほど下）
 
 - 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
   `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
