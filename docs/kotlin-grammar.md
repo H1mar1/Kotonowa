@@ -1545,6 +1545,37 @@ Modifier.imePadding()                                    // キーボードが�
 
 鍵を `messages.size` にしているので、**発言が増えたときだけ**下へスクロールする。入力欄に 1 文字打つたびに画面は描き直されるが、そのたびにスクロールはしない。
 
+### (149) 長押しと確認ダイアログ — `combinedClickable` / `AlertDialog` / `Modifier.then`
+
+```kotlin
+Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress)   // ふつうに押す・長押しを別々に受け取る
+Modifier.widthIn(max = 280.dp).then(
+    if (isMine) Modifier.combinedClickable(…) else Modifier           // 条件で飾りを足す／足さない
+)
+if (uiState.deleteTarget != null) {
+    AlertDialog(
+        onDismissRequest = onDismissDelete,                           // 外側・「戻る」で閉じようとした
+        title = { Text("この発言を消しますか？") },
+        text = { Text("…") },
+        confirmButton = { TextButton(onClick = onConfirmDelete) { Text("消す") } },
+        dismissButton = { TextButton(onClick = onDismissDelete) { Text("やめる") } },
+    )
+}
+```
+
+2026-11-24、Step 50-D で記録。
+
+| 書き方 | 意味 |
+|---|---|
+| `combinedClickable(onClick, onLongClick)` | 「押す」と「長押し」を別々の呼び鈴で受け取れる飾り。`clickable` は押すだけ。押すのに用が無いときは `onClick = {}`（何もしない） |
+| `.then(飾り)` | 飾りの鎖に、もう 1 つ飾りをつなぐ。`if` を式として使い（§5-㊳）、自分の発言なら長押し、違えば `Modifier`（何も足さない空の飾り）をつなぐ |
+| `AlertDialog(…)` | 画面の上に重ねて出す確認の小窓。**描かれている間だけ出る**ので、`if` で出す・出さないを決める（画面が「開いている」を覚えるのではなく、頭脳の箱 `deleteTarget` を見る。§3-(76)） |
+| `onDismissRequest` | 小窓の外を押した・端末の「戻る」を押したときに鳴る。ふつうは［やめる］と同じ呼び鈴を渡す |
+| `confirmButton` / `dismissButton` | 右側の「する」ボタン／左側の「やめる」ボタン。中身は自分で `TextButton` を置く |
+
+⚠️ `AlertDialog` は自分では閉じない。［消す］を押しても、頭脳が `deleteTarget = null` に戻すまで出たまま。
+閉じ忘れると、消し終わったのにダイアログが残る（`confirmDelete` の `onSuccess` / `onFailure` の両方で `null` に戻しているのはこのため）。
+
 ## §4 その他
 
 ### ⑮ `?:` — エルビス演算子
@@ -4031,6 +4062,36 @@ NotificationCompat.Builder(…)
 | `setContentIntent(…)` | 通知に「タップされたらこれ」を持たせる |
 
 ⚠️ `setContentIntent` を付けないと、タップしても**何も起きずに通知が消えるだけ**（`setAutoCancel(true)` のため）。
+
+
+### (150) 依頼書に一言添える — `putExtra` / `getStringExtra` / `savedInstanceState` / `rememberSaveable`
+
+```kotlin
+// 送る側（通知を出す係）
+val intent = Intent(this, MainActivity::class.java).apply {
+    putExtra(EXTRA_CHAT_CALENDAR_ID, chatCalendarId)        // 依頼書に「名札：値」を書き添える
+}
+PendingIntent.getActivity(this, notificationId, intent, FLAG_IMMUTABLE or FLAG_UPDATE_CURRENT)
+
+// 受け取る側（MainActivity の onCreate）
+val id: String? = if (savedInstanceState == null) intent.getStringExtra(EXTRA_CHAT_CALENDAR_ID) else null
+var chatToOpen by rememberSaveable { mutableStateOf(id) }
+```
+
+2026-11-24、Step 50-F で記録。
+
+| 書き方 | 意味 |
+|---|---|
+| `putExtra(名札, 値)` | 依頼書（`Intent`。§8-(139)）に、おまけの情報を「名札：値」で書き添える。Map（§4-㉟）に似た形 |
+| `intent.getStringExtra(名札)` | 開かれた Activity が、自分を開いた依頼書（`intent`）から文字を読む。**無ければ `null`**（型は `String?`） |
+| `EXTRA_〜` の名札 | 他のアプリの名札とぶつからないよう、アプリの名前（`com.example.kotonowa.`）から始める習慣がある |
+| `PendingIntent.getActivity` の 2 つ目（番号） | 包んだ依頼書を見分ける番号。**同じ番号・同じ行き先だと「同じもの」と見なされ**、書き添えた中身が古いままになる。通知ごとに違う番号にする |
+| `FLAG_UPDATE_CURRENT` | 同じものと見なされたときは、書き添えた中身を新しい方に書き換える |
+| `savedInstanceState` | Activity が**作り直されたとき**（画面を回したなど）だけ中身がある。`null` ＝ 初めて作られた |
+| `rememberSaveable { … }` | 画面を回して作り直されても値を覚えている `remember`。ふつうの `remember` は作り直しで最初の値に戻る |
+
+⚠️ 依頼書は Activity が作り直されても**同じものが残る**。`savedInstanceState == null` で「初めてのときだけ」読まないと、
+画面を回すたびに同じトークへ飛んでしまう。
 
 ---
 

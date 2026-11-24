@@ -1,6 +1,7 @@
 package com.example.kotonowa.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -120,6 +121,10 @@ private fun NavHostController.navigateToTab(tab: MainTab) {
 fun KotonowaNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
+    // Step 50：チャットの通知から開かれたときの、開きたいトークのカレンダー id（無ければ null）
+    openChatCalendarId: String? = null,
+    // Step 50：トークを開き終わったら鳴らす（MainActivity が null に戻す）
+    onChatOpened: () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -161,6 +166,18 @@ fun KotonowaNavHost(
         }
 
         composable(Routes.HOME) {
+            // Step 50：チャットの通知から開かれたら、ホームに着いたところでトーク画面へ進む（Claude が書いた）。
+            // ホームで待つのは、起動直後はスプラッシュ→ログイン確認→ホームと進むため（ログインしていなければホームに来ない）。
+            // 履歴は [HOME, CHAT_LIST, CHAT_ROOM] にする（「戻る」でトーク一覧 → ホーム）
+            LaunchedEffect(openChatCalendarId) {
+                val id = openChatCalendarId ?: return@LaunchedEffect
+                navController.navigateToTab(MainTab.CHAT)
+                // TODO(50-F-4) 誰の：地図の係（navController）の ／ 何をする：id を差し込んだトーク画面の住所へ行く
+                //   49-F-4 で書いた onRoomClick の中身と同じ 1 行
+                navController.navigate(Routes.chatRoom(id))
+                onChatOpened()
+            }
+
             CalendarScreen(
                 onAddClick = { navController.navigate((Routes.SCHEDULE_EDIT)) },
                 onItemClick = { id -> navController.navigate(Routes.scheduleDetail(id)) },

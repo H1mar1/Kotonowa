@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.model.ChatMessage
 import com.example.kotonowa.domain.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,6 +116,48 @@ class ChatRoomViewModel @Inject constructor(
                             isSending = false,
                             errorMessage = "送れませんでした"
                         )
+                    }
+                }
+        }
+    }
+
+    /**
+     * 吹き出しが長押しされた（Step 50）。自分の発言なら「消しますか？」のダイアログを開く。
+     * 画面は自分の吹き出しにしか長押しを付けないが、頭脳でも確かめる（ルールが最後の砦なのは変わらない）。
+     */
+    fun onMessageLongPress(message: ChatMessage) {
+        // TODO(50-C-2) 門番：この発言の送った人（message.senderUid）が、自分（_uiState.value.myUid）と違うなら、何もせず帰る
+        //   49-D-7 の「==」の逆で「!=」。49-D-5 の門番と同じく if (…) return の 1 行
+        if (message.senderUid != _uiState.value.myUid) return
+
+        // TODO(50-C-3) 誰の：状態の箱を ／ 何をする：deleteTarget を引数の message に書き換える（onInputChange と同じ形）
+        _uiState.update { it.copy(deleteTarget = message) }
+    }
+
+    /** ダイアログの［やめる］か、ダイアログの外が押された */
+    fun dismissDelete() {
+        // TODO(50-C-4) 誰の：状態の箱を ／ 何をする：deleteTarget を無し（null）に戻す（50-C-3 と同じ形。入れる値だけ違う）
+        _uiState.update { it.copy(deleteTarget = null) }
+    }
+
+    /** ダイアログの［消す］が押された（Claude が骨組みを書いた。send() と同じ形） */
+    fun confirmDelete() {
+        val state = _uiState.value
+        // 確認中の発言が無い・消している途中なら何もしない
+        val target = state.deleteTarget ?: return
+        if (state.isDeleting) return
+
+        _uiState.update { it.copy(isDeleting = true, errorMessage = null) }
+
+        viewModelScope.launch {
+            // TODO(50-C-5) 誰の：チャットの窓口（chatRepository）の ／ 何をする：このカレンダー（calendarId）から、確認中の発言（target）の id の発言を消す
+            //   send() の 49-D-6 と同じ形。2 つ目の引数は発言そのものではなく、その id
+            chatRepository.deleteMessage(calendarId,target.id)
+                // 消えた吹き出しは見張りから自然に消える（Step 18 と同じ）。ダイアログを閉じるだけ
+                .onSuccess { _uiState.update { it.copy(isDeleting = false, deleteTarget = null) } }
+                .onFailure {
+                    _uiState.update {
+                        it.copy(isDeleting = false, deleteTarget = null, errorMessage = "消せませんでした")
                     }
                 }
         }
