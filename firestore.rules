@@ -61,6 +61,38 @@ service cloud.firestore {
         && request.resource.data.get('displayName', null) in [null, request.auth.token.get('name', null)];
     }
 
+    // 新しい発言の中身が正しいか（Step 49 で書いた条件を、Step 51 で DM と共有するため関数にした）
+    function isValidNewMessage() {
+      // 書いてよい項目はこの 4 つだけ（余計な項目を足させない）
+      return request.resource.data.keys().hasOnly(['senderUid', 'senderName', 'text', 'createdAt'])
+        // 送り主は自分。名前は通行証の名前かメール（他人の名前を名乗らせない。Step 46 の isOwnNameAndEmail と同じ考え方）
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderName in [request.auth.token.get('name', null), request.auth.token.email]
+        // 本文は 1〜1000 文字の文字列
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000
+        // 時刻はサーバーの時刻（serverTimestamp）だけ。端末の時計で過去・未来の発言を作らせない
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // DM の部屋の id（「小さい uid_大きい uid」）の中に自分がいるか（Step 51-D）。
+    // 部屋の書類が「まだ無い」ときでも判定できる（id だけを見るので、書類を読まなくてよい）
+    function isInDmId(chatId) {
+      return request.auth.uid in chatId.split('_');
+    }
+
+    // DM の部屋の id から、自分ではない方（相手）の uid を取り出す（Step 51-D）
+    function dmOtherUid(chatId) {
+      let uids = chatId.split('_');
+      return uids[0] == request.auth.uid ? uids[1] : uids[0];
+    }
+
+    // 今ある DM の部屋の 2 人に、自分が入っているか（Step 51-D。発言の読み書きで使う）
+    function isDmMember(chatId) {
+      return request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.memberUids;
+    }
+
     // ---- users（Step 28 / 46） ----
 
     // 名刺は本人だけが読める（Step 46）。他人のメール・fcmTokens・mutedCalendarIds を読ませない。
@@ -160,19 +192,10 @@ service cloud.firestore {
         allow read: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
 
+        // 中身の条件は上の isValidNewMessage（DM と共有）
         allow create: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids
-          // 書いてよい項目はこの 4 つだけ（余計な項目を足させない）
-          && request.resource.data.keys().hasOnly(['senderUid', 'senderName', 'text', 'createdAt'])
-          // 送り主は自分。名前は通行証の名前かメール（他人の名前を名乗らせない。Step 46 の isOwnNameAndEmail と同じ考え方）
-          && request.resource.data.senderUid == request.auth.uid
-          && request.resource.data.senderName in [request.auth.token.get('name', null), request.auth.token.email]
-          // 本文は 1〜1000 文字の文字列
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 1000
-          // 時刻はサーバーの時刻（serverTimestamp）だけ。端末の時計で過去・未来の発言を作らせない
-          && request.resource.data.createdAt == request.time;
+          && isValidNewMessage();
 
         // 書き換えは誰にもさせない（「削除されました」と残す形は採らなかった。Step 50）
         allow update: if false;
@@ -183,6 +206,60 @@ service cloud.firestore {
         allow delete: if request.auth != null
           && resource.data.senderUid == request.auth.uid
           && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
+      }
+    }
+
+    // ---- directChats（Phase 5 / Step 51-D） ----
+    // DM の部屋。読み書きできるのは部屋の 2 人だけ。
+    // 「共有カレンダーを一緒にしているか」は作るときだけ確かめる。作ったあとは、どちらかがカレンダーを抜けても続けられる（要件定義書 §3.6）
+    // lastMessageText / lastMessageAt はサーバーの関数（51-E）が管理者の権限で書くので、アプリからの書き換えは許さない
+
+    match /directChats/{chatId} {
+      // 1 件を読む（openDirectChat の「もうあるか」）。まだ無い部屋も読めるよう、書類ではなく id で判定する
+      allow get: if request.auth != null && isInDmId(chatId);
+
+      // 一覧を見張る（observeMyDirectChats）。アプリは「memberUids に自分が入っている」で絞るので、それと同じ条件
+      allow list: if request.auth != null
+        && request.auth.uid in resource.data.memberUids;
+
+      allow create: if request.auth != null
+        && isInDmId(chatId)
+        // id は「小さい uid_大きい uid」の形だけ（2 人に分けられて、並び順が正しい。自分どうしの部屋も作れない）
+        && chatId.split('_').size() == 2
+        && chatId.split('_')[0] < chatId.split('_')[1]
+        // 書いてよい項目はこの 4 つだけ（最後の発言は関数が書く）
+        && request.resource.data.keys().hasOnly(['memberUids', 'memberNames', 'viaCalendarId', 'createdAt'])
+        // 中身の 2 人は、id の 2 人と同じ
+        && request.resource.data.memberUids.size() == 2
+        && request.resource.data.memberUids.hasAll(chatId.split('_'))
+        // 2 人とも、viaCalendarId の共有カレンダーのメンバー（マイカレンダーは書類が無いので、ここで「いいえ」になる）
+        && get(/databases/$(database)/documents/calendars/$(request.resource.data.viaCalendarId)).data.memberUids.hasAll(chatId.split('_'))
+        // 名前の表は 2 人分だけ
+        && request.resource.data.memberNames.keys().hasOnly(chatId.split('_'))
+        // 自分の名前は通行証の名前かメール（発言の senderName と同じ）
+        && request.resource.data.memberNames[request.auth.uid] in [request.auth.token.get('name', null), request.auth.token.email]
+        // 相手の名前は、そのカレンダーの名簿の行に写してある名前かメール（他人の名前をでっち上げさせない）
+        && request.resource.data.memberNames[dmOtherUid(chatId)] in [
+             get(/databases/$(database)/documents/calendars/$(request.resource.data.viaCalendarId)/members/$(dmOtherUid(chatId))).data.get('displayName', null),
+             get(/databases/$(database)/documents/calendars/$(request.resource.data.viaCalendarId)/members/$(dmOtherUid(chatId))).data.get('email', null)
+           ]
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+
+      // DM の発言。グループの messages と同じ形で、「部屋のメンバーか」の見方だけ違う
+      match /messages/{messageId} {
+        allow read: if request.auth != null && isDmMember(chatId);
+
+        allow create: if request.auth != null
+          && isDmMember(chatId)
+          && isValidNewMessage();
+
+        allow update: if false;
+
+        allow delete: if request.auth != null
+          && resource.data.senderUid == request.auth.uid
+          && isDmMember(chatId);
       }
     }
 

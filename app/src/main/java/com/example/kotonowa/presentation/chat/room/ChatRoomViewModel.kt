@@ -1,11 +1,13 @@
 package com.example.kotonowa.presentation.chat.room
 
+import androidx.compose.ui.graphics.vector.Group
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
 import com.example.kotonowa.domain.model.ChatMessage
+import com.example.kotonowa.domain.model.ChatRoomId
 import com.example.kotonowa.domain.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,12 @@ class ChatRoomViewModel @Inject constructor(
     // トーク画面は必ず calendarId 付きで開かれるので、無ければ navigate の書き間違い＝バグ（Step 18-B と同じ）
     private val calendarId: String = checkNotNull(savedStateHandle["calendarId"])
 
+    // 窓口に渡す「どのトークか」の札（Step 51-B）。今はグループだけなので、calendarId をグループの札で包む。
+    // calendarId は上のバーのカレンダー名を読む（loadTitle）ためにも残す。DM で開く形は 51-F で足す
+    // TODO(51-B-4) グループの札（ChatRoomId の Group）を、上の calendarId で作る
+    //   作り方は data class の作り方と同じ：型の名前(中身)。入れ子なので「親の名前.子の名前」で呼ぶ（ScheduleItem.Event と同じ）
+    private val roomId: ChatRoomId = ChatRoomId.Group(calendarId)
+
     // 自分の uid は最初に 1 回入れておく（画面が「自分の発言か」を判定するため）
     private val _uiState =
         MutableStateFlow(ChatRoomUiState(myUid = authRepository.currentUser?.uid))
@@ -62,7 +70,8 @@ class ChatRoomViewModel @Inject constructor(
     private fun observeMessages() {
         viewModelScope.launch {
             try {
-                chatRepository.observeMessages(calendarId).collect { messages ->
+                // TODO(51-B-5) 窓口の 3 つの係に渡すものを、calendarId から 51-B-4 の札に変える（この行・send・confirmDelete の 3 か所）
+                chatRepository.observeMessages(roomId).collect { messages ->
                     // TODO(49-D-3) 誰の：状態の箱を ／ 何をする：messages を流れてきた messages に、isLoading を false に書き換える
                     //   TaskListViewModel の collect の中の 1 行と同じ形（名前が rows → messages に変わるだけ）
                     _uiState.update { it.copy(messages = messages, isLoading = false) }
@@ -106,7 +115,7 @@ class ChatRoomViewModel @Inject constructor(
 
         viewModelScope.launch {
             // TODO(49-D-6) 誰の：チャットの窓口（chatRepository）の ／ 何をする：このカレンダー（calendarId）に、本文 text を送る
-            chatRepository.sendMessage(calendarId, text)
+            chatRepository.sendMessage(roomId, text)
                 // 送れたら入力欄を空にする（送ったのに文字が残っていると、もう一度送ってしまう）
                 .onSuccess { _uiState.update { it.copy(isSending = false, input = "") } }
                 // 送れなかったら、打った文字は残したまま一言だけ出す（打ち直さなくてよいように）
@@ -152,7 +161,7 @@ class ChatRoomViewModel @Inject constructor(
         viewModelScope.launch {
             // TODO(50-C-5) 誰の：チャットの窓口（chatRepository）の ／ 何をする：このカレンダー（calendarId）から、確認中の発言（target）の id の発言を消す
             //   send() の 49-D-6 と同じ形。2 つ目の引数は発言そのものではなく、その id
-            chatRepository.deleteMessage(calendarId,target.id)
+            chatRepository.deleteMessage(roomId, target.id)
                 // 消えた吹き出しは見張りから自然に消える（Step 18 と同じ）。ダイアログを閉じるだけ
                 .onSuccess { _uiState.update { it.copy(isDeleting = false, deleteTarget = null) } }
                 .onFailure {

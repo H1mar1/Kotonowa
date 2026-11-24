@@ -166,6 +166,11 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
   - 新着の通知は Cloud Functions `notifyChatMessage`（発言の作成で動く）。宛先は送った本人以外のメンバー、
     見出し＝カレンダー名・本文＝「○○さん：本文」。通知設定でそのカレンダーを止めている人には送らない（`sendToUser` の `calendarId`）
   - 通知を**タップするとそのトーク画面を開く**。通知の `data` に `calendarId` を載せ、`MainActivity` → `NavHost` で `chat_room/{calendarId}` へ
+- **③ DM（Step 51。2026-11-24 にユーザーが選択）**
+  - 相手の名前は、DM の部屋を作るときに**部屋の書類へ 2 人分写す**（`memberNames`。名簿の行の `displayName` → 無ければ `email`）。カレンダーを抜けても名前は残る
+  - 「共有カレンダーを一緒にしている」を確かめるのは**部屋を作るときだけ**。作ったあとは、どちらかがそのカレンダーを抜けても読み書きを続けられる（ルールは「部屋の 2 人か」だけを見る）
+  - DM の新着通知は**いつも届く**（招待と同じ。通知設定の ON/OFF の対象外）
+  - 入口はメンバー画面の他の人の行の［メッセージ］。部屋が無ければ作ってから開く
 
 ---
 
@@ -181,7 +186,7 @@ Phase2 のUI実装時に、必要なメッセージが出揃ってからまと�
 | `events` | トップレベル（calendarId参照） | eventId, calendarId, type(event/task), title, description, startAt, endAt, allDay, dueAt, isCompleted, sortAt, createdBy, reminderMinutesBefore, updatedAt |
 | `invites` | トップレベル | inviteId, calendarId, **calendarName**, invitedEmail, role, status, invitedBy, createdAt |
 | `calendars/{calendarId}/messages`（Phase 5 案） | サブコレクション | messageId, senderUid, senderName, text, attachedItemId?, createdAt |
-| `directChats`（Phase 5 案） | トップレベル | chatId（2 人の uid を小さい順に `_` でつなぐ）, memberUids[2], viaCalendarId, lastMessageText, lastMessageAt, createdAt |
+| `directChats`（Phase 5） | トップレベル | chatId（2 人の uid を小さい順に `_` でつなぐ）, memberUids[2], **memberNames{uid: 名前}**, viaCalendarId, lastMessageText, lastMessageAt, createdAt |
 | `directChats/{chatId}/messages`（Phase 5 案） | サブコレクション | グループの messages と同じ |
 
 **設計メモ**

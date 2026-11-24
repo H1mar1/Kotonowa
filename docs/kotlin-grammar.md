@@ -3051,6 +3051,48 @@ getTimestamp(FIELD_CREATED_AT, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
 | `ServerTimestampBehavior.ESTIMATE` | 読むときに、サーバーの時刻がまだ付いていなければ**見込みの時刻**を入れる | 送った直後、自分の端末には書類が先に届く（Firestore の「待たずに見せる」仕組み）。その瞬間は時刻が `null` なので、そのままだと組み立てに失敗して自分の発言が一瞬消える |
 | `doc.id` | 書類の住所そのもの | `getString("id")` は中身に書いた `id` を読む。`add` で作った書類は中身に `id` を書いていないので、住所の方を読む |
 
+### (151) 2 人から決まる住所 `sorted().joinToString("_")` ／ 表（Map）を保存する・読む（2026-11-24、Step 51-C で追記）
+
+**① DM の部屋の id を作る。**
+
+```kotlin
+val chatId = listOf(me.uid, otherUid).sorted().joinToString("_")
+// 自分 "bbb"・相手 "aaa" → ["bbb", "aaa"] → ["aaa", "bbb"] → "aaa_bbb"
+```
+
+| 部分 | 意味 |
+|---|---|
+| `listOf(a, b)` | 2 つを並べたリストを作る |
+| `.sorted()` | 小さい順（文字なら辞書の順）に並べ替えた**新しい**リスト（`sortedBy { }` の、基準が中身そのもの版。§4 の `sortedBy` と同じく元は変わらない） |
+| `.joinToString("_")` | 中身を `"_"` を挟んでつなげ、1 つの文字にする |
+
+**なぜ並べ替えるのか。** A さんが開くと `[A, B]`、B さんが開くと `[B, A]` になる。そのままつなぐと
+`A_B` と `B_A` の 2 部屋ができてしまう。**先に順番を決めてしまえば、誰が開いても同じ住所**になる
+（招待状の id を `「カレンダーid」_「メール」` に決めたのと同じ考え方。Step 36-A）。
+
+**② 表（Map）を書類の 1 項目として保存する。**
+
+```kotlin
+FIELD_MEMBER_NAMES to mapOf(me.uid to myName, otherUid to otherName)
+// Firestore では memberNames: { "aaa": "たろう", "bbb": "はなこ" } という「項目の中の表」になる
+```
+
+`mapOf` の中の `to` は「名札 to 値」（§4 の `mapOf` と同じ）。ここでは名札が uid、値が名前。
+
+**③ 表を読む。** `getString` のような専用の取り出し口が無いので、配列（§4-(141)）と同じく `as?` で受ける。
+
+```kotlin
+val memberNames = get(FIELD_MEMBER_NAMES) as? Map<*, *>        // 表でなければ null
+val name = memberNames?.get(otherUid) as? String ?: "（名前未登録）"
+```
+
+| 部分 | 意味 |
+|---|---|
+| `Map<*, *>` | 「名札も値も型が分からない表」。`*` は何でも |
+| `表?.get(名札)` | その名札の値を引く。無ければ `null`（表そのものが `null` なら `?.` で止まる） |
+| `as? String` | 値を文字として扱ってみる。文字でなければ `null` |
+| `?: "（名前未登録）"` | どこかで `null` になったら、この文字 |
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行

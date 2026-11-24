@@ -932,6 +932,37 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   「＜」・端末の「戻る」で一覧へ、トーク画面には下のタブが出ない、タブを何度行き来しても「戻る」1 回でホーム。ログイン後の `PERMISSION_DENIED` は 0 件（ログアウトの瞬間の分は Step 28 の 💡 と同じ）。
   確認用の 2 発言は school のトークに残してある。**これで Step 49（① グループで送る・読む）は完了。**
 
+#### Step 51 の内訳（③ DM）
+
+**設計（2026-11-24 にユーザーが選択。要件定義書 §3.6・§4）。** 相手の名前は部屋に写す（`memberNames`）／「一緒のカレンダーか」は作るときだけ確かめ、抜けても続けられる／DM の通知はいつも届く。
+部屋は `directChats/{小さいuid_大きいuid}`、発言は `directChats/{id}/messages`（グループと同じ項目）。トーク画面・消す・通知は ② の仕組みを使い回す。
+「どのトークか」をグループと DM で同じ窓口に渡せるよう、**`ChatRoomId`（sealed interface：`Group(calendarId)` / `Direct(chatId)`）**で表す。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 51-A | `domain/model/ChatRoomId`（sealed）＋ `DirectChat` | ✅ 11-24（51-A-1 の名前の直しは Claude） |
+| 51-B | 窓口の発言 3 つ（見張る・送る・消す）を `ChatRoomId` で受け取るように（約束・実装・トーク画面の頭脳） | ✅ 11-24（51-B-2/5 の直しは Claude。Claude が adb で school の読む・送る・消すを確認、`PERMISSION_DENIED` 0 件） |
+| 51-C | 窓口：`openDirectChat`（無ければ作る）・`observeMyDirectChats` ＋ 実装 | ✅ 11-24（51-C-7/8 の直しは Claude。ビルド通過・実機は 51-G 後） |
+| 51-D | ルール：`directChats` と その `messages`（Claude）＋公開 | ✅ 11-24 公開済み（グループの送る・消すが引き続き通ることを adb で確認） |
+| 51-E | Functions：DM の新着通知＋グループ・DM の `lastMessageText` / `lastMessageAt` を書く（Claude）＋公開 | |
+| 51-F | トーク画面を DM でも開く（`Routes` の `dm_room/{chatId}`・頭脳の題名） | |
+| 51-G | メンバー画面の他の人の行に［メッセージ］ | |
+| 51-H | トーク一覧にグループと DM を混ぜて、新しい発言の順に並べる | |
+| 51-I | DM の通知を押したらその DM を開く | |
+| 51-J | 実機確認 | |
+
+- 51-A で踏んだところ：`Group(val chatRoomId: ChatRoomId)`（札の中に札。`calendarId` がどこにも無い）、`Direct(val chat: DirectChat)`（部屋を丸ごと。住所や通知には id の文字しか無い）、
+  `Group(val ChatMessage: String)`（お手本のファイル名を名前の欄に写した）。**どれもビルドが通る**。`val 名前: 型` の名前は「何が入っているか」
+- 51-B で踏んだところ：`.document(ChatRoomId.Group)`（封筒の**型の名前**を渡した。欲しいのは今の札の中身 `roomId.calendarId`）、
+  `sendMessage(ChatRepository=calendarId, text)`（`名前 =` は名前付き引数の書き方で、左は**引数の名前**。型の名前ではない）、`observeMessages()`（空のまま）。
+  グループか DM かを見分けるのは `messagesOf` の `when` 1 か所だけ（3 つの係はそこを通る）
+- 51-C で踏んだところ（どれもビルドが通る）：`memberUids to me.uid`（2 人の並びでなく自分 1 人。相手の一覧に出ず、`as? List` で壊れた書類扱い）、
+  `memberNames to me.chatName()`（表でなく名前 1 つ）、`lastMessageText` に `?: throw`（作ったばかりの部屋が `runCatching` で黙って捨てられ一覧に出ない）。
+  ビルドで止まったもの：戻り値の `Result` 抜け、`firstOrNull {memberUids -> me}`（比べていない・`me` は別の係の箱）、`getTimestamp(toChatMessage())`（名札ではなく係の呼び出し）
+- 51-D：部屋は `get`（id の `split('_')` に自分がいるか。まだ無い部屋も読める）と `list`（`memberUids` に自分）を分けた。`create` は id の形（2 つ・小さい順）、
+  2 人とも `viaCalendarId` のメンバー、自分の名前は通行証・相手の名前は名簿の行と照合。発言の中身の条件は `isValidNewMessage()` にまとめてグループと共有。
+  ⚠️ 名簿の行に名前もメールも無い相手とは DM を作れない（Step 46 より前の行）
+
 #### Step 50 の内訳（② 消す・新着の通知）
 
 **設計（2026-11-24 にユーザーが選択。要件定義書 §3.6）。** 跡を残さず消す／自分の吹き出しの長押し → 確認ダイアログ／通知をタップするとそのトーク画面。
