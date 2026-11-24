@@ -17,6 +17,8 @@ import com.example.kotonowa.presentation.calendar.edit.ScheduleEditScreen
 import com.example.kotonowa.presentation.calendarlist.CalendarListScreen
 import com.example.kotonowa.presentation.calendarlist.create.CalendarCreateScreen
 import com.example.kotonowa.presentation.calendarlist.members.MemberListScreen
+import com.example.kotonowa.presentation.chat.list.ChatListScreen
+import com.example.kotonowa.presentation.chat.room.ChatRoomScreen
 import com.example.kotonowa.presentation.common.MainBottomBar
 import com.example.kotonowa.presentation.common.MainTab
 import com.example.kotonowa.presentation.invites.InviteListScreen
@@ -71,20 +73,37 @@ object Routes {
     // Step 47-E: タスク一覧画面の住所。id は要らない（全カレンダーのタスクは頭脳がログイン情報から集める）
     // TODO(47-E-4) NOTIFICATION_SETTINGS と同じ形。名前は TASKS、中身の文字は "tasks"
     const val TASKS = "tasks"
+
+    // Step 49-F: トーク一覧の住所。id は要らない（入っているカレンダーは頭脳がログイン情報から集める）
+    // TODO(49-F-2) TASKS と同じ形。名前は CHAT_LIST、中身の文字は "chat_list"
+    const val CHAT_LIST="chat_list"
+
+    // Step 49-F: トーク画面の住所。どのカレンダーのトークかを id で受け取る（CALENDAR_MEMBERS / calendarMembers と同じ形）
+    //   { } の中の名前は、ChatRoomViewModel が savedStateHandle["calendarId"] で受け取る名前と同じ綴りにする
+    const val CHAT_ROOM = "chat_room/{calendarId}"
+
+    // TODO(49-F-3) 誰の：この関数の ／ 何をする：受け取った id を住所の文字に差し込む（calendarMembers と同じ形。§6-㉖）
+    fun chatRoom(calendarId: String) = "chat_room/$calendarId"
 }
 
 /**
  * 下のタブが押されたときの行き先（Step 47-E。grammar §3-(146)）。Claude が書いた。
  *
- * 履歴はいつも [HOME] か [HOME, TASKS] のどちらかにする（タブを押すたびに積み上げない）。
+ * 履歴はいつも [HOME] か [HOME, TASKS] か [HOME, CHAT_LIST] にする（タブを押すたびに積み上げない）。
  *  ・カレンダー … HOME まで戻る（HOME は消さない）
- *  ・タスク … HOME より上を片付けてから TASKS へ。すでに TASKS が一番上なら作り直さない
+ *  ・タスク／チャット … HOME より上を片付けてから行く。すでにそれが一番上なら作り直さない
+ *    （トーク画面 [HOME, CHAT_LIST, CHAT_ROOM] からタスクへ行くときも、トーク画面ごと片付く）
  * 地図の係（NavHostController）に足した拡張関数なので、navController.navigateToTab(tab) と呼べる（§4-㊱）。
  */
 private fun NavHostController.navigateToTab(tab: MainTab) {
     when (tab) {
         MainTab.CALENDAR -> popBackStack(Routes.HOME, inclusive = false)
         MainTab.TASKS -> navigate(Routes.TASKS) {
+            popUpTo(Routes.HOME)
+            launchSingleTop = true
+        }
+        // Step 49-F（Claude が書いた）。タスクと同じ形で、行き先だけ CHAT_LIST
+        MainTab.CHAT -> navigate(Routes.CHAT_LIST) {
             popUpTo(Routes.HOME)
             launchSingleTop = true
         }
@@ -174,6 +193,35 @@ fun KotonowaNavHost(
                         onTabSelected = { tab -> navController.navigateToTab(tab) },
                     )
                 },
+            )
+        }
+
+        // Step 49-F: トーク一覧（下のタブの 3 つ目）。お手本はすぐ上の TASKS
+        composable(Routes.CHAT_LIST) {
+            ChatListScreen(
+                // TODO(49-F-4) 誰の：地図の係（navController）の ／ 何をする：押された行の id を差し込んだトーク画面の住所へ行く
+                //   住所は 49-F-3 の chatRoom で作る。お手本は TASKS の onItemClick（scheduleDetail が chatRoom に変わる）
+                onRoomClick = { id -> navController.navigate(Routes.chatRoom(id)) },
+                bottomBar = {
+                    MainBottomBar(
+                        // TODO(49-F-5) ここはチャット画面。選ばれているのはどのタブか（TASKS の bottomBar と比べる）
+                        selected = MainTab.CHAT,
+                        onTabSelected = { tab -> navController.navigateToTab(tab) },
+                    )
+                },
+            )
+        }
+
+        // Step 49-F: トーク画面。お手本は下の CALENDAR_MEMBERS（id の穴がある住所）。下のタブは出さない（LINE と同じ）
+        composable(
+            route = Routes.CHAT_ROOM,
+            arguments = listOf(
+                // TODO(49-F-6) 穴の名前と、中身が文字であること（34-D-7 と同じ形。名前は CHAT_ROOM の { } の中と同じ綴り）
+                navArgument("calendarId") { type = NavType.StringType },
+            ),
+        ) {
+            ChatRoomScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

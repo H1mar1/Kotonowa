@@ -7,11 +7,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.kotonowa.ui.theme.KotonowaTheme
 
-/** 画面の下のタブの種類（Step 47-E）。2 択でも enum にすると、名前で読める（47-B の TaskFilter と同じ） */
-enum class MainTab { CALENDAR, TASKS }
+/**
+ * 画面の下のタブの種類（Step 47-E）。2 択でも enum にすると、名前で読める（47-B の TaskFilter と同じ）。
+ * Step 49-F で CHAT（チャット）を足した。足すと `when (tab)` の枝が足りない所がビルドで止まるので、直し忘れない。
+ */
+enum class MainTab { CALENDAR, TASKS, CHAT }
 
 /**
- * 画面の下の「カレンダー／タスク」のタブ（Step 47-E。grammar §3-(145)）。
+ * 画面の下の「カレンダー／タスク／チャット」のタブ（Step 47-E。grammar §3-(145)）。
  *
  * カレンダー画面とタスク画面の両方の Scaffold の bottomBar に置く。
  * どちらが選ばれているかは外から受け取り、押されたら呼び鈴を鳴らすだけ。行き先は知らない（NavHost が決める）。
@@ -39,6 +42,14 @@ fun MainBottomBar(
             onClick = { onTabSelected(MainTab.TASKS) },
             icon = { Text("✅") },
             label = { Text("タスク") },
+        )
+        NavigationBarItem(
+            // TODO(49-F-1) 47-E-3 の「チャット」版。選ばれているか：selected が MainTab.CHAT と同じか ／
+            //   押されたら：誰の：呼び鈴 onTabSelected を ／ 何をする：「チャット」を渡して鳴らす
+            selected = selected== MainTab.CHAT,
+            onClick = { onTabSelected(MainTab.CHAT) },
+            icon = { Text("💬") },
+            label = { Text("チャット") },
         )
     }
 }
