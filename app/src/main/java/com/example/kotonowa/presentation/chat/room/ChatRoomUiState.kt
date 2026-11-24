@@ -16,10 +16,10 @@ import com.example.kotonowa.domain.model.ChatMessage
 data class ChatRoomUiState(
     val title: String = "",
     // TODO(49-D-1) 発言の並び。型は ChatMessage の並び、最初は空の並び（TaskListUiState の rows と同じ形）
-    val messages: ____ = ____,
+    val messages: List<ChatMessage> =emptyList(),
     val myUid: String? = null,
     // TODO(49-D-2) 入力欄の文字。最初は何も打っていない（空の文字）
-    val input: String = ____,
+    val input: String = "",
     val isSending: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,

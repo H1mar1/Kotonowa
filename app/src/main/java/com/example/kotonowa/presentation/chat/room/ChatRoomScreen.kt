@@ -128,7 +128,7 @@ private fun ChatRoomContent(
                 ) {
                     items(uiState.messages, key = { message -> message.id }) { message ->
                         // TODO(49-D-7) 自分の発言か：この発言の送った人の uid が、状態の myUid と同じか（==）
-                        val isMine = ____
+                        val isMine = message.senderUid == uiState.myUid
                         MessageBubble(message = message, isMine = isMine)
                     }
                 }
@@ -146,7 +146,7 @@ private fun MessageBubble(message: ChatMessage, isMine: Boolean) {
         modifier = Modifier.fillMaxWidth(),
         // TODO(49-D-8) 横の寄せ方：自分の発言なら右（Arrangement.End）、そうでなければ左（Arrangement.Start）
         //   if は「答えを返す式」として使える（grammar §5-㊳。38-B の色の出し分けと同じ形：if (条件) A else B）
-        horizontalArrangement = ____,
+        horizontalArrangement = if(isMine) Arrangement.End else Arrangement.Start,
     ) {
         Column(
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
@@ -202,8 +202,8 @@ private fun InputBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     // TODO(49-D-9) 今の値と、変化の返し先（MemberListScreen の招待のメール欄と同じ形）
-                    value = ____,
-                    onValueChange = ____,
+                    value = input,
+                    onValueChange = onInputChange,
                     placeholder = { Text("メッセージ") },
                     // 長い文は 4 行まで広がり、それ以上は欄の中でスクロール
                     maxLines = 4,
@@ -211,7 +211,7 @@ private fun InputBar(
                 )
                 Button(
                     // TODO(49-D-10) 押されたら：呼び鈴 onSend を（渡すだけなので () は付けない。Step 35-E の ⚠️）
-                    onClick = ____,
+                    onClick = onSend,
                     // 送っている途中・空白だけのときは押せない
                     enabled = !isSending && input.isNotBlank(),
                     modifier = Modifier.padding(start = 8.dp),

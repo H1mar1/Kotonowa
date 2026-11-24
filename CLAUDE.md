@@ -916,17 +916,13 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 49-A | `domain/model/ChatMessage` ＋ `domain/repository/ChatRepository` | ✅ 11-23 |
 | 49-B | `data/repository/ChatRepositoryImpl`（`calendars/{id}/messages`）＋ `RepositoryModule` | ✅ 11-24（49-B-2 の直しは Claude） |
 | 49-C | ルール：`messages` の `read` / `create`（メンバー・送り主は本人）（Claude）＋公開 | ✅ 11-24 公開済み |
-| 49-D | トーク画面（`presentation/chat/room/`。UiState / ViewModel / Screen） | 🔧 骨組みを作成（穴 11 か所。自動スクロール・入力欄の配置は Claude） |
+| 49-D | トーク画面（`presentation/chat/room/`。UiState / ViewModel / Screen） | ✅ 11-24（自動スクロール・入力欄の配置と 49-D-7 の直しは Claude。ビルド通過） |
 | 49-E | トーク一覧（`presentation/chat/list/`。入っている共有カレンダーを並べる） | |
 | 49-F | 下のタブの 3 つ目＋ `Routes` ＋ `NavHost` | |
 | 49-G | 実機確認（2 アカウントで送り合う） | |
 
-- ⏸ **再開メモ（2026-11-24 中断）。** 49-D の穴埋め 11 か所（`presentation/chat/room/` の 3 ファイル）が未記入のまま WIP コミットした（**ビルドは通らない**）。
-  再開したら、まず 49-D の説明（§2.6 の順。新しい文法は §3-(148)）と穴の表を表示してから進める：
-  UiState（49-D-1/2：`messages` の型と空の並び・`input` の空文字）、ViewModel（49-D-3 `collect` で `messages`/`isLoading` を更新・49-D-4 `input` を更新・
-  49-D-5 門番 `text.isEmpty() || state.isSending`・49-D-6 `chatRepository.sendMessage(calendarId, text)`）、
-  Screen（49-D-7 `isMine`・49-D-8 `if (isMine) Arrangement.End else Arrangement.Start`・49-D-9 入力欄の `value`/`onValueChange`・49-D-10 `onClick = onSend`）。
-  そのあと 49-E（トーク一覧）→ 49-F（下のタブ 3 つ目＋`Routes`＋`NavHost`）→ 49-G（2 アカウントで実機確認）
+- 49-D で踏んだところ：`input: String = null` → `String?` に変えて消そうとした（型を緩めると使う側の `trim()`・`InputBar` が止まる。0 文字の文字は `""`）、
+  `val isMine = uiState.myUid`（比べずに uid そのものを入れた。発言ごとに変わる答えには `message.senderUid ==` が要る）
 
 - 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
   `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
