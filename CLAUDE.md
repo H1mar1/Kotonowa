@@ -919,7 +919,7 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 49-D | トーク画面（`presentation/chat/room/`。UiState / ViewModel / Screen） | ✅ 11-24（自動スクロール・入力欄の配置と 49-D-7 の直しは Claude。ビルド通過） |
 | 49-E | トーク一覧（`presentation/chat/list/`。入っている共有カレンダーを並べる） | ✅ 11-24（49-E-2/3 の直しは Claude。ビルド通過） |
 | 49-F | 下のタブの 3 つ目＋ `Routes` ＋ `NavHost` | ✅ 11-24（`MainTab.CHAT`・`navigateToTab` の枝と 49-F-3/4/6 の直しは Claude。ビルド通過） |
-| 49-G | 実機確認（2 アカウントで送り合う） | |
+| 49-G | 実機確認（2 アカウントで送り合う） | ✅ 11-24（Claude が adb で操作） |
 
 - 49-D で踏んだところ：`input: String = null` → `String?` に変えて消そうとした（型を緩めると使う側の `trim()`・`InputBar` が止まる。0 文字の文字は `""`）、
   `val isMine = uiState.myUid`（比べずに uid そのものを入れた。発言ごとに変わる答えには `message.senderUid ==` が要る）
@@ -927,6 +927,10 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   正しい行を穴の中に書き足して古い行を残した（入れ子になり `collect` が 3 つのエラーに化けた）。画面側の 3 か所は一発で正解
 - 49-F で踏んだところ：`"chatRoom/$calendarId"`（`CHAT_ROOM` の `chat_room/` と綴りが違い、押すと行き先が無い）、`navArgument("chatRoom")`（`{ }` の中の名前ではなく画面の名前）、
   `navigate(Routes.chatRoom(id) }`（`)` が 1 つ足りない）。前 2 つはビルドが通る。**`" "` の中は上下に並べて 1 文字ずつ見比べる**
+- **49-G（2026-11-24）。** test で 💬 → 一覧に school（青い丸）→ 空の案内 →「Hello from test」を送信（右・色付き・入力欄が空に・［送信］が押せなくなる）。
+  `+tester@gmail.com` に切り替えると左・灰色に名前 `test@example.com` 付きで見え、「Reply from tester」を返す → test に戻ると相手の発言に `+tester` のメールが付いて届いていた。
+  「＜」・端末の「戻る」で一覧へ、トーク画面には下のタブが出ない、タブを何度行き来しても「戻る」1 回でホーム。ログイン後の `PERMISSION_DENIED` は 0 件（ログアウトの瞬間の分は Step 28 の 💡 と同じ）。
+  確認用の 2 発言は school のトークに残してある。**これで Step 49（① グループで送る・読む）は完了。**
 
 - 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
   `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
