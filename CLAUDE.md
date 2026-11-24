@@ -918,13 +918,15 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 49-C | ルール：`messages` の `read` / `create`（メンバー・送り主は本人）（Claude）＋公開 | ✅ 11-24 公開済み |
 | 49-D | トーク画面（`presentation/chat/room/`。UiState / ViewModel / Screen） | ✅ 11-24（自動スクロール・入力欄の配置と 49-D-7 の直しは Claude。ビルド通過） |
 | 49-E | トーク一覧（`presentation/chat/list/`。入っている共有カレンダーを並べる） | ✅ 11-24（49-E-2/3 の直しは Claude。ビルド通過） |
-| 49-F | 下のタブの 3 つ目＋ `Routes` ＋ `NavHost` | |
+| 49-F | 下のタブの 3 つ目＋ `Routes` ＋ `NavHost` | ✅ 11-24（`MainTab.CHAT`・`navigateToTab` の枝と 49-F-3/4/6 の直しは Claude。ビルド通過） |
 | 49-G | 実機確認（2 アカウントで送り合う） | |
 
 - 49-D で踏んだところ：`input: String = null` → `String?` に変えて消そうとした（型を緩めると使う側の `trim()`・`InputBar` が止まる。0 文字の文字は `""`）、
   `val isMine = uiState.myUid`（比べずに uid そのものを入れた。発言ごとに変わる答えには `message.senderUid ==` が要る）
 - 49-E で踏んだところ：`calendarRepository.collect`（窓口の人に直接 `collect`。間の `.observeMyCalendars(uid)` で管をもらってから受け取る）、
   正しい行を穴の中に書き足して古い行を残した（入れ子になり `collect` が 3 つのエラーに化けた）。画面側の 3 か所は一発で正解
+- 49-F で踏んだところ：`"chatRoom/$calendarId"`（`CHAT_ROOM` の `chat_room/` と綴りが違い、押すと行き先が無い）、`navArgument("chatRoom")`（`{ }` の中の名前ではなく画面の名前）、
+  `navigate(Routes.chatRoom(id) }`（`)` が 1 つ足りない）。前 2 つはビルドが通る。**`" "` の中は上下に並べて 1 文字ずつ見比べる**
 
 - 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
   `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
