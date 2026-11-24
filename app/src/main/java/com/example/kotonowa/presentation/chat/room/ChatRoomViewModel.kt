@@ -37,7 +37,8 @@ class ChatRoomViewModel @Inject constructor(
     private val calendarId: String = checkNotNull(savedStateHandle["calendarId"])
 
     // 自分の uid は最初に 1 回入れておく（画面が「自分の発言か」を判定するため）
-    private val _uiState = MutableStateFlow(ChatRoomUiState(myUid = authRepository.currentUser?.uid))
+    private val _uiState =
+        MutableStateFlow(ChatRoomUiState(myUid = authRepository.currentUser?.uid))
     val uiState: StateFlow<ChatRoomUiState> = _uiState.asStateFlow()
 
     init {
@@ -63,12 +64,17 @@ class ChatRoomViewModel @Inject constructor(
                 chatRepository.observeMessages(calendarId).collect { messages ->
                     // TODO(49-D-3) 誰の：状態の箱を ／ 何をする：messages を流れてきた messages に、isLoading を false に書き換える
                     //   TaskListViewModel の collect の中の 1 行と同じ形（名前が rows → messages に変わるだけ）
-                    ____
+                    _uiState.update { it.copy(messages = messages, isLoading = false) }
                 }
             } catch (e: CancellationException) {
                 throw e   // 取り止めの合図は失敗ではない（grammar §2-(91)。Exception より上に置く）
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = "読み込めませんでした") }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "読み込めませんでした"
+                    )
+                }
             }
         }
     }
@@ -76,7 +82,7 @@ class ChatRoomViewModel @Inject constructor(
     /** 入力欄の文字が変わった */
     fun onInputChange(text: String) {
         // TODO(49-D-4) 誰の：状態の箱を ／ 何をする：input を引数の text に書き換える（TaskListViewModel の onFilterChange と同じ形）
-        ____
+        _uiState.update { it.copy(input = text) }
     }
 
     /** 送信ボタンが押された */
@@ -87,7 +93,7 @@ class ChatRoomViewModel @Inject constructor(
 
         // TODO(49-D-5) 門番 2 つ：本文が空（isEmpty()）か、送っている途中（state.isSending）なら、何もせず帰る（return）
         //   「または」は ||。ScheduleEditViewModel.save() の二度押し防止と同じ考え方
-        if (____) return
+        if (text.isEmpty() || state.isSending) return
 
         // 長すぎる発言は、ルールに断られる前にここで止める（Claude が書いた）
         if (text.length > MAX_MESSAGE_LENGTH) {
@@ -99,11 +105,18 @@ class ChatRoomViewModel @Inject constructor(
 
         viewModelScope.launch {
             // TODO(49-D-6) 誰の：チャットの窓口（chatRepository）の ／ 何をする：このカレンダー（calendarId）に、本文 text を送る
-            ____
+            chatRepository.sendMessage(calendarId, text)
                 // 送れたら入力欄を空にする（送ったのに文字が残っていると、もう一度送ってしまう）
                 .onSuccess { _uiState.update { it.copy(isSending = false, input = "") } }
                 // 送れなかったら、打った文字は残したまま一言だけ出す（打ち直さなくてよいように）
-                .onFailure { _uiState.update { it.copy(isSending = false, errorMessage = "送れませんでした") } }
+                .onFailure {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = "送れませんでした"
+                        )
+                    }
+                }
         }
     }
 }
