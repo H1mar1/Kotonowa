@@ -174,8 +174,15 @@ service cloud.firestore {
           // 時刻はサーバーの時刻（serverTimestamp）だけ。端末の時計で過去・未来の発言を作らせない
           && request.resource.data.createdAt == request.time;
 
-        // 書き換えは誰にもさせない。消す（delete）は ② で開ける
-        allow update, delete: if false;
+        // 書き換えは誰にもさせない（「削除されました」と残す形は採らなかった。Step 50）
+        allow update: if false;
+
+        // Step 50：消せるのは送った本人だけ。しかも今もこの部屋のメンバーであること
+        // （外されたあとに、もう読めない部屋の発言を消せないようにする）。
+        // resource は「今ある書類」。消す前の発言の senderUid が自分か見る（request.resource は消すときは無い）
+        allow delete: if request.auth != null
+          && resource.data.senderUid == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/calendars/$(calendarId)).data.memberUids;
       }
     }
 

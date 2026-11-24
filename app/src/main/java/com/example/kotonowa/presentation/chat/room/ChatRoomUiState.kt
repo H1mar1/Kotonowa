@@ -12,15 +12,21 @@ import com.example.kotonowa.domain.model.ChatMessage
  * @property isSending 送っている途中か（二度押し防止・送信ボタンを押せなくする）
  * @property isLoading 最初の読み込み中か（開いた瞬間に見張りが始まるので true 始まり。Step 18-B と同じ）
  * @property errorMessage 送れなかった・読めなかったときの一言
+ * @property deleteTarget 「消しますか？」と確認中の発言（Step 50）。null ならダイアログを出さない
+ * @property isDeleting 消している途中か（［消す］の二度押し防止）
  */
 data class ChatRoomUiState(
     val title: String = "",
     // TODO(49-D-1) 発言の並び。型は ChatMessage の並び、最初は空の並び（TaskListUiState の rows と同じ形）
-    val messages: List<ChatMessage> =emptyList(),
+    val messages: List<ChatMessage> = emptyList(),
     val myUid: String? = null,
     // TODO(49-D-2) 入力欄の文字。最初は何も打っていない（空の文字）
     val input: String = "",
     val isSending: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    // TODO(50-C-1) 確認中の発言。型は「発言 1 つ、または無し」、最初は無し
+    //   （詳細画面の item や、招待一覧の processingInviteId と同じ「? 付きの型 = null」の形）
+    val deleteTarget: ChatMessage? = null,
+    val isDeleting: Boolean = false,
 )

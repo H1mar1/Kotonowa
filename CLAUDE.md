@@ -932,6 +932,29 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   「＜」・端末の「戻る」で一覧へ、トーク画面には下のタブが出ない、タブを何度行き来しても「戻る」1 回でホーム。ログイン後の `PERMISSION_DENIED` は 0 件（ログアウトの瞬間の分は Step 28 の 💡 と同じ）。
   確認用の 2 発言は school のトークに残してある。**これで Step 49（① グループで送る・読む）は完了。**
 
+#### Step 50 の内訳（② 消す・新着の通知）
+
+**設計（2026-11-24 にユーザーが選択。要件定義書 §3.6）。** 跡を残さず消す／自分の吹き出しの長押し → 確認ダイアログ／通知をタップするとそのトーク画面。
+
+| | 内容 | 状態 |
+|---|---|---|
+| 50-A | `ChatRepository.deleteMessage(calendarId, messageId)` ＋ 実装 | ✅ 11-24 |
+| 50-B | ルール：`messages` の `delete`（送った本人・メンバー）（Claude）＋公開 | ✅ 11-24 公開済み |
+| 50-C | トーク画面の頭脳：消す対象の発言（確認ダイアログ）・`deleteMessage` | ✅ 11-24（`confirmDelete` の骨組みは Claude） |
+| 50-D | トーク画面：自分の吹き出しの長押し ＋ 確認ダイアログ | ✅ 11-24（長押しの飾り・ダイアログの形は Claude。grammar §3-(149)） |
+| 50-E | Functions：`notifyChatMessage`（送った本人以外へ・通知設定に従う・`data` に `calendarId`）（Claude）＋公開 | ✅ 11-24 公開済み |
+| 50-F | Android：通知の `calendarId` を `MainActivity` → `NavHost` へ渡し、トーク画面を開く | ✅ 11-24（`PendingIntent` の番号・`rememberSaveable`・ホームでの `LaunchedEffect` は Claude。grammar §8-(150)） |
+| 50-G | 実機確認 | |
+
+- 50-A で踏んだところ：`firestore.collection(SUBCOLLECTION_MESSAGES)`（いちばん上の階の棚を指した。発言は部屋の 1 段下。ビルドは通り、実行すると `PERMISSION_DENIED`）。道順は `messagesOf(calendarId)` にまとめてある
+- 50-C で踏んだところ：`if (message.senderUid != _uiState.value.myUid)` の後ろの `return` 忘れ（**ビルドが通る**。空行とコメントを挟んでも次の文が `if` の中身になり、
+  「他人の発言でだけダイアログが開く」逆の動きになる）。門番の `if (…) return` は 1 行で完結させる
+- **50-D の実機確認（2026-11-24。Claude が adb で操作）。** test で school を開き、`+tester` の発言を長押し → 何も出ない。自分の「Hello from test」を長押し → 確認の小窓 →［やめる］で閉じて残る →
+  もう一度長押し →［消す］で吹き出しが消えた。`PERMISSION_DENIED` 0 件。相手の画面から消えるかは 50-G で見る
+- 50-F で踏んだところ：`{ id -> navController.navigate(Routes.chatRoom(id)) }`（49-F-4 の呼び鈴の包み紙ごと写した。前の行の `navigateToTab(…)` に渡すラムダとして読まれ
+  `Expression is treated as a trailing lambda argument`）。**渡すときは `{ }` で包む・今すぐやるときは包まない**
+- 50-E：`sendToUser` に `extraData`（見出し・本文のほかに載せる名札）を足し、チャットの通知には `chatCalendarId` を載せる（Android の受け取り係と同じ綴りにする）
+
 - 49-B で踏んだところ：`doc.toScheduleItem()` を写したまま（別ファイルの `private` なのでビルドで止まった）、`?.emptyList()`（`?:` と `?.` の取り違え）、
   `getString("sendUid")` / `getString("textが入っていません")` / `getString("test")`（名札の綴り違い・エラー文を名札の場所に書いた。**ビルドが通り、読めない発言は `runCatching` で黙って捨てられ、全部消えて見える**）。
   名札は保存と同じ定数（`FIELD_〇〇`）で読む

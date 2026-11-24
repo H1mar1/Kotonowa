@@ -7,12 +7,13 @@
  * Step 43：招待が届いたら通知
  * Step 44：他のメンバーが予定・タスクを追加・編集したら通知
  * Step 46：招待を送る（アプリから呼び出す。users をアプリから読めなくするため、相手探しをサーバーへ移した）
+ * Step 50：チャットに新しい発言があったら通知（タップでそのトーク画面を開けるよう、カレンダーの id も載せる）
  */
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
-import { onDocumentWritten } from "firebase-functions/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/firestore";
 import { HttpsError, onCall } from "firebase-functions/https";
 import { setGlobalOptions } from "firebase-functions/options";
 
@@ -31,6 +32,12 @@ setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
 const KEY_PUSH_TITLE = "title";
 const KEY_PUSH_BODY = "body";
 
+/**
+ * Step 50：通知を押したときにどの画面を開くか、の名札。Android の KotonowaMessagingService と同じ文字列にする。
+ * KEY_PUSH_CHAT_CALENDAR_ID が入っている通知は「このカレンダーのトーク画面を開く」。入っていなければアプリを開くだけ（今までどおり）
+ */
+const KEY_PUSH_CHAT_CALENDAR_ID = "chatCalendarId";
+
 /** 肩書きの日本語。Firestore には小文字の英語で入っている（Step 30） */
 const ROLE_LABELS: Record<string, string> = {
   editor: "編集者",
@@ -43,12 +50,14 @@ const ROLE_LABELS: Record<string, string> = {
  *
  * @param calendarId どのカレンダーについての通知か（Step 45）。渡したときは、その人が通知を止めていれば送らない。
  *                   招待の通知は渡さない（止められない）
+ * @param extraData 見出し・本文のほかに載せる名札と値（Step 50。チャットの通知でトーク画面の id を載せる）。省略したら何も足さない
  */
 async function sendToUser(
   uid: string,
   title: string,
   body: string,
   calendarId?: string,
+  extraData: Record<string, string> = {},
 ): Promise<void> {
   const userRef = getFirestore().collection("users").doc(uid);
   const userSnap = await userRef.get();
@@ -76,6 +85,8 @@ async function sendToUser(
     data: {
       [KEY_PUSH_TITLE]: title,
       [KEY_PUSH_BODY]: body,
+      // ... は「中身を広げてここに並べる」（extraData が空なら何も足されない）
+      ...extraData,
     },
     // high にすると、端末が省電力で眠っていてもすぐ届く
     android: { priority: "high" },
@@ -203,6 +214,44 @@ export const notifyScheduleChange = onDocumentWritten("events/{eventId}", async 
     ),
   );
 });
+
+/**
+ * Step 50：グループのトークに発言が作られたら、送った本人以外のメンバーへ通知する。
+ *
+ * 見出し＝カレンダー名、本文＝「○○さん：本文」。通知設定でそのカレンダーを止めている人には送らない（sendToUser の calendarId）。
+ * 「作成」だけで動かす（onDocumentCreated）。発言は書き換えられず（ルールで禁止）、消したときに通知は要らないため。
+ */
+export const notifyChatMessage = onDocumentCreated(
+  "calendars/{calendarId}/messages/{messageId}",
+  async (event) => {
+    const calendarId = event.params.calendarId;
+    logger.info("発言の作成を受け取った", { calendarId, messageId: event.params.messageId });
+
+    const message = event.data;
+    if (!message) return;
+
+    const senderUid: string = message.get("senderUid");
+    const senderName: string = message.get("senderName") || "メンバー";
+    const text: string = message.get("text") ?? "";
+
+    // 部屋の書類から名前とメンバーを読む。部屋が無い（消された直後など）なら送らない
+    const calendarSnap = await getFirestore().collection("calendars").doc(calendarId).get();
+    if (!calendarSnap.exists) return;
+
+    const calendarName: string = calendarSnap.get("name");
+    const memberUids: string[] = calendarSnap.get("memberUids") ?? [];
+
+    // 送った本人を除いた全員へ、同時に送る。押したらこのカレンダーのトーク画面を開けるよう、id も載せる
+    const receivers = memberUids.filter((uid) => uid !== senderUid);
+    await Promise.all(
+      receivers.map((uid) =>
+        sendToUser(uid, calendarName, `${senderName}さん：${text}`, calendarId, {
+          [KEY_PUSH_CHAT_CALENDAR_ID]: calendarId,
+        }),
+      ),
+    );
+  },
+);
 
 /** sendInvite がアプリへ返す結果。Android の InviteSendResult と同じ 3 つ */
 type SendInviteResult = "sent" | "not_registered" | "already_member";

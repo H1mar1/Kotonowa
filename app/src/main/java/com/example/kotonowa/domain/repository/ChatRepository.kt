@@ -24,4 +24,11 @@ interface ChatRepository {
      */
     // TODO(49-A-3) 戻り値の型：成功／失敗だけを入れた封筒（setCalendarMuted の戻り値と同じ）
     suspend fun sendMessage(calendarId: String, text: String): Result<Unit>
+
+    /**
+     * そのカレンダーのトークから、発言 messageId を消す（Step 50。跡を残さず書類ごと）。
+     * 消せるのは送った本人だけ（ルールが確かめる）。消えた発言は見張りの方から自然に消える（Step 18 と同じ）。
+     */
+    // TODO(50-A-1) 戻り値の型：成功／失敗だけを入れた封筒（すぐ上の sendMessage と同じ）
+    suspend fun deleteMessage(calendarId: String, messageId: String): Result<Unit>
 }

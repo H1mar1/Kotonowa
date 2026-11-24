@@ -94,6 +94,23 @@ class ChatRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    /**
+     * 発言を 1 件消す（Step 50）。お手本は ScheduleRepositoryImpl の deleteItem。
+     * 違うのは棚だけ：あちらは events の棚、こちらはそのカレンダーの発言の棚（上の messagesOf）。
+     */
+    override suspend fun deleteMessage(calendarId: String, messageId: String): Result<Unit> = try {
+        // TODO(50-A-2) 誰の：このカレンダーの発言の棚（messagesOf(calendarId)）の ／ どれ：messageId の書類を ／
+        //   何をする：消して（delete）、終わるまで待つ（await）。deleteItem の 4 行と同じ形（1 行目だけ違う）
+        messagesOf(calendarId)
+            .document(messageId)
+            .delete()
+            .await()
+
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }
 
 // ---- 変換係（このファイルの中だけで使う。§4-㊱） --------------------------

@@ -28,6 +28,12 @@ import javax.inject.Inject
 const val KEY_PUSH_TITLE = "title"
 const val KEY_PUSH_BODY = "body"
 
+/** Step 50：チャットの通知だけに載っている「どのカレンダーのトークか」の名札（Functions の KEY_PUSH_CHAT_CALENDAR_ID と同じ綴り） */
+const val KEY_PUSH_CHAT_CALENDAR_ID = "chatCalendarId"
+
+/** Step 50：通知 → MainActivity へ渡す依頼書（Intent）に付ける、トーク画面のカレンダー id の名札（grammar §8-(150)） */
+const val EXTRA_CHAT_CALENDAR_ID = "com.example.kotonowa.CHAT_CALENDAR_ID"
+
 /**
  * プッシュ通知を受け取る係（Step 42。grammar §8-(136)）。
  *
@@ -41,8 +47,11 @@ const val KEY_PUSH_BODY = "body"
 @AndroidEntryPoint
 class KotonowaMessagingService : FirebaseMessagingService() {
 
-    @Inject lateinit var authRepository: AuthRepository
-    @Inject lateinit var pushTokenRepository: PushTokenRepository
+    @Inject
+    lateinit var authRepository: AuthRepository
+
+    @Inject
+    lateinit var pushTokenRepository: PushTokenRepository
 
     // この係専用の「裏で走らせる場所」。ViewModel ではないので viewModelScope が無く、自分で作る。
     // 係が片付けられるとき（onDestroy）に止める（grammar §8-(138)）
@@ -81,10 +90,18 @@ class KotonowaMessagingService : FirebaseMessagingService() {
         //   （見出しの無い通知は出さない。ReminderWorker の ★1 と同じ考え方）
         val title = message.data[KEY_PUSH_TITLE] ?: message.notification?.title ?: return
 
-        showNotification(title, body)
+        // Step 50：チャットの通知なら、どのカレンダーのトークか。予定・招待の通知には載っていないので null
+        // TODO(50-F-1) message.data から、名札 KEY_PUSH_CHAT_CALENDAR_ID の値を取り出す（すぐ上の body の行の最初の部分と同じ形。
+        //   無ければ null のままでよいので、?: は付けない）
+        val chatCalendarId = message.data[KEY_PUSH_CHAT_CALENDAR_ID]
+
+        showNotification(title, body, chatCalendarId)
     }
 
-    private fun showNotification(title: String, body: String) {
+    /**
+     * @param chatCalendarId チャットの通知なら、そのカレンダーの id（Step 50）。押されたらそのトーク画面を開く。null ならアプリを開くだけ
+     */
+    private fun showNotification(title: String, body: String, chatCalendarId: String?) {
         // Android 13 以降は許可が無いと出せない（grammar §8-(100)。ReminderWorker と同じ）
         val granted = ContextCompat.checkSelfPermission(
             this,
@@ -92,15 +109,25 @@ class KotonowaMessagingService : FirebaseMessagingService() {
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) return
 
+        // 通知 id は「今の時刻」から作る。届いた通知が前の通知を上書きせず、並んで出る（grammar §8-(105) の ⚠️）
+        val notificationId = System.currentTimeMillis().toInt()
+
         // 通知をタップしたらアプリを開く（grammar §8-(139)）
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // Step 50：チャットの通知なら、依頼書に「このカレンダーのトークを開いて」を書き添える（grammar §8-(150)）
+            if (chatCalendarId != null) {
+                // TODO(50-F-2) 依頼書に、名札 EXTRA_CHAT_CALENDAR_ID で chatCalendarId を書き添える（putExtra(名札, 値)。§8-(150)）
+                putExtra(EXTRA_CHAT_CALENDAR_ID, chatCalendarId)
+            }
         }
         val pendingIntent = PendingIntent.getActivity(
             this,
-            0,
+            // 通知ごとに違う番号にする（Step 50。Claude が書いた）。同じ 0 のままだと、2 つ目の通知の依頼書が
+            // 1 つ目と「同じもの」と見なされ、書き添えた id が古いまま（別のトークが開く）になる（grammar §8-(150)）
+            notificationId,
             intent,
-            PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
         val notification = NotificationCompat.Builder(
@@ -115,9 +142,8 @@ class KotonowaMessagingService : FirebaseMessagingService() {
             .setContentIntent(pendingIntent)
             .build()
 
-        // 通知 id は「今の時刻」から作る。届いた通知が前の通知を上書きせず、並んで出る（grammar §8-(105) の ⚠️）
         NotificationManagerCompat.from(this)
-            .notify(System.currentTimeMillis().toInt(), notification)
+            .notify(notificationId, notification)
     }
 
     override fun onDestroy() {
