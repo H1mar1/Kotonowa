@@ -24,7 +24,7 @@ private const val MAX_MESSAGE_LENGTH = 1000
 /**
  * トーク画面の頭脳（Step 49-D）。① ではグループ（共有カレンダーごと）のトークだけ。
  *
- * 住所 "chat_room/{calendarId}" の calendarId を SavedStateHandle から受け取る（MemberListViewModel と同じ）。
+ * 住所 "chat_room/{calendarId}"（グループ）か "dm_room/{chatId}"（DM。Step 51-F）の id を SavedStateHandle から受け取る。
  * 開いた瞬間に ① カレンダー名を 1 回読み ② 発言を見張り始める。
  * 送ったあとに一覧を読み直す処理は書かない（見張りが新しい発言を流してくる。Step 17-F と同じ）。
  */
@@ -36,18 +36,29 @@ class ChatRoomViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    // トーク画面は必ず calendarId 付きで開かれるので、無ければ navigate の書き間違い＝バグ（Step 18-B と同じ）
-    private val calendarId: String = checkNotNull(savedStateHandle["calendarId"])
+    // 自分の uid（「自分の発言か」の判定と、DM の相手を決めるのに使う）
+    private val myUid: String? = authRepository.currentUser?.uid
 
-    // 窓口に渡す「どのトークか」の札（Step 51-B）。今はグループだけなので、calendarId をグループの札で包む。
-    // calendarId は上のバーのカレンダー名を読む（loadTitle）ためにも残す。DM で開く形は 51-F で足す
-    // TODO(51-B-4) グループの札（ChatRoomId の Group）を、上の calendarId で作る
-    //   作り方は data class の作り方と同じ：型の名前(中身)。入れ子なので「親の名前.子の名前」で呼ぶ（ScheduleItem.Event と同じ）
-    private val roomId: ChatRoomId = ChatRoomId.Group(calendarId)
+    // 窓口に渡す「どのトークか」の札（Step 51-B / 51-F）。
+    // この画面は 2 つの住所から開かれる：グループ "chat_room/{calendarId}" ／ DM "dm_room/{chatId}"。
+    // どちらの穴に値が入っているかで、グループか DM かを見分ける（入っていない方は null）
+    private val roomId: ChatRoomId = run {
+        val calendarId: String? = savedStateHandle["calendarId"]
+        val chatId: String? = savedStateHandle["chatId"]
+        // TODO(51-F-6) 条件だけの when（grammar §5-(64)。ScheduleDetailContent と同じ形）で札を作る
+        //   calendarId が無しでない → グループの札（51-B-4 と同じ作り方）
+        //   chatId が無しでない     → DM の札（作り方は同じ。子の名前と中身だけ違う）
+        //   どちらも無い           → navigate の書き間違い＝バグなので落とす（else -> error("…")。Step 18-B の checkNotNull と同じ考え方）
+        when {
+            calendarId != null -> ChatRoomId.Group(calendarId)
+            chatId != null -> ChatRoomId.Direct(chatId)
+            else -> error("calendarId も chatId もありません")
+        }
+    }
 
     // 自分の uid は最初に 1 回入れておく（画面が「自分の発言か」を判定するため）
     private val _uiState =
-        MutableStateFlow(ChatRoomUiState(myUid = authRepository.currentUser?.uid))
+        MutableStateFlow(ChatRoomUiState(myUid = myUid))
     val uiState: StateFlow<ChatRoomUiState> = _uiState.asStateFlow()
 
     init {
@@ -55,14 +66,32 @@ class ChatRoomViewModel @Inject constructor(
         observeMessages()
     }
 
-    /** 上のバーに出すカレンダー名を 1 回読む（名前は開いている間は変わらないので見張らない。Step 25 と同じ考え方） */
+    /**
+     * 上のバーに出す名前を 1 回読む（名前は開いている間は変わらないので見張らない。Step 25 と同じ考え方）。
+     * グループならカレンダー名、DM なら相手の名前（Step 51-F）。名前が読めなくても話はできるので、失敗は画面に出さない
+     */
     private fun loadTitle() {
         viewModelScope.launch {
-            calendarRepository.getCalendar(calendarId)
-                .onSuccess { calendar ->
-                    _uiState.update { it.copy(title = calendar?.name ?: "") }
+            // 札の種類で読み先を変える（51-B の messagesOf と同じ when。枝の中では roomId をその種類として扱える）
+            when (roomId) {
+                is ChatRoomId.Group ->
+                    calendarRepository.getCalendar(roomId.calendarId)
+                        .onSuccess { calendar ->
+                            _uiState.update { it.copy(title = calendar?.name ?: "") }
+                        }
+
+                is ChatRoomId.Direct -> {
+                    val uid = myUid ?: return@launch
+                    // TODO(51-F-7) 誰の：チャットの窓口の ／ 何をする：この DM の部屋（roomId の chatId）を、自分の uid で 1 回読む
+                    //   すぐ上のグループの枝の getCalendar の行と同じ形
+                    chatRepository.getDirectChat(roomId.chatId, uid)
+                        // TODO(51-F-8) 読めたら、題名を相手の名前（chat の otherName）にする。部屋が無ければ ""
+                        //   すぐ上のグループの枝の onSuccess と同じ形（calendar → chat、name → otherName）
+                        .onSuccess { chat ->
+                            _uiState.update { it.copy(title = chat?.otherName ?: "") }
+                        }
                 }
-            // 名前が読めなくても話はできるので、失敗は画面に出さない
+            }
         }
     }
 

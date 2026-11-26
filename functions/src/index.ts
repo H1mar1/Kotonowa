@@ -8,12 +8,13 @@
  * Step 44：他のメンバーが予定・タスクを追加・編集したら通知
  * Step 46：招待を送る（アプリから呼び出す。users をアプリから読めなくするため、相手探しをサーバーへ移した）
  * Step 50：チャットに新しい発言があったら通知（タップでそのトーク画面を開けるよう、カレンダーの id も載せる）
+ * Step 51：DM の新着通知／グループ・DM の部屋に「最後の発言」を書く（トーク一覧の並び順と一言に使う）
  */
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { DocumentReference, FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
-import { onDocumentCreated, onDocumentWritten } from "firebase-functions/firestore";
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from "firebase-functions/firestore";
 import { HttpsError, onCall } from "firebase-functions/https";
 import { setGlobalOptions } from "firebase-functions/options";
 
@@ -37,6 +38,45 @@ const KEY_PUSH_BODY = "body";
  * KEY_PUSH_CHAT_CALENDAR_ID が入っている通知は「このカレンダーのトーク画面を開く」。入っていなければアプリを開くだけ（今までどおり）
  */
 const KEY_PUSH_CHAT_CALENDAR_ID = "chatCalendarId";
+
+/**
+ * Step 51：DM の通知に載せる「どの DM の部屋か」の名札。Android の受け取り係（51-I）と同じ文字列にする。
+ * グループの chatCalendarId と名札を分けておくと、Android 側は「どちらの名札が入っているか」で開く画面を選べる
+ */
+const KEY_PUSH_DM_CHAT_ID = "dmChatId";
+
+/**
+ * Step 51：部屋の書類（calendars/{id} か directChats/{id}）に「最後の発言」を書き直す。
+ *
+ * 書き足された発言をそのまま写すのではなく、毎回「いちばん新しい発言」を探し直して写す。こうすると
+ *   ・発言が消されたとき（Step 50）も、1 つ前の発言に戻せる（跡を残さない）
+ *   ・2 つの発言がほぼ同時に届いて関数の順番が入れ替わっても、最後は正しい発言になる
+ * 発言が 1 つも無くなったら、2 つの項目を消す（作ったばかりの DM の部屋と同じ状態に戻る）。
+ *
+ * この 2 項目はアプリからは書けない（ルール 51-D）。ここは管理者の権限なのでルールに縛られない。
+ */
+async function refreshLastMessage(roomRef: DocumentReference): Promise<void> {
+  // 部屋が無い（消された直後など）なら何もしない。update は書類が無いと失敗するため
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) return;
+
+  // 送った時刻の新しい順に並べて、先頭の 1 つだけ取る（desc ＝ 大きい順）
+  const latest = await roomRef.collection("messages").orderBy("createdAt", "desc").limit(1).get();
+
+  if (latest.empty) {
+    await roomRef.update({
+      lastMessageText: FieldValue.delete(),
+      lastMessageAt: FieldValue.delete(),
+    });
+    return;
+  }
+
+  const message = latest.docs[0];
+  await roomRef.update({
+    lastMessageText: message.get("text") ?? "",
+    lastMessageAt: message.get("createdAt"),
+  });
+}
 
 /** 肩書きの日本語。Firestore には小文字の英語で入っている（Step 30） */
 const ROLE_LABELS: Record<string, string> = {
@@ -241,6 +281,9 @@ export const notifyChatMessage = onDocumentCreated(
     const calendarName: string = calendarSnap.get("name");
     const memberUids: string[] = calendarSnap.get("memberUids") ?? [];
 
+    // Step 51：トーク一覧のために、部屋に「最後の発言」を書く
+    await refreshLastMessage(calendarSnap.ref);
+
     // 送った本人を除いた全員へ、同時に送る。押したらこのカレンダーのトーク画面を開けるよう、id も載せる
     const receivers = memberUids.filter((uid) => uid !== senderUid);
     await Promise.all(
@@ -250,6 +293,63 @@ export const notifyChatMessage = onDocumentCreated(
         }),
       ),
     );
+  },
+);
+
+/**
+ * Step 51：DM に発言が作られたら、部屋に「最後の発言」を書き、相手へ通知する。
+ *
+ * 見出し＝送った人の名前、本文＝本文そのもの（LINE の 1 対 1 と同じ形。DM なので「○○さん：」は付けない）。
+ * DM の通知は通知設定の対象外で、いつも届く（要件定義書 §3.6。sendToUser に calendarId を渡さない）。
+ */
+export const notifyDirectMessage = onDocumentCreated(
+  "directChats/{chatId}/messages/{messageId}",
+  async (event) => {
+    const chatId = event.params.chatId;
+    logger.info("DM の発言の作成を受け取った", { chatId, messageId: event.params.messageId });
+
+    const message = event.data;
+    if (!message) return;
+
+    const senderUid: string = message.get("senderUid");
+    const senderName: string = message.get("senderName") || "メンバー";
+    const text: string = message.get("text") ?? "";
+
+    const chatRef = getFirestore().collection("directChats").doc(chatId);
+    const chatSnap = await chatRef.get();
+    if (!chatSnap.exists) return;
+
+    await refreshLastMessage(chatRef);
+
+    // 相手 ＝ 部屋の 2 人のうち、送った本人ではない方
+    const memberUids: string[] = chatSnap.get("memberUids") ?? [];
+    const receivers = memberUids.filter((uid) => uid !== senderUid);
+    await Promise.all(
+      receivers.map((uid) =>
+        sendToUser(uid, senderName, text, undefined, { [KEY_PUSH_DM_CHAT_ID]: chatId }),
+      ),
+    );
+  },
+);
+
+/**
+ * Step 51：グループの発言が消されたら（Step 50）、部屋の「最後の発言」を 1 つ前に戻す。
+ * 消した発言がトーク一覧に残り続けないようにするため。通知は送らない。
+ */
+export const onGroupMessageDeleted = onDocumentDeleted(
+  "calendars/{calendarId}/messages/{messageId}",
+  async (event) => {
+    logger.info("発言の削除を受け取った", { calendarId: event.params.calendarId });
+    await refreshLastMessage(getFirestore().collection("calendars").doc(event.params.calendarId));
+  },
+);
+
+/** Step 51：DM の発言が消されたら、部屋の「最後の発言」を 1 つ前に戻す（上の DM 版） */
+export const onDirectMessageDeleted = onDocumentDeleted(
+  "directChats/{chatId}/messages/{messageId}",
+  async (event) => {
+    logger.info("DM の発言の削除を受け取った", { chatId: event.params.chatId });
+    await refreshLastMessage(getFirestore().collection("directChats").doc(event.params.chatId));
   },
 );
 

@@ -944,8 +944,8 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 51-B | 窓口の発言 3 つ（見張る・送る・消す）を `ChatRoomId` で受け取るように（約束・実装・トーク画面の頭脳） | ✅ 11-24（51-B-2/5 の直しは Claude。Claude が adb で school の読む・送る・消すを確認、`PERMISSION_DENIED` 0 件） |
 | 51-C | 窓口：`openDirectChat`（無ければ作る）・`observeMyDirectChats` ＋ 実装 | ✅ 11-24（51-C-7/8 の直しは Claude。ビルド通過・実機は 51-G 後） |
 | 51-D | ルール：`directChats` と その `messages`（Claude）＋公開 | ✅ 11-24 公開済み（グループの送る・消すが引き続き通ることを adb で確認） |
-| 51-E | Functions：DM の新着通知＋グループ・DM の `lastMessageText` / `lastMessageAt` を書く（Claude）＋公開 | |
-| 51-F | トーク画面を DM でも開く（`Routes` の `dm_room/{chatId}`・頭脳の題名） | |
+| 51-E | Functions：DM の新着通知＋グループ・DM の `lastMessageText` / `lastMessageAt` を書く（Claude）＋公開 | ✅ 11-25 公開済み（school で送る→部屋に写る→消す→1 つ前に戻る、をコンソールで確認。DM の通知は 51-J） |
+| 51-F | トーク画面を DM でも開く（`Routes` の `dm_room/{chatId}`・頭脳の題名） | ✅ 11-27（51-F-7 の直しは Claude。ビルド通過・school の題名と発言が今までどおり出ることを adb で確認。DM 側は 51-G 後） |
 | 51-G | メンバー画面の他の人の行に［メッセージ］ | |
 | 51-H | トーク一覧にグループと DM を混ぜて、新しい発言の順に並べる | |
 | 51-I | DM の通知を押したらその DM を開く | |
@@ -962,6 +962,11 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 - 51-D：部屋は `get`（id の `split('_')` に自分がいるか。まだ無い部屋も読める）と `list`（`memberUids` に自分）を分けた。`create` は id の形（2 つ・小さい順）、
   2 人とも `viaCalendarId` のメンバー、自分の名前は通行証・相手の名前は名簿の行と照合。発言の中身の条件は `isValidNewMessage()` にまとめてグループと共有。
   ⚠️ 名簿の行に名前もメールも無い相手とは DM を作れない（Step 46 より前の行）
+- 51-E：`refreshLastMessage(部屋)` は毎回「いちばん新しい発言」を探し直して部屋に写す（消したら 1 つ前に戻る・順番の入れ替わりに強い。0 件なら 2 項目を消す）。
+  `notifyChatMessage` に足し、`notifyDirectMessage`（見出し＝送った人・本文＝本文・通知設定の対象外・名札 `dmChatId`）、
+  `onGroupMessageDeleted` / `onDirectMessageDeleted`（`onDocumentDeleted`）を新設
+- 51-F で踏んだところ：`COLLECTION_DIRECT_CHATS.chatId`（棚の名前は**ただの文字**。棚を指せるのは窓口 `firestore` だけ）、`=` の後ろの全角スペースと行末の `,`、
+  `chatRepository.sendMessage(roomId.chatId)`（読む係ではなく送る係。答えが `Result<Unit>` なので `chat?.otherName` まで巻き添えで止まった）
 
 #### Step 50 の内訳（② 消す・新着の通知）
 

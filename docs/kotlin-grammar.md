@@ -3093,6 +3093,32 @@ val name = memberNames?.get(otherUid) as? String ?: "（名前未登録）"
 | `as? String` | 値を文字として扱ってみる。文字でなければ `null` |
 | `?: "（名前未登録）"` | どこかで `null` になったら、この文字 |
 
+### (152) `run { }` で箱の中身を作る ／ `error("…")` でわざと落とす（2026-11-25、Step 51-F で追記）
+
+```kotlin
+private val roomId: ChatRoomId = run {
+    val calendarId: String? = savedStateHandle["calendarId"]
+    val chatId: String? = savedStateHandle["chatId"]
+    when {
+        calendarId != null -> ChatRoomId.Group(calendarId)
+        chatId != null -> ChatRoomId.Direct(chatId)
+        else -> error("calendarId も chatId もありません")
+    }
+}
+```
+
+**`run { }`（ラン）** … `{ }` の中を上から実行し、**最後の行の答え**を外へ渡す。
+箱（`roomId`）の中身を 1 行で書けず、途中で使う下ごしらえの箱（`calendarId` / `chatId`）が要るときに使う。
+下ごしらえの箱は `{ }` の外からは見えないので、クラスの中に余計な箱が増えない。
+「値を返す `if` / `when`」（§5-(68)）と同じで、**最後の行が答え**になる。
+
+**`error("…")`（エラー）** … その場でアプリを止める（`IllegalStateException` を投げる）。
+`checkNotNull`（§4-(87)）と同じ考え方で、「ここに来たら書き間違い＝バグ」の場所に置く。
+黙って空の画面を出すより、すぐ止まる方が原因に気づける。
+
+💡 `when` の `else` の枝が `error(…)` だと、その枝は「答えを返さない（止まる）」ので、
+残りの枝の答え（`ChatRoomId`）だけで型が決まる。だから `roomId` は `?` の付かない `ChatRoomId` にできる。
+
 ## §5 判定（条件分岐）
 
 ### ㉑ `if (条件) { }` — 条件が成り立つときだけ実行
