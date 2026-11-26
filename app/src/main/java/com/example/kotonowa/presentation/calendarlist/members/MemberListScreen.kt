@@ -1,6 +1,7 @@
 package com.example.kotonowa.presentation.calendarlist.members
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.currentRecomposeScope
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +48,21 @@ import com.example.kotonowa.ui.theme.KotonowaTheme
 @Composable
 fun MemberListScreen(
     onNavigateBack: () -> Unit,
+    onOpenDm: (String) -> Unit, // Step 51-G：DM の部屋の id を添えて鳴らす呼び鈴。行き先は NavHost が決める
     modifier: Modifier = Modifier,
     viewModel: MemberListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Step 51-G：部屋が開けたら（合図の id が入ったら）DM のトーク画面へ移り、合図を下ろす
+    //   鍵は合図そのもの。null → id に変わった瞬間だけ中身が動く（grammar §3-⑬・§3-(148)）
+    LaunchedEffect(uiState.openedChatId) {
+        // TODO(51-G-7) 合図の id を手元の val に受ける。無ければ（null なら）何もせずに終える
+        //   お手本は KotonowaNavHost の val id = openChatCalendarId ?: return@LaunchedEffect（Step 50-F）
+        val chatId = uiState.openedChatId ?: return@LaunchedEffect
+        onOpenDm(chatId)
+        viewModel.onDmOpened()
+    }
 
     MemberListContent(
         uiState = uiState,
@@ -64,6 +78,9 @@ fun MemberListScreen(
         onInviteRoleChange = viewModel::onInviteRoleChange,
         // TODO(35-E-1) 誰の：頭脳の ／ 何をする：「招待状を出す」関数をそのまま手渡す（35-D-3）
         onInvite = viewModel::sendInvite,
+        // TODO(51-G-8) 誰の：頭脳の ／ 何をする：「DM を開く」関数をそのまま手渡す（型が (MemberItem) -> Unit で一致する。§1-(78) の①）
+        //   すぐ上の onInvite = viewModel::sendInvite と同じ形
+        onMessage = viewModel::openDirectChat,
         modifier = modifier,
     )
 }
@@ -84,6 +101,7 @@ private fun MemberListContent(
     onInviteEmailChange: (String) -> Unit,   // 打たれた文字を添えて鳴らす
     onInviteRoleChange: (MemberRole) -> Unit, // 選ばれた肩書きを添えて鳴らす
     onInvite: () -> Unit,                     // 「招待」が押されたら鳴らす（添えるもの無し）
+    onMessage: (MemberItem) -> Unit,          // ［メッセージ］が押されたら、その行の人を添えて鳴らす（51-G）
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -155,6 +173,14 @@ private fun MemberListContent(
                         onChangeRole = { role -> onChangeRole(member.uid, role) },
                         // TODO(34-D-4) 誰の：この画面の呼び鈴を ／ 何をする：「この行の人の uid」を添えて鳴らす
                         onRemove = { onRemove(member.uid) },
+                        // TODO(51-G-9) ［メッセージ］を出すか。この行が自分ではないとき（自分とは DM できない）
+                        //   「〜ではない」は !（Step 38-B の !uiState.canEdit と同じ）
+                        showMessage = !member.isMe,
+                        // この行の人の部屋を開いている途中か（押した行のボタンだけ止める）
+                        isOpeningDm = uiState.openingDmUid == member.uid,
+                        // TODO(51-G-10) 誰の：この画面の呼び鈴を ／ 何をする：この行の人（member）を添えて鳴らす
+                        //   すぐ上の onRemove = { onRemove(member.uid) } と同じ形（{ } で包む。§1-(78) の②）
+                        onMessage = { onMessage(member) },
                     )
                 }
             }
@@ -175,6 +201,9 @@ private fun MemberRow(
     showControls: Boolean,
     onChangeRole: (MemberRole) -> Unit,
     onRemove: () -> Unit,
+    showMessage: Boolean,
+    isOpeningDm: Boolean,
+    onMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -190,6 +219,18 @@ private fun MemberRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(member.name, style = MaterialTheme.typography.titleMedium)
                 Text(member.role.label(), style = MaterialTheme.typography.labelMedium)
+
+                // Step 51-G：［メッセージ］は名前の下に置く（右側はオーナーのボタン 2 つで埋まっているため）。
+                //   オーナーかどうかに関係なく、自分以外の行には出す（同じカレンダーの人なら誰とでも DM できる）
+                if (showMessage) {
+                    TextButton(
+                        onClick = onMessage,
+                        enabled = !isOpeningDm, // 開いている途中は押せない（二度押し防止）
+                        contentPadding = PaddingValues(0.dp), // 左端を名前と揃える（Step 24 B-5 と同じ）
+                    ) {
+                        Text(if (isOpeningDm) "開いています…" else "💬 メッセージ")
+                    }
+                }
             }
 
             if (showControls) {
@@ -312,9 +353,9 @@ private fun MemberRole.label(): String = when (this) {
 // ---- Preview 用のダミー（この画面の中だけで使う） ----
 
 private val PREVIEW_MEMBERS = listOf(
-    MemberItem(uid = "me", name = "ひまり", role = MemberRole.OWNER),
-    MemberItem(uid = "a", name = "田中", role = MemberRole.EDITOR),
-    MemberItem(uid = "b", name = "suzuki@example.com", role = MemberRole.VIEWER),
+    MemberItem(uid = "me", name = "ひまり", role = MemberRole.OWNER, isMe = true),
+    MemberItem(uid = "a", name = "田中", role = MemberRole.EDITOR, isMe = false),
+    MemberItem(uid = "b", name = "suzuki@example.com", role = MemberRole.VIEWER, isMe = false),
 )
 
 @Preview(showBackground = true, name = "オーナーが見た")
@@ -333,6 +374,7 @@ private fun MemberListOwnerPreview() {
             onInviteEmailChange = {},
             onInviteRoleChange = {},
             onInvite = {},
+            onMessage = {},
         )
     }
 }
@@ -353,6 +395,7 @@ private fun MemberListEditorPreview() {
             onInviteEmailChange = {},
             onInviteRoleChange = {},
             onInvite = {},
+            onMessage = {},
         )
     }
 }
@@ -375,6 +418,7 @@ private fun MemberListInvitedPreview() {
             onInviteEmailChange = {},
             onInviteRoleChange = {},
             onInvite = {},
+            onMessage = {},
         )
     }
 }

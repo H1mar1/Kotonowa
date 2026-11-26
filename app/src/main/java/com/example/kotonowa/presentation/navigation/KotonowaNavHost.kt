@@ -377,6 +377,9 @@ fun KotonowaNavHost(
         ) {
             MemberListScreen(
                 onNavigateBack = { navController.popBackStack() },
+                // TODO(51-G-11) 誰の：地図の係の ／ 何をする：受け取った id を差し込んだ DM の住所へ行く
+                //   お手本はチャット一覧の onRoomClick = { id -> navController.navigate(Routes.chatRoom(id)) }。住所の係を 51-F-2 の dmRoom に変える
+                onOpenDm = { id -> navController.navigate(Routes.dmRoom(id)) },
             )
         }
 

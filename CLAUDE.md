@@ -946,7 +946,7 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
 | 51-D | ルール：`directChats` と その `messages`（Claude）＋公開 | ✅ 11-24 公開済み（グループの送る・消すが引き続き通ることを adb で確認） |
 | 51-E | Functions：DM の新着通知＋グループ・DM の `lastMessageText` / `lastMessageAt` を書く（Claude）＋公開 | ✅ 11-25 公開済み（school で送る→部屋に写る→消す→1 つ前に戻る、をコンソールで確認。DM の通知は 51-J） |
 | 51-F | トーク画面を DM でも開く（`Routes` の `dm_room/{chatId}`・頭脳の題名） | ✅ 11-27（51-F-7 の直しは Claude。ビルド通過・school の題名と発言が今までどおり出ることを adb で確認。DM 側は 51-G 後） |
-| 51-G | メンバー画面の他の人の行に［メッセージ］ | |
+| 51-G | メンバー画面の他の人の行に［メッセージ］ | ✅ 11-27（51-G-5・7〜11 の直しは Claude。Claude が adb で test → `+tester` の DM を開き、題名に相手のメール・「戻る」でメンバー画面・2 回目は既存の部屋が開く、`PERMISSION_DENIED` 0 件） |
 | 51-H | トーク一覧にグループと DM を混ぜて、新しい発言の順に並べる | |
 | 51-I | DM の通知を押したらその DM を開く | |
 | 51-J | 実機確認 | |
@@ -967,6 +967,9 @@ Gemini・統計の質問やコードの貼り付けで止まる。どちらも `
   `onGroupMessageDeleted` / `onDirectMessageDeleted`（`onDocumentDeleted`）を新設
 - 51-F で踏んだところ：`COLLECTION_DIRECT_CHATS.chatId`（棚の名前は**ただの文字**。棚を指せるのは窓口 `firestore` だけ）、`=` の後ろの全角スペースと行末の `,`、
   `chatRepository.sendMessage(roomId.chatId)`（読む係ではなく送る係。答えが `Result<Unit>` なので `chat?.otherName` まで巻き添えで止まった）
+- 51-G：頭脳は部屋の id を合図（`openedChatId`）に置くだけ、画面が `LaunchedEffect` で気づいて `onOpenDm(id)` → `onDmOpened()` で下ろす（Step 17 の `isSaved` と同じ分担）。
+  踏んだところ：`openingDmUid = myUid`（自分の uid。**ビルドが通り**、押した行が「開いています…」にならない）、51-G-4 の旗の行に窓口の呼び出しを書いた、
+  `navigate(Routes.DM_ROOM)`（**型紙のまま**。ビルドが通り `{chatId}` という部屋へ行く。`navigate` には id を差し込む `dmRoom(id)`）、`!uiState.members`（全員の並びに `!`）、`onMessage(member.uid)`（行の人まるごとが要る）
 
 #### Step 50 の内訳（② 消す・新着の通知）
 

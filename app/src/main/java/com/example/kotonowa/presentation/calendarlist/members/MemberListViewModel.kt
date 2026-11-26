@@ -7,6 +7,7 @@ import com.example.kotonowa.domain.model.InviteSendResult
 import com.example.kotonowa.domain.model.MemberRole
 import com.example.kotonowa.domain.repository.AuthRepository
 import com.example.kotonowa.domain.repository.CalendarRepository
+import com.example.kotonowa.domain.repository.ChatRepository
 import com.example.kotonowa.domain.repository.InviteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.coroutines.cancellation.CancellationException
@@ -33,6 +34,8 @@ class MemberListViewModel @Inject constructor(
     private val calendarRepository: CalendarRepository, // 名簿の窓口（Step 30）
     // TODO(35-D-2-2) 招待状の窓口（35-B / 35-C）。上の 2 行と同じ形。名前は inviteRepository
     private val inviteRepository: InviteRepository,
+    // TODO(51-G-3) チャットの窓口（Step 49 / 51-C）。上の 2 行と同じ形。名前は chatRepository、型は ChatRepository
+    private val chatRepository: ChatRepository,
     savedStateHandle: SavedStateHandle,                 // NavHost が渡してくる「宛名付きメモ」
 ) : ViewModel() {
 
@@ -69,6 +72,9 @@ class MemberListViewModel @Inject constructor(
                                 //   member は null にならないので ?. は要らない（中の displayName / email が null になりうるだけ）
                                 name = member.displayName ?: member.email ?: "（名前未登録）",
                                 role = member.role,
+                                // TODO(51-G-1) この行が自分か。誰の：この行の人の uid が ／ 何か：自分の uid（myUid）と同じか
+                                //   すぐ下の isOwner の any { } の中の前半と同じ比べ方
+                                isMe = member.uid == myUid
                             )
                         }.sortedBy { item -> item.role } // オーナー → 編集者 → 閲覧者の順に並べる（§4-(125)）
 
@@ -202,6 +208,54 @@ class MemberListViewModel @Inject constructor(
                     finishInvite("招待を送れませんでした")
                 }
         }
+    }
+
+    // ---- 51-G：DM を開く -----------------------------------------------------
+
+    /**
+     * ［メッセージ］が押されたら呼ばれる。この人との DM の部屋を開き（無ければ作る。51-C）、開けたら合図を立てる。
+     * 画面遷移はしない。画面が合図（openedChatId）を見て DM のトーク画面へ移る（Step 17 の isSaved と同じ分担）。
+     * お手本はこのファイルの sendInvite（門番 → 旗を立てる → launch → onSuccess / onFailure）。
+     */
+    fun openDirectChat(member: MemberItem) {
+        // 門番①：自分の行（ボタンは出さないが、念のため）
+        if (member.isMe) return
+        // 門番②：どれかの部屋を開いている途中なら何もしない（二度押しで 2 回遷移するのを防ぐ）
+        if (_uiState.value.openingDmUid != null) return
+
+        // TODO(51-G-4) 誰の：状態の箱の ／ 何をする：openingDmUid をこの行の人の uid に、errorMessage を null に（前回のエラーを消す）
+        //   sendInvite の isInviting = true, inviteMessage = null と同じ形
+        _uiState.update { it.copy(openingDmUid = member.uid, errorMessage = null) }
+
+        viewModelScope.launch {
+            // TODO(51-G-5) 誰の：チャットの窓口の ／ 何をする：この人との DM の部屋を開く（51-C の openDirectChat）
+            //   渡す 3 つ：相手の uid（member.uid）・相手の名前（member.name）・どのカレンダーで知り合ったか（この画面の calendarId）
+            //   お手本はすぐ上の inviteRepository.sendInvite(calendarId, email, state.inviteRole) の行
+            chatRepository.openDirectChat(member.uid, member.name, calendarId)
+                .onSuccess { chatId ->
+                    // TODO(51-G-6) 誰の：状態の箱の ／ 何をする：openingDmUid を null に戻し、openedChatId に chatId を入れる
+                    _uiState.update {
+                        it.copy(
+                            openingDmUid = null,
+                            openedChatId = chatId
+                        )
+                    }
+                }
+                .onFailure {
+                    // ルールに断られたとき（相手の名簿の行に名前もメールも無い、など。51-D の ⚠️）もここに来る
+                    _uiState.update {
+                        it.copy(
+                            openingDmUid = null,
+                            errorMessage = "トークを開けませんでした"
+                        )
+                    }
+                }
+        }
+    }
+
+    /** 画面が DM のトーク画面へ移ったら呼ばれる。合図を下ろす（下ろさないと、戻ってきたときにまた DM へ飛ぶ）。 */
+    fun onDmOpened() {
+        _uiState.update { it.copy(openedChatId = null) }
     }
 
     /** 招待を途中で終えるときの後片付け。「送信中」の旗を下ろし、一言を出す。打った文字は残す（打ち直せるように）。 */
