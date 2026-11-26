@@ -13,6 +13,9 @@ data class MemberItem(
     val uid: String,       // その人の uid。ロール変更・外すときに「誰を」の指定に使う
     val name: String,      // 画面に出す名前（名刺の表示名 → メール → 「名前未登録」の順で決める）
     val role: MemberRole,  // その人の肩書き
+    // Step 51-G：この行が自分か。自分の行には［メッセージ］を出さない（自分とは DM できない）。
+    //   画面は uid を比べず、頭脳が決めた「はい／いいえ」を見るだけ（Step 38 の canEdit と同じ分担）
+    val isMe: Boolean,
 )
 
 /**
@@ -44,4 +47,14 @@ data class MemberListUiState(
     // 招待の結果を入力欄の下に出す一言（「招待を送りました」「見つかりません」など）。無ければ null。
     // errorMessage と分けるのは、成功の知らせも出すため（赤い文字のエラー欄に「送りました」は出したくない）
     val inviteMessage: String? = null,
+
+    // ---- 51-G：DM を開く ----------------------------------------------------
+
+    // TODO(51-G-2) ［メッセージ］を押して、部屋を開いている途中の相手の uid。最初は「無し」
+    //   押した 1 行のボタンだけ止めるため、Boolean ではなく「誰の」を持つ（Step 36-E の processingInviteId と同じ考え方）
+    val openingDmUid: String? = null,
+
+    // TODO(51-G-2) 開けた DM の部屋の id。最初は「無し」
+    //   入ったら画面が DM のトーク画面へ移り、すぐ null に戻す「1 回きりの合図」（Step 17-E-4 の isSaved と同じ役）
+    val openedChatId: String? = null,
 )
