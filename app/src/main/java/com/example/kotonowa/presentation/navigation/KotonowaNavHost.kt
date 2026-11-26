@@ -85,6 +85,14 @@ object Routes {
 
     // TODO(49-F-3) 誰の：この関数の ／ 何をする：受け取った id を住所の文字に差し込む（calendarMembers と同じ形。§6-㉖）
     fun chatRoom(calendarId: String) = "chat_room/$calendarId"
+
+    // Step 51-F: DM のトーク画面の住所。どの DM の部屋かを id で受け取る（CHAT_ROOM と同じ形）
+    //   { } の中の名前は、ChatRoomViewModel が savedStateHandle["chatId"] で受け取る名前と同じ綴りにする
+    // TODO(51-F-1) 名前は DM_ROOM、中身の文字は "dm_room/{chatId}"（すぐ上の CHAT_ROOM と同じ形）
+    const val DM_ROOM = "dm_room/{chatId}"
+
+    // TODO(51-F-2) 受け取った chatId を住所の文字に差し込む（すぐ上の chatRoom と同じ形。名前は dmRoom）
+    fun dmRoom(chatId: String) = "dm_room/$chatId"
 }
 
 /**
@@ -235,6 +243,19 @@ fun KotonowaNavHost(
             arguments = listOf(
                 // TODO(49-F-6) 穴の名前と、中身が文字であること（34-D-7 と同じ形。名前は CHAT_ROOM の { } の中と同じ綴り）
                 navArgument("calendarId") { type = NavType.StringType },
+            ),
+        ) {
+            ChatRoomScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        // Step 51-F: DM のトーク画面。画面も頭脳も CHAT_ROOM と同じもの（頭脳が住所の穴の名前で「グループか DM か」を見分ける）
+        composable(
+            route = Routes.DM_ROOM,
+            arguments = listOf(
+                // TODO(51-F-3) 穴の名前と、中身が文字であること（すぐ上の CHAT_ROOM の navArgument と同じ形。名前は DM_ROOM の { } の中と同じ綴り）
+                navArgument("chatId") { type = NavType.StringType },
             ),
         ) {
             ChatRoomScreen(

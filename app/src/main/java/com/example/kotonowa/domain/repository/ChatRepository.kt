@@ -56,4 +56,11 @@ interface ChatRepository {
      */
     // TODO(51-C-2) 戻り値の型：DM の部屋（DirectChat）の並びが流れてくる管（すぐ上の observeMessages と同じ形。中身の型だけ違う）
     fun observeMyDirectChats(myUid: String): Flow<List<DirectChat>>
+
+    /**
+     * DM の部屋 1 つを 1 回だけ読む（Step 51-F。トーク画面の上のバーに相手の名前を出すため）。
+     * 部屋が無ければ封筒の中身は null（CalendarRepository.getCalendar と同じ形）。
+     * 「相手」を決めるのに自分が誰かが要るので、myUid も受け取る（observeMyDirectChats と同じ）。
+     */
+    suspend fun getDirectChat(chatId: String, myUid: String): Result<DirectChat?>
 }

@@ -58,8 +58,11 @@ class ChatRepositoryImpl @Inject constructor(
             // TODO(51-B-2) 枝の中では roomId がその種類として扱える（スマートキャスト。§4-⑱）
             //   グループ：棚は COLLECTION_CALENDARS ／ 書類は roomId の calendarId（51-A-1 で付けた名前）
             //   DM      ：棚は上に足した COLLECTION_DIRECT_CHATS ／ 書類は roomId の chatId
-            is ChatRoomId.Group -> firestore.collection(COLLECTION_CALENDARS).document(roomId.calendarId)
-            is ChatRoomId.Direct -> firestore.collection(COLLECTION_DIRECT_CHATS).document(roomId.chatId)
+            is ChatRoomId.Group -> firestore.collection(COLLECTION_CALENDARS)
+                .document(roomId.calendarId)
+
+            is ChatRoomId.Direct -> firestore.collection(COLLECTION_DIRECT_CHATS)
+                .document(roomId.chatId)
         }
         return roomDoc.collection(SUBCOLLECTION_MESSAGES)
     }
@@ -192,6 +195,21 @@ class ChatRepositoryImpl @Inject constructor(
             }
 
         awaitClose { registration.remove() }
+    }
+
+    override suspend fun getDirectChat(chatId: String, myUid: String): Result<DirectChat?> = try {
+        // TODO(51-F-4) 誰の：DM の部屋の棚（COLLECTION_DIRECT_CHATS）の ／ どれ：chatId の書類を ／ 何をする：1 回読んで待つ
+        //   お手本は CalendarRepositoryImpl.getCalendar の snapshot の 4 行（棚の名前と id の名前だけ違う）
+        val snapshot = firestore.collection(COLLECTION_DIRECT_CHATS)
+            .document(chatId)
+            .get()
+            .await()
+
+        // TODO(51-F-5) 書類があれば DirectChat に組み立て、無ければ null（getCalendar の Result.success(…) の 1 行と同じ形）
+        //   組み立て係は toDirectChat。自分の uid（myUid）を渡す（51-C-6 と同じ）
+        Result.success(if(snapshot.exists()) snapshot.toDirectChat(myUid) else null)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 }
 
